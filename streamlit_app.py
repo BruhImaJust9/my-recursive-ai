@@ -69,11 +69,6 @@ with st.sidebar:
     tokens_slider = st.slider("Max Tokens (Response Length)", 100, 2000, 1000, 50)
     
     st.write("---")
-    # Sliders to dynamically adjust creativity & response length
-    temp_slider = st.slider("Brain Creativity (Temperature)", 0.1, 1.5, 0.7, 0.1)
-    tokens_slider = st.slider("Max Tokens (Response Length)", 100, 2000, 1000, 50)
-    
-    st.write("---")
     
     # ADD THESE TWO LINES RIGHT HERE:
     thinking_mode = st.toggle("🧠 Enable Deep Thinking Mode", value=st.session_state.deep_thinking)
