@@ -172,16 +172,26 @@ if user_input:
 
 # Display the chat history
 for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
+    # 1. Display what you asked
     with st.chat_message("user"):
         st.write(user_q)
+        
+    # 2. Display what the ASI answered
     with st.chat_message("assistant"):
-        st.info(f"🤖 **System Log (Evolved Instruction):**\n{sys_log}")
-        # Display the chat history
-for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
-    with st.chat_message("user"):
-        st.write(user_q)
-    with st.chat_message("assistant"):
-        st.info(f"🤖 **System Log (Evolved Instruction):**\n{sys_log}")
+        # Let's cleanly separate the diagnostic system log at the top
+        st.caption(f"⚙️ *System Log: {sys_log}*")
+        
+        # Parse and display deep thinking if enabled
+        if "<thinking>" in ai_a and "</thinking>" in ai_a:
+            parts = ai_a.split("</thinking>")
+            thinking_part = parts[0].replace("<thinking>", "").strip()
+            final_answer = parts[1].strip()
+            
+            with st.expander("🧠 View Inner Thought Process", expanded=False):
+                st.write(thinking_part)
+            st.write(final_answer)
+        else:
+            st.write(ai_a)
         
         # REPLACE st.write(ai_a) WITH THIS PARSER BLOCK:
         if "<thinking>" in ai_a and "</thinking>" in ai_a:
