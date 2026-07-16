@@ -115,33 +115,39 @@ def query_free_llm(prompt, system_prompt):
         return f"Error connecting to the cosmic brain: {str(e)}"
 
 # ==========================================
-# 4. STREAMLIT UI LAYOUT (Lines 104-127)
+# 4. STREAMLIT UI LAYOUT WITH FILE SHIELD
 # ==========================================
 st.title("🌀 Recursive Self-Improving ASI")
 st.write("Now powered by a live, independent open-source neural network!")
 
-user_input = st.chat_input("Ask the ASI an open-ended question:")
+# Updated to accept files directly in the chat bar!
+user_input = st.chat_input(
+    "Ask the ASI a question or upload a file:", 
+    accept_file="multiple"
+)
+
 if user_input:
-    # 1. Mutate the AI's internal thinking rules (Self-Improvement)
+    # 1. Extract the text message and list of files
+    prompt_text = user_input["text"]
+    uploaded_files = user_input["files"]
+    
+    # 2. If files were uploaded, read their details and add them to the prompt
+    if uploaded_files:
+        file_details = f"\n\n📎 [Attached Files]: " + ", ".join([f.name for f in uploaded_files])
+        prompt_text += file_details
+        
+    # 3. Mutate the AI's internal thinking rules (Self-Improvement)
     log, success = run_recursive_improvement()
     
-    # 2. Fetch the independent thought using the live API
-    response = query_free_llm(user_input, st.session_state.system_instruction)
+    # 4. Fetch the independent thought using the live API
+    response = query_free_llm(prompt_text, st.session_state.system_instruction)
     
-    # 3. Save to active chat history
-    st.session_state.chat_history.append((user_input, response, log))
+    # 5. Save to active chat history
+    st.session_state.chat_history.append((prompt_text, response, log))
     
-    # NEW: Automatically write to the local memory file so it persists!
+    # 6. Automatically write to the local memory file so it persists!
     with open(MEMORY_FILE, "w") as f:
         json.dump(st.session_state.chat_history, f)
-
-# Display the chat
-for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
-    with st.chat_message("user"):
-        st.write(user_q)
-    with st.chat_message("assistant"):
-        st.info(f"🤖 **System Log (Evolved Instruction):**\n{sys_log}")
-        st.write(ai_a)
 
 # ==========================================
 # 5. THE MEMORY VAULT (DOWNLOAD CHIP) (Lines 124-143)
