@@ -55,7 +55,7 @@ def query_free_llm(prompt, system_prompt):
     
     # We use Meta-Llama-3.1-8B-Instruct via the auto-provider router
     payload = {
-        "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+        "model": "model": "Qwen/Qwen2.5-7B-Instruct",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}
