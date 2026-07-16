@@ -1,7 +1,29 @@
 import streamlit as st
 import random
 import requests
-
+# ==========================================
+# 0. THE COMMAND CENTER SIDEBAR
+# ==========================================
+with st.sidebar:
+    st.title("⚙️ ASI Control Panel")
+    st.write("Fine-tune the neural network's parameters:")
+    
+    # Sliders to dynamically adjust creativity & response length
+    temp_slider = st.slider("Brain Creativity (Temperature)", 0.1, 1.5, 0.7, 0.1)
+    tokens_slider = st.slider("Max Tokens (Response Length)", 100, 2000, 1000, 50)
+    
+    st.write("---")
+    
+    # An on-demand manual mutation button
+    if st.button("🌀 Force Mental Evolution"):
+        log, success = run_recursive_improvement()
+        st.success("New cognitive state compiled!")
+        st.rerun()
+        
+    st.write("---")
+    st.markdown("### 🧠 Diagnostics")
+    st.markdown(f"**Token Level:** {tokens_slider}")
+    st.markdown(f"**Creativity Engine:** {temp_slider}")
 # Set up your Hugging Face Token securely from Streamlit secrets
 HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 
@@ -59,8 +81,8 @@ def query_free_llm(prompt, system_prompt):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}
         ],
-        "max_tokens": 1000,
-        "temperature": 0.7
+        "max_tokens": tokens_slider,
+        "temperature": temp_slider
     }
     
     try:
