@@ -3,6 +3,7 @@ import random
 import requests
 import json
 import os
+import base64
 
 # Set up your Hugging Face Token securely from Streamlit secrets
 HF_TOKEN = st.secrets.get("HF_TOKEN", "")
