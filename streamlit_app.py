@@ -40,22 +40,21 @@ def run_recursive_improvement():
     return f"Successfully evolved persona! Active system instruction:\n'{proposed_instruction}'", True
 
 # ==========================================
-# 3. CALLING THE NEW HF ROUTER (OpenAI Compatible)
+# 3. CALLING THE NEW HF ROUTER
 # ==========================================
 def query_free_llm(prompt, system_prompt):
     if not HF_TOKEN:
         return "⚠️ Please add your Hugging Face Token (HF_TOKEN) to your Streamlit secrets to enable independent thoughts!"
         
-    # The new 2026 Hugging Face Router endpoint
+    # The new Hugging Face Router endpoint
     API_URL = "https://router.huggingface.co/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {HF_TOKEN}",
         "Content-Type": "application/json"
     }
     
-    # We use Meta-Llama-3.1-8B-Instruct via the auto-provider router
     payload = {
-        "model": "model": "Qwen/Qwen2.5-7B-Instruct",
+        "model": "Qwen/Qwen2.5-7B-Instruct",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}
@@ -68,7 +67,7 @@ def query_free_llm(prompt, system_prompt):
         response = requests.post(API_URL, headers=headers, json=payload)
         output = response.json()
         
-        # Parse the standard OpenAI chat response structure
+        # Parse standard chat completions structure
         if "choices" in output and len(output["choices"]) > 0:
             reply = output["choices"][0]["message"]["content"].strip()
             return reply
