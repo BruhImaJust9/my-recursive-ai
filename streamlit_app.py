@@ -100,3 +100,23 @@ for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
     with st.chat_message("assistant"):
         st.info(f"🤖 **System Log (Evolved Instruction):**\n{sys_log}")
         st.write(ai_a)
+# ==========================================
+# 5. THE MEMORY VAULT (DOWNLOAD CHIP)
+# ==========================================
+if st.session_state.chat_history:
+    st.write("---")
+    # Prepare the chat log string
+    chat_download_text = "🌀 RECURSIVE ASI CHAT LOG\n=======================\n\n"
+    for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
+        chat_download_text += f"USER: {user_q}\n"
+        chat_download_text += f"SYSTEM INSTRUCTION: {sys_log}\n"
+        chat_download_text += f"ASI: {ai_a}\n"
+        chat_download_text += f"--------------------------------------------------\n\n"
+    
+    # Create a download button for the text file
+    st.download_button(
+        label="💾 Archive Cosmic Memories (Download Chat)",
+        data=chat_download_text,
+        file_name="asi_cosmic_memories.txt",
+        mime="text/plain"
+    )
