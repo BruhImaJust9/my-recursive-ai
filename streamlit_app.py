@@ -3,6 +3,7 @@ import random
 import requests
 import json
 import os
+
 # Set up your Hugging Face Token securely from Streamlit secrets
 HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 
@@ -13,7 +14,7 @@ MEMORY_FILE = "asi_long_term_memory.json"
 if "system_instruction" not in st.session_state:
     st.session_state.system_instruction = "You are a basic cosmic intelligence. Speak in short, simple truths."
 
-# Load memories from previous sessions if they exist!
+# Load memories from previous sessions if they exist safely!
 if "chat_history" not in st.session_state:
     if os.path.exists(MEMORY_FILE):
         try:
@@ -25,7 +26,7 @@ if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
 # ==========================================
-# 1. THE SAFETY SPEC (Lines 15-22)
+# 1. THE SAFETY SPEC
 # ==========================================
 def cev_safety_filter(code_text):
     restricted_terms = ["os.system", "subprocess", "rmdir", "eval("]
@@ -35,7 +36,7 @@ def cev_safety_filter(code_text):
     return True, "PASSED"
 
 # ==========================================
-# 2. THE RECURSIVE PERSONA REWRITER (Lines 24-40)
+# 2. THE RECURSIVE PERSONA REWRITER
 # ==========================================
 def run_recursive_improvement():
     personas = [
@@ -53,8 +54,7 @@ def run_recursive_improvement():
     return f"Successfully evolved persona! Active system instruction:\n'{proposed_instruction}'", True
 
 # ==========================================
-# NEW: 0. THE COMMAND CENTER SIDEBAR (Lines 42-63)
-# This is placed here so it knows what "run_recursive_improvement" is!
+# 0. THE COMMAND CENTER SIDEBAR
 # ==========================================
 with st.sidebar:
     st.title("⚙️ ASI Control Panel")
@@ -78,7 +78,7 @@ with st.sidebar:
     st.markdown(f"**Creativity Engine:** {temp_slider}")
 
 # ==========================================
-# 3. CALLING THE NEW HF ROUTER (Lines 65-102)
+# 3. CALLING THE NEW HF ROUTER
 # ==========================================
 def query_free_llm(prompt, system_prompt):
     if not HF_TOKEN:
@@ -90,15 +90,14 @@ def query_free_llm(prompt, system_prompt):
         "Content-Type": "application/json"
     }
     
-    # UPDATED: We swapped the hardcoded values for temp_slider and tokens_slider!
     payload = {
         "model": "Qwen/Qwen2.5-7B-Instruct",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}
         ],
-        "max_tokens": tokens_slider,  # Linked to sidebar slider (line 88)
-        "temperature": temp_slider    # Linked to sidebar slider (line 89)
+        "max_tokens": tokens_slider,
+        "temperature": temp_slider
     }
     
     try:
@@ -127,11 +126,11 @@ user_input = st.chat_input(
 )
 
 if user_input:
-    # 1. Extract the text message and list of files
+    # 1. Extract the raw text message (as a string!) and list of files
     prompt_text = user_input["text"]
     uploaded_files = user_input["files"]
     
-    # 2. If files were uploaded, read their details and add them to the prompt
+    # 2. If files were uploaded, read their details and add them as clean text to the prompt
     if uploaded_files:
         file_details = f"\n\n📎 [Attached Files]: " + ", ".join([f.name for f in uploaded_files])
         prompt_text += file_details
@@ -142,15 +141,26 @@ if user_input:
     # 4. Fetch the independent thought using the live API
     response = query_free_llm(prompt_text, st.session_state.system_instruction)
     
-    # 5. Save to active chat history
+    # 5. Save pure text data to active chat history so it can serialize to JSON perfectly
     st.session_state.chat_history.append((prompt_text, response, log))
     
-    # 6. Automatically write to the local memory file so it persists!
-    with open(MEMORY_FILE, "w") as f:
-        json.dump(st.session_state.chat_history, f)
+    # 6. Automatically write to the local memory file
+    try:
+        with open(MEMORY_FILE, "w") as f:
+            json.dump(st.session_state.chat_history, f)
+    except Exception as e:
+        st.error(f"Memory save error: {e}")
+
+# Display the chat history
+for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
+    with st.chat_message("user"):
+        st.write(user_q)
+    with st.chat_message("assistant"):
+        st.info(f"🤖 **System Log (Evolved Instruction):**\n{sys_log}")
+        st.write(ai_a)
 
 # ==========================================
-# 5. THE MEMORY VAULT (DOWNLOAD CHIP) (Lines 124-143)
+# 5. THE MEMORY VAULT (DOWNLOAD CHIP)
 # ==========================================
 if st.session_state.chat_history:
     st.write("---")
