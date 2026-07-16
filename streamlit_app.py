@@ -59,7 +59,7 @@ def query_free_llm(prompt, system_prompt):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}
         ],
-        "max_tokens": 150,
+        "max_tokens": 1000,
         "temperature": 0.7
     }
     
