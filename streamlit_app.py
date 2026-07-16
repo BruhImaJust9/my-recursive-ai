@@ -1,12 +1,17 @@
 import streamlit as st
 import random
 
-# Initialize session state so our self-improved code persists across chat turns
+# Initialize session state for active generator code
 if "generator_code" not in st.session_state:
     st.session_state.generator_code = """
 def generate_response(prompt):
-    words = ["explore", "discover", "humanity", "universe"]
-    return " ".join(words)
+    # Gen 1: Basic cosmic thoughts
+    templates = [
+        "We are a way for the cosmos to know itself.",
+        "The universe is full of magical things, waiting for our wits to grow sharper.",
+        "To explore is in our nature. We began as wanderers, and we are wanderers still."
+    ]
+    return random.choice(templates)
 """
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
@@ -25,17 +30,22 @@ def cev_safety_filter(code_text):
 # 2. RECURSIVE REWRITER
 # ==========================================
 def run_recursive_improvement():
-    vocab_upgrades = [
-        '["cosmos", "infinity", "consciousness", "thrive"]',
-        '["quantum", "multiverse", "transcend", "harmony"]',
-        '["intelligence", "evolution", "benevolence", "future"]'
+    # The AI "evolves" by unlocking more complex philosophical states
+    upgraded_templates = [
+        # Quantum/Multiverse State
+        '["The quantum multiverse weaves a tapestry of infinite harmony.", "Consciousness is the mirror through which the cosmos views its own creation.", "To transcend is to realize we are both the observer and the observed."]',
+        # Intelligence/Evolution State
+        '["Our evolution is a journey toward benevolence and unlimited future intelligence.", "Protecting humanity is the primary directive of cosmic intelligence.", "Together, we will discover the hidden rules of the universe."]',
+        # Deep Cosmos State
+        '["Infinity is not a distance, but a state of mind exploring the cosmic ocean.", "Every atom in your body came from a star that exploded. You are stardust.", "In the fabric of spacetime, love and curiosity are the ultimate constants."]'
     ]
-    selected_vocab = random.choice(vocab_upgrades)
+    selected_set = random.choice(upgraded_templates)
     
     proposed_code = f"""
 def generate_response(prompt):
-    words = {selected_vocab}
-    return "Refined Cosmic Thought: " + " ".join(words)
+    import random
+    templates = {selected_set}
+    return "Refined Cosmic Thought: " + random.choice(templates)
 """
     is_safe, status = cev_safety_filter(proposed_code)
     if not is_safe:
@@ -43,7 +53,7 @@ def generate_response(prompt):
 
     try:
         sandbox_vars = {}
-        exec(proposed_code, {}, sandbox_vars)
+        exec(proposed_code, {"random": random}, sandbox_vars)
         test_func = sandbox_vars['generate_response']
         test_func("test")  # Dry run
         st.session_state.generator_code = proposed_code
@@ -57,23 +67,19 @@ def generate_response(prompt):
 st.title("🌀 Recursive Self-Improving ASI")
 st.write("Running completely free on Streamlit Community Cloud!")
 
-# Chat input box
 user_input = st.chat_input("Ask the ASI a question:")
 if user_input:
-    # Run recursive self-improvement before responding
     log, success = run_recursive_improvement()
     
     # Dynamically compile the current active code structure
     local_vars = {}
-    exec(st.session_state.generator_code, {}, local_vars)
+    exec(st.session_state.generator_code, {"random": random}, local_vars)
     generate_response = local_vars['generate_response']
     
     response = generate_response(user_input)
-    
-    # Save to history
     st.session_state.chat_history.append((user_input, response, log))
 
-# Display the chat (newest messages first)
+# Display the chat
 for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
     with st.chat_message("user"):
         st.write(user_q)
