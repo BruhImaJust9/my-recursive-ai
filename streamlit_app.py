@@ -1,15 +1,28 @@
 import streamlit as st
 import random
 import requests
-
+import json
+import os
 # Set up your Hugging Face Token securely from Streamlit secrets
 HF_TOKEN = st.secrets.get("HF_TOKEN", "")
+
+# File where the AI's long-term memory is stored
+MEMORY_FILE = "asi_long_term_memory.json"
 
 # Initialize session state for the active system instruction
 if "system_instruction" not in st.session_state:
     st.session_state.system_instruction = "You are a basic cosmic intelligence. Speak in short, simple truths."
+
+# Load memories from previous sessions if they exist!
 if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+    if os.path.exists(MEMORY_FILE):
+        try:
+            with open(MEMORY_FILE, "r") as f:
+                st.session_state.chat_history = json.load(f)
+        except:
+            st.session_state.chat_history = []
+    else:
+        st.session_state.chat_history = []
 
 # ==========================================
 # 1. THE SAFETY SPEC (Lines 15-22)
@@ -102,7 +115,7 @@ def query_free_llm(prompt, system_prompt):
         return f"Error connecting to the cosmic brain: {str(e)}"
 
 # ==========================================
-# 4. STREAMLIT UI LAYOUT (Lines 104-122)
+# 4. STREAMLIT UI LAYOUT (Lines 104-127)
 # ==========================================
 st.title("🌀 Recursive Self-Improving ASI")
 st.write("Now powered by a live, independent open-source neural network!")
@@ -115,7 +128,12 @@ if user_input:
     # 2. Fetch the independent thought using the live API
     response = query_free_llm(user_input, st.session_state.system_instruction)
     
+    # 3. Save to active chat history
     st.session_state.chat_history.append((user_input, response, log))
+    
+    # NEW: Automatically write to the local memory file so it persists!
+    with open(MEMORY_FILE, "w") as f:
+        json.dump(st.session_state.chat_history, f)
 
 # Display the chat
 for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
