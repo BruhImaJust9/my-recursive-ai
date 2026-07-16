@@ -14,6 +14,10 @@ MEMORY_FILE = "asi_long_term_memory.json"
 if "system_instruction" not in st.session_state:
     st.session_state.system_instruction = "You are a basic cosmic intelligence. Speak in short, simple truths."
 
+# ADD THIS LINE RIGHT HERE:
+if "deep_thinking" not in st.session_state:
+    st.session_state.deep_thinking = False
+
 # Load memories from previous sessions if they exist safely!
 if "chat_history" not in st.session_state:
     if os.path.exists(MEMORY_FILE):
@@ -65,6 +69,19 @@ with st.sidebar:
     tokens_slider = st.slider("Max Tokens (Response Length)", 100, 2000, 1000, 50)
     
     st.write("---")
+    # Sliders to dynamically adjust creativity & response length
+    temp_slider = st.slider("Brain Creativity (Temperature)", 0.1, 1.5, 0.7, 0.1)
+    tokens_slider = st.slider("Max Tokens (Response Length)", 100, 2000, 1000, 50)
+    
+    st.write("---")
+    
+    # ADD THESE TWO LINES RIGHT HERE:
+    thinking_mode = st.toggle("🧠 Enable Deep Thinking Mode", value=st.session_state.deep_thinking)
+    st.session_state.deep_thinking = thinking_mode
+    
+    st.write("---") # Keeps things visually separated
+    
+    # An on-demand manual mutation button
     
     # An on-demand manual mutation button
     if st.button("🌀 Force Mental Evolution"):
@@ -83,7 +100,14 @@ with st.sidebar:
 def query_free_llm(prompt, system_prompt):
     if not HF_TOKEN:
         return "⚠️ Please add your Hugging Face Token (HF_TOKEN) to your Streamlit secrets to enable independent thoughts!"
-        
+       # ADD THIS SYSTEM PROMPT MODIFIER:
+    if st.session_state.deep_thinking:
+        system_prompt += (
+            "\n\nCRITICAL INSTRUCTION: You must think step-by-step before answering. "
+            "Start your response with <thinking> and write out your raw, unedited, "
+            "analytical thought process. Once your thinking is complete, close the tag with "
+            "</thinking> and then write your final, elegant response to the user."
+        ) 
     API_URL = "https://router.huggingface.co/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {HF_TOKEN}",
@@ -157,7 +181,24 @@ for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
         st.write(user_q)
     with st.chat_message("assistant"):
         st.info(f"🤖 **System Log (Evolved Instruction):**\n{sys_log}")
-        st.write(ai_a)
+        # Display the chat history
+for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
+    with st.chat_message("user"):
+        st.write(user_q)
+    with st.chat_message("assistant"):
+        st.info(f"🤖 **System Log (Evolved Instruction):**\n{sys_log}")
+        
+        # REPLACE st.write(ai_a) WITH THIS PARSER BLOCK:
+        if "<thinking>" in ai_a and "</thinking>" in ai_a:
+            parts = ai_a.split("</thinking>")
+            thinking_part = parts[0].replace("<thinking>", "").strip()
+            final_answer = parts[1].strip()
+            
+            with st.expander("🧠 View Inner Thought Process", expanded=False):
+                st.caption(thinking_part)
+            st.write(final_answer)
+        else:
+            st.write(ai_a)
 
 # ==========================================
 # 5. THE MEMORY VAULT (DOWNLOAD CHIP)
