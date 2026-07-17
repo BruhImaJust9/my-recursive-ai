@@ -248,46 +248,30 @@ st.title("🌀 Recursive Self-Improving ASI")
 st.write("Now powered by a live, independent open-source neural network!")
 
 # Updated to accept files directly in the chat bar!
-user_input = st.chat_input(
-    "Ask the ASI a question or upload a file:", 
-    accept_file="multiple"
-)
+# ==========================================
+# 4. STREAMLIT UI LAYOUT (DUPLICATION-FREE)
+# ==========================================
+st.title("🌀 Recursive Self-Improving ASI")
+st.write("Now powered by a live, independent open-source neural network!")
 
-if user_input:
-    # 1. Extract the raw text message (as a string!) and list of files
-    prompt_text = user_input["text"]
-    uploaded_files = user_input["files"]
-    
-    # 2. If files were uploaded, read their details and add them as clean text to the prompt
-    if uploaded_files:
-        file_details = f"\n\n📎 [Attached Files]: " + ", ".join([f.name for f in uploaded_files])
-        prompt_text += file_details
+# --- 1. RENDER PAST CONVERSATION FIRST ---
+for item in reversed(st.session_state.chat_history):
+    # Support older saves that didn't have image_b64
+    if len(item) == 4:
+        user_q, ai_a, sys_log, img_data = item
+    else:
+        user_q, ai_a, sys_log = item
+        img_data = None
         
-    # 3. Mutate the AI's internal thinking rules (Self-Improvement)
-    log, success = run_recursive_improvement()
-    
-    # 4. Fetch the independent thought using the live API
-    response = query_free_llm(prompt_text, st.session_state.system_instruction)
-    
-    # 5. Save pure text data to active chat history so it can serialize to JSON perfectly
-    st.session_state.chat_history.append((prompt_text, response, log))
-    
-    # 6. Automatically write to the local memory file
-    try:
-        with open(MEMORY_FILE, "w") as f:
-            json.dump(st.session_state.chat_history, f)
-    except Exception as e:
-        st.error(f"Memory save error: {e}")
-
-# Display the chat history
-for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
-    # 1. Display what you asked
+    # User message
     with st.chat_message("user"):
         st.write(user_q)
+        if img_data:
+            decoded_image = base64.b64decode(img_data)
+            st.image(decoded_image, width=300)
         
-    # 2. Assign a custom avatar based on the system log/persona
-    avatar_icon = "🤖"  # Default generic bot
-    
+    # Assistant response with dynamic avatars
+    avatar_icon = "🤖"
     if "quantum physicist" in sys_log.lower():
         avatar_icon = "⚛️"
     elif "cosmic consciousness" in sys_log.lower():
@@ -297,11 +281,9 @@ for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
     elif "basic cosmic intelligence" in sys_log.lower():
         avatar_icon = "🪐"
 
-    # Display what the ASI answered with its custom avatar!
     with st.chat_message("assistant", avatar=avatar_icon):
         st.caption(f"⚙️ *System Log: {sys_log}*")
         
-        # Parse and display deep thinking if enabled
         if "<thinking>" in ai_a and "</thinking>" in ai_a:
             parts = ai_a.split("</thinking>")
             thinking_part = parts[0].replace("<thinking>", "").strip()
@@ -312,34 +294,42 @@ for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
             st.write(final_answer)
         else:
             st.write(ai_a)
-        
-        # REPLACE st.write(ai_a) WITH THIS PARSER BLOCK:
-        if "<thinking>" in ai_a and "</thinking>" in ai_a:
-            parts = ai_a.split("</thinking>")
-            thinking_part = parts[0].replace("<thinking>", "").strip()
-            final_answer = parts[1].strip()
-            
-            with st.expander("🧠 View Inner Thought Process", expanded=False):
-                st.caption(thinking_part)
-            st.write(final_answer)
-        else:
-            st.write(ai_a)
 
-# ==========================================
-# 5. THE MEMORY VAULT (DOWNLOAD CHIP)
-# ==========================================
-if st.session_state.chat_history:
-    st.write("---")
-    chat_download_text = "🌀 RECURSIVE ASI CHAT LOG\n=======================\n\n"
-    for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
-        chat_download_text += f"USER: {user_q}\n"
-        chat_download_text += f"SYSTEM INSTRUCTION: {sys_log}\n"
-        chat_download_text += f"ASI: {ai_a}\n"
-        chat_download_text += f"--------------------------------------------------\n\n"
+
+# --- 2. CAPTURE NEW INPUT & TRIGGER RERUN ---
+user_input = st.chat_input("Ask the ASI a question or upload a file:", accept_file="multiple")
+
+if user_input:
+    prompt_text = user_input["text"]
+    uploaded_files = user_input["files"]
+    image_b64 = None
     
-    st.download_button(
-        label="💾 Archive Cosmic Memories (Download Chat)",
-        data=chat_download_text,
-        file_name="asi_cosmic_memories.txt",
-        mime="text/plain"
-    )
+    if uploaded_files:
+        file_details = f"\n\n📎 [Attached Files]: " + ", ".join([f.name for f in uploaded_files])
+        prompt_text += file_details
+        
+        for f in uploaded_files:
+            if f.type.startswith("image/"):
+                bytes_data = f.read()
+                image_b64 = base64.b64encode(bytes_data).decode("utf-8")
+                break
+        
+    # Mutate the system rules
+    log, success = run_recursive_improvement()
+    
+    # Get the AI reply (no rendering here, just calculation!)
+    with st.spinner("🌀 Processing neural nodes..."):
+        response = query_free_llm(prompt_text, st.session_state.system_instruction, image_b64)
+    
+    # Append to session state
+    st.session_state.chat_history.append((prompt_text, response, log, image_b64))
+    
+    # Save directly to active session file
+    try:
+        with open(MEMORY_FILE, "w") as f:
+            json.dump(st.session_state.chat_history, f)
+    except Exception as e:
+        st.error(f"Memory save error: {e}")
+        
+    # Immediately rerun so the "RENDER PAST CONVERSATION" loop draws it cleanly!
+    st.rerun()
