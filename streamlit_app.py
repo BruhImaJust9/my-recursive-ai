@@ -361,18 +361,36 @@ def query_free_llm(prompt, system_prompt):
 # ==========================================
 # 4. STREAMLIT UI LAYOUT WITH FILE SHIELD
 # ==========================================
-st.title("🌀 Recursive Self-Improving ASI")
+# NEW: ACTIVE PERSONA BADGE (WITH SHOW/HIDE TOGGLE)
 # ==========================================
-# NEW: ACTIVE PERSONA BADGE
-# ==========================================
-# Calculate the current generation based on our history logic
+# 1. Initialize visibility state if it doesn't exist yet
+if "show_status_badge" not in st.session_state:
+    st.session_state.show_status_badge = True
+
+# 2. Calculate the current generation based on our history logic
 current_gen = 1
 for user_q, ai_a, sys_log in st.session_state.chat_history:
     if "cognitive optimization successful" in sys_log.lower() or "active system instruction:" in sys_log.lower():
         current_gen += 1
 
-# Display a prominent, styled card showing the AI's current state
-st.info(f"🧬 **ASI STATUS: ACTIVE (Generation {current_gen})**\n\n**Current Directive:** *\"{st.session_state.system_instruction}\"*")
+# 3. Render the card based on the show/hide state
+if st.session_state.show_status_badge:
+    # Split the space: 85% for the text badge, 15% for the close button
+    badge_col, btn_col = st.columns([0.85, 0.15])
+    
+    with badge_col:
+        st.info(f"🧬 **ASI STATUS: ACTIVE (Generation {current_gen})**\n\n**Current Directive:** *\"{st.session_state.system_instruction}\"*")
+        
+    with btn_col:
+        # The 'X' button to hide the giant text card
+        if st.button("❌ Close", use_container_width=True, key="hide_badge_btn"):
+            st.session_state.show_status_badge = False
+            st.rerun()
+else:
+    # When closed, show a clean, compact button to restore it
+    if st.button(f"🔓 Show ASI Status Card (Gen {current_gen})", use_container_width=False, key="show_badge_btn"):
+        st.session_state.show_status_badge = True
+        st.rerun()
 st.write("Now powered by a live, independent open-source neural network!")
 
 # Updated to accept files directly in the chat bar!
