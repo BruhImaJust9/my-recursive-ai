@@ -270,6 +270,31 @@ with st.sidebar:
             if idx < len(evolutionary_steps) - 1:
                 st.markdown("<p style='text-align: center; margin: 0;'>🧬 👇 <i>Mutation Event</i> 👇 🧬</p>", unsafe_allow_html=True)
     else:
+    # ==========================================
+    # NEW: EVOLUTIONARY TIME MACHINE (ROLLBACK)
+    # ==========================================
+    if len(evolutionary_steps) > 1:
+        st.write("---")
+        st.markdown("### ⏮️ Evolutionary Rollback")
+        st.caption("Override the AI's current brain state with a past generation:")
+        
+        # Create a dropdown to select which generation to restore
+        rollback_options = [f"Gen {i+1}" for i in range(len(evolutionary_steps))]
+        selected_rollback = st.selectbox(
+            "Select past generation:", 
+            options=rollback_options,
+            key="rollback_selector"
+        )
+        
+        if st.button("⏪ Restore Selected Brain State", use_container_width=True):
+            # Find the index of the selected generation
+            gen_index = rollback_options.index(selected_rollback)
+            restored_instruction = evolutionary_steps[gen_index]
+            
+            # Set the live brain state back to this historical state
+            st.session_state.system_instruction = restored_instruction
+            st.success(f"Brain state successfully rolled back to {selected_rollback}!")
+            st.rerun()
         st.caption("No mutations recorded yet. Send a few messages to start evolving!")
 
 # ==========================================
