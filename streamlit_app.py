@@ -34,7 +34,28 @@ HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 CHATS_DIR = "saved_chats"
 if not os.path.exists(CHATS_DIR):
     os.makedirs(CHATS_DIR)
+# --- NEW: PERMANENT TRACKING FOR UNIVERSAL GENERATION ---
+GEN_TRACKER_FILE = os.path.join(CHATS_DIR, "universal_generation_counter.json")
 
+def load_universal_generation():
+    if os.path.exists(GEN_TRACKER_FILE):
+        try:
+            with open(GEN_TRACKER_FILE, "r") as f:
+                data = json.load(f)
+                return data.get("current_gen", 1)
+        except:
+            return 1
+    return 1
+
+def save_universal_generation(gen_num):
+    try:
+        with open(GEN_TRACKER_FILE, "w") as f:
+            json.dump({"current_gen": gen_num}, f)
+    except:
+        pass
+
+if "current_gen" not in st.session_state:
+    st.session_state.current_gen = load_universal_generation()
 # --- SKILL VAULT DIRECTORY SETUP ---
 SKILLS_DIR = "mutated_skills"
 if not os.path.exists(SKILLS_DIR):
@@ -137,6 +158,12 @@ def run_recursive_improvement():
                 return f"Self-improvement aborted. Safety status: {status}", False
                 
             st.session_state.system_instruction = evolved_instruction
+            
+            # 🧬 NEW: Increment and permanently save the universal generation counter
+            st.session_state.current_gen += 1
+            save_universal_generation(st.session_state.current_gen)
+            
+            return "Cognitive optimization successful: Rules upgraded based on contextual performance analysis.", True
             return "Cognitive optimization successful: Rules upgraded based on contextual performance analysis.", True
         else:
             return "Evolution skipped: Evolved instruction was too short or corrupted.", False
@@ -443,10 +470,8 @@ def query_moa_engine(prompt, system_prompt, aggregator_model_id):
 st.title("🌀 Recursive Self-Improving ASI")
 
 # COLLAPSIBLE ACTIVE PERSONA BADGE
-current_gen = 1
-for user_q, ai_a, sys_log in st.session_state.chat_history:
-    if "cognitive optimization successful" in sys_log.lower() or "active system instruction:" in sys_log.lower():
-        current_gen += 1
+# 🧬 FIXED: Pull directly from global state history
+current_gen = st.session_state.current_gen
 
 if st.session_state.show_status_badge:
     badge_col, btn_col = st.columns([0.85, 0.15])
