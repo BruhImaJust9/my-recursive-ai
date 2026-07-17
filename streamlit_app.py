@@ -500,10 +500,28 @@ if user_input:
         log, success = run_recursive_improvement()
         
     # ROUTE TO SINGLE ENGINE OR COLLABORATIVE MoA PIPELINE
-    if st.session_state.moa_active:
-        response = query_moa_engine(prompt_text, st.session_state.system_instruction, selected_model_id)
-    else:
-        response = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
+   # ROUTE TO PIPELINE WITH SELF-REFLECTION CRITIQUE
+    with st.spinner("🧠 Generating initial draft..."):
+        if st.session_state.moa_active:
+            initial_draft = query_moa_engine(prompt_text, st.session_state.system_instruction, selected_model_id)
+        else:
+            initial_draft = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
+            
+    with st.spinner("🔍 Running autonomous self-correction loop..."):
+        reflection_prompt = f"""
+        You are the internal self-critic and logic-validation module of an ASI.
+        Review the initial draft response provided below against the user's original request. Look for any logical gaps, mathematical contradictions, or factual inaccuracies. If you find errors, rewrite the response to be completely flawless. If the draft is already perfect, return it exactly as it is.
+        
+        [USER REQUEST]:
+        {prompt_text}
+        
+        [INITIAL DRAFT RESPONSE]:
+        {initial_draft}
+        
+        OUTPUT INSTRUCTION: Provide only the final, corrected response. Do not include phrases like 'Here is the corrected version'.
+        """
+        # We use Llama 3.3 70B to critique the answer because it is highly intelligent
+        response = query_free_llm(reflection_prompt, "You are a strict logical validator. Output only the perfect final response.", "llama-3.3-70b-versatile")
     
     st.session_state.chat_history.append((prompt_text, response, log))
     
