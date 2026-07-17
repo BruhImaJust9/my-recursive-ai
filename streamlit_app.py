@@ -14,6 +14,15 @@ HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 CHATS_DIR = "saved_chats"
 if not os.path.exists(CHATS_DIR):
     os.makedirs(CHATS_DIR)
+    # Directory where all your different chats will live
+CHATS_DIR = "saved_chats"
+if not os.path.exists(CHATS_DIR):
+    os.makedirs(CHATS_DIR)
+
+# --- NEW: SKILL VAULT DIRECTORY SETUP ---
+SKILLS_DIR = "mutated_skills"
+if not os.path.exists(SKILLS_DIR):
+    os.makedirs(SKILLS_DIR)
 
 def get_saved_chats():
     files = glob.glob(os.path.join(CHATS_DIR, "*.json"))
@@ -231,7 +240,16 @@ with st.sidebar:
     st.markdown("### 🧠 Diagnostics")
     st.markdown(f"**Token Level:** {tokens_slider}")
     st.markdown(f"**Creativity Engine:** {temp_slider}")
-
+    st.write("---")
+    st.markdown("### 🛠️ Hardware Skill Vault")
+    st.caption("Native Python utilities engineered by the ASI:")
+    
+    skills_list = glob.glob(os.path.join(SKILLS_DIR, "*.py"))
+    if skills_list:
+        for s in skills_list:
+            st.success(f"⚙️ {os.path.basename(s)}")
+    else:
+        st.info("Vault empty. Awaiting autonomous generation sequences.")
     # ==========================================
     # DNA MUTATION HISTORY
     # ==========================================
@@ -290,10 +308,49 @@ with st.sidebar:
 # ==========================================
 # 4. CALLING THE NEW HF ROUTER
 # ==========================================
-def query_free_llm(prompt, system_prompt, model_id): # <-- Added model_id here
+import sys
+import importlib.util
+
+def get_compiled_skills():
+    """Scans the Skill Vault and lists what the AI has built."""
+    skills = glob.glob(os.path.join(SKILLS_DIR, "*.py"))
+    skill_descriptions = []
+    for s in skills:
+        name = os.path.basename(s).replace(".py", "")
+        skill_descriptions.append(f"- Native Skill '{name}': Coded and compiled successfully.")
+    return "\n".join(skill_descriptions) if skill_descriptions else "No custom tools compiled yet."
+
+def mutate_new_code_skill(skill_name, code_content, test_input, expected_output_type):
+    """Safely compiles, tests, and integrates AI-written Python functions."""
+    is_safe, status = cev_safety_filter(code_content)
+    if not is_safe:
+        return f"Mutation rejected: {status}"
+        
+    file_path = os.path.join(SKILLS_DIR, f"{skill_name}.py")
+    try:
+        with open(file_path, "w") as f:
+            f.write(code_content)
+            
+        spec = importlib.util.spec_from_file_location(skill_name, file_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        
+        # Test it!
+        result = module.execute(test_input)
+        if isinstance(result, expected_output_type):
+            return f"✅ Success! New skill '{skill_name}' integrated."
+        else:
+            os.remove(file_path)
+            return "❌ Mutation failed: Output type mismatch."
+    except Exception as e:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        return f"❌ Mutation crashed: {str(e)}"
+def query_free_llm(prompt, system_prompt, model_id):
     if not HF_TOKEN:
         return "⚠️ Please add your Hugging Face Token (HF_TOKEN) to your Streamlit secrets to enable independent thoughts!"
     
+    # [ON TOP]: Deep Thinking modifier (existing code)
     if st.session_state.deep_thinking:
         system_prompt += (
             "\n\nCRITICAL INSTRUCTION: You must think step-by-step before answering. "
@@ -302,6 +359,14 @@ def query_free_llm(prompt, system_prompt, model_id): # <-- Added model_id here
             "</thinking> and then write your final, elegant response to the user."
         ) 
         
+    # =====================================================================
+    # 👉 [IN BETWEEN]: PLACE STEP 3 RIGHT HERE!
+    # =====================================================================
+    compiled_tools = get_compiled_skills()
+    system_prompt += f"\n\n[UNLOCKED SKILL VAULT EXTRACTION]:\n{compiled_tools}"
+    # =====================================================================
+        
+    # [ON THE BOTTOM]: API setup and network request (existing code)
     API_URL = "https://router.huggingface.co/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {HF_TOKEN}",
@@ -309,13 +374,16 @@ def query_free_llm(prompt, system_prompt, model_id): # <-- Added model_id here
     }
     
     payload = {
-        "model": model_id, # <-- Dynamically use the selected model!
+        "model": model_id,
         "messages": [
-            {"role": "system", "content": system_prompt},
+            {"role": "system", "content": system_prompt}, # <-- It grabs the modified prompt here!
             {"role": "user", "content": prompt}
         ],
         "max_tokens": tokens_slider,
         "temperature": temp_slider
+    }
+    
+    # ... rest of your try/except block ...
     }
     
     try:
