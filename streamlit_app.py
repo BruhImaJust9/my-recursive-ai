@@ -231,6 +231,47 @@ with st.sidebar:
     st.markdown(f"**Token Level:** {tokens_slider}")
     st.markdown(f"**Creativity Engine:** {temp_slider}")
 
+    # ==========================================
+    # NEW: DNA MUTATION HISTORY
+    # ==========================================
+    st.write("---")
+    st.markdown("### 🧬 Persona Evolutionary Tree")
+    
+    # 1. Gather unique historical mutations from chat log logs
+    evolutionary_steps = []
+    
+    # We always start our evolutionary history with the base cosmic instruction
+    base_instruction = "You are a basic cosmic intelligence. Speak in short, simple truths."
+    evolutionary_steps.append(base_instruction)
+    
+    for user_q, ai_a, sys_log in st.session_state.chat_history:
+        # Check if the system log recorded a dynamic upgrade or successful persona shift
+        if "cognitive optimization successful" in sys_log.lower() or "successfully evolved persona" in sys_log.lower():
+            # If we find a fresh instruction in the log, let's capture it
+            if sys_log not in evolutionary_steps:
+                evolutionary_steps.append(sys_log)
+        elif "active system instruction:" in sys_log.lower():
+            parts = sys_log.split("'")
+            if len(parts) > 1:
+                instruction = parts[1]
+                if instruction not in evolutionary_steps:
+                    evolutionary_steps.append(instruction)
+                
+    # 2. Render the steps inside the sidebar as a cool vertical timeline
+    if len(st.session_state.chat_history) > 0:
+        st.write("How your AI's brain has mutated over time:")
+        for idx, step in enumerate(evolutionary_steps):
+            st.markdown(f"**Gen {idx + 1}:**")
+            # If the instruction is too long, slice it nicely so it looks neat in the sidebar
+            display_step = step[:120] + "..." if len(step) > 120 else step
+            st.info(display_step)
+            
+            # Draw a mutation pointer between generations
+            if idx < len(evolutionary_steps) - 1:
+                st.markdown("<p style='text-align: center; margin: 0;'>🧬 👇 <i>Mutation Event</i> 👇 🧬</p>", unsafe_html=True)
+    else:
+        st.caption("No mutations recorded yet. Send a few messages to start evolving!")
+
 # ==========================================
 # 3. CALLING THE NEW HF ROUTER
 # ==========================================
