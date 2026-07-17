@@ -393,8 +393,8 @@ import sys
 import importlib.util
 
 def get_compiled_skills():
-# --- NEW: AUTONOMOUS SKILL EXECUTOR CORE ---
-def execute_compiled_skill(skill_name, argument_string):
+    # --- NEW: AUTONOMOUS SKILL EXECUTOR CORE ---
+    def execute_compiled_skill(skill_name, argument_string):
     """Dynamically loads a skill from mutated_skills/ and executes its code."""
     file_path = os.path.join(SKILLS_DIR, f"{skill_name}.py")
     if not os.path.exists(file_path):
