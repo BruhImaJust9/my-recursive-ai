@@ -7,7 +7,20 @@ import base64
 
 # Set up your Hugging Face Token securely from Streamlit secrets
 HF_TOKEN = st.secrets.get("HF_TOKEN", "")
+# File where the AI's long-term memory is stored
+MEMORY_FILE = "asi_long_term_memory.json"
 
+# ADD THIS RESET FUNCTION RIGHT HERE:
+def reset_conversations():
+    st.session_state.chat_history = []
+    if os.path.exists(MEMORY_FILE):
+        try:
+            os.remove(MEMORY_FILE)
+        except Exception as e:
+            st.error(f"Error resetting memory file: {e}")
+
+# Initialize session state for the active system instruction (keep this...)
+if "system_instruction" not in st.session_state:
 # File where the AI's long-term memory is stored
 MEMORY_FILE = "asi_long_term_memory.json"
 
@@ -86,6 +99,9 @@ with st.sidebar:
         st.rerun()
         
     st.write("---")
+    if st.button("🗑️ Clear Chat History", type="primary", use_container_width=True):
+        reset_conversations()
+        st.rerun()
     st.markdown("### 🧠 Diagnostics")
     st.markdown(f"**Token Level:** {tokens_slider}")
     st.markdown(f"**Creativity Engine:** {temp_slider}")
