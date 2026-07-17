@@ -274,9 +274,9 @@ with st.sidebar:
         # NEW: EVOLUTIONARY TIME MACHINE (ROLLBACK)
         # ==========================================
         if len(evolutionary_steps) > 1:
-        st.write("---")
-        st.markdown("### ⏮️ Evolutionary Rollback")
-        st.caption("Override the AI's current brain state with a past generation:")
+            st.write("---")
+            st.markdown("### ⏮️ Evolutionary Rollback")
+            st.caption("Override the AI's current brain state with a past generation:")
         
         # Create a dropdown to select which generation to restore
         rollback_options = [f"Gen {i+1}" for i in range(len(evolutionary_steps))]
