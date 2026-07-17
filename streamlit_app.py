@@ -531,6 +531,10 @@ if user_input:
         if st.session_state.pause_evolution:
             log = "Evolution Paused by user manual lock."
             success = False
+            # 🗃️ Scan input for new permanent facts about the user before responding
+        extract_and_update_profile(prompt_text)
+        
+        with st.spinner("🧠 Generating initial draft..."):
         else:
             log, success = run_recursive_improvement()
             
