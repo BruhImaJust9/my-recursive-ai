@@ -114,7 +114,7 @@ def run_recursive_improvement():
 # ==========================================
 with st.sidebar:
     with st.sidebar:
-    # --- NEW: LIVE METRIC DASHBOARD ---
+        # --- NEW: LIVE METRIC DASHBOARD ---
     st.markdown("### 📊 ASI Core Status")
     
     # Calculate how many messages are in the history
