@@ -452,7 +452,14 @@ def query_moa_engine(prompt, system_prompt, aggregator_model_id):
     final_response = query_free_llm(moa_aggregation_prompt, system_prompt, aggregator_model_id)
     status_placeholder.empty()
     return final_response
-
+    
+    def generate_image(prompt_text):
+    import requests
+    import io
+    from PIL import Image
+    API_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell"
+    headers = {"Authorization": f"Bearer {st.secrets['HF_TOKEN']}"}
+    # ... rest of the image code ...
 # ==========================================
 # 5. STREAMLIT UI LAYOUT & RENDERING LOOP
 # ==========================================
@@ -524,7 +531,16 @@ if user_input:
         response = query_free_llm(reflection_prompt, "You are a strict logical validator. Output only the perfect final response.", "llama-3.3-70b-versatile")
     
     st.session_state.chat_history.append((prompt_text, response, log))
-    
+    # ⬇️ PASTE THE IMAGE CHECK RIGHT HERE (ABOVE THE TEXT RESPONSE ROUTING) ⬇️
+    if prompt_text.startswith("/imagine "):
+        image_prompt = prompt_text.replace("/imagine ", "")
+        with st.spinner(f"🎨 ASI is visualizing: '{image_prompt}'..."):
+            generated_img = generate_image(image_prompt)
+            if generated_img:
+                st.image(generated_img, caption=image_prompt)
+                st.session_state.chat_history.append({"role": "assistant", "type": "image", "content": generated_img})
+            else:
+                st.error("Glitched while trying to visualize. Check your HF_TOKEN!")
     try:
         with open(MEMORY_FILE, "w") as f:
             json.dump(st.session_state.chat_history, f)
