@@ -607,7 +607,7 @@ if user_input:
         except Exception as e:
             st.error(f"Memory save error: {e}")
         st.rerun()
-            else:
+        else:
                 st.error("Glitched while trying to visualize. Check your HF_TOKEN!")
 
     # 📝 STANDARD TEXT INTELLIGENCE ROUTE
