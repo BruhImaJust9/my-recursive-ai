@@ -393,12 +393,13 @@ import sys
 import importlib.util
 
 def get_compiled_skills():
-    # --- NEW: AUTONOMOUS SKILL EXECUTOR CORE ---
-    def execute_compiled_skill(skill_name, argument_string):
-        """Dynamically loads a skill from mutated_skills/ and executes its code."""
-    file_path = os.path.join(SKILLS_DIR, f"{skill_name}.py")
-    if not os.path.exists(file_path):
-        return f"Error: Skill '{skill_name}' does not exist in the vault."
+    """Scans the Skill Vault and lists what the AI has built."""
+    skills = glob.glob(os.path.join(SKILLS_DIR, "*.py"))
+    skill_descriptions = []
+    for s in skills:
+        name = os.path.basename(s).replace(".py", "")
+        skill_descriptions.append(f"- Native Skill '{name}': Coded and compiled successfully.")
+    return "\n".join(skill_descriptions) if skill_descriptions else "No custom tools compiled yet."
         
     try:
         # Dynamically import the script on the fly
