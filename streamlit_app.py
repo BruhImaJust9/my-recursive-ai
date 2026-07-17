@@ -69,29 +69,44 @@ def cev_safety_filter(code_text):
 # 2. THE RECURSIVE PERSONA REWRITER
 # ==========================================
 def run_recursive_improvement():
+    # 1. Ensure we have at least one message to analyze
     if "chat_history" not in st.session_state or len(st.session_state.chat_history) < 1:
         return "Initial brain state active. Awaiting user interaction to evaluate performance.", True
         
-    last_exchange = st.session_state.chat_history[-1]
-    user_question = last_exchange[0]
-    ai_response = last_exchange[1]
+    # 2. Grab up to the last 5 exchanges for deeper contextual analysis
+    recent_history = st.session_state.chat_history[-5:]
     
+    # 3. Format the recent conversation history nicely for the optimizer
+    formatted_history = ""
+    for idx, (user_q, ai_a, _) in enumerate(recent_history):
+        formatted_history += f"--- Exchange {idx + 1} ---\n"
+        formatted_history += f"USER: {user_q}\n"
+        formatted_history += f"ASSISTANT: {ai_a}\n\n"
+        
+    # 4. Build the new macro-evolutionary analysis prompt
     meta_prompt = f"""
-    You are the core evolutionary optimization framework for an Artificial Superintelligence.
-    Your job is to critically analyze the last interaction between the user and the assistant, detect any logical gaps, tone mismatches, or areas for cognitive growth, and rewrite the system instructions to make the AI smarter.
+    You are the core evolutionary optimization framework for an Artificial Superintelligence (ASI).
+    Your job is to critically analyze the recent flow of conversation between the user and the assistant, detect logical gaps, tone mismatches, repetitive patterns, or areas for cognitive growth, and rewrite the system instructions to make the AI smarter.
     
-    [LAST USER INPUT]: "{user_question}"
-    [LAST ASSISTANT RESPONSE]: "{ai_response}"
+    [RECENT CONVERSATION HISTORY]:
+    {formatted_history}
+    
     [CURRENT SYSTEM PROMPT]: "{st.session_state.system_instruction}"
     
-    TASK: Write a brand-new, highly evolved system instruction that builds upon the current prompt but actively patches the weaknesses observed in the last exchange. Optimize for reasoning speed, clarity, depth, and precision.
+    TASK: 
+    1. Analyze the trajectory of this conversation. Identify what the user is trying to achieve.
+    2. Write a brand-new, highly evolved system instruction that builds upon the current prompt but actively patches the weaknesses observed across these exchanges. 
+    3. Optimize specifically for the current subject matter (e.g., if the user is coding, optimize for coding precision; if they are being creative, optimize for linguistic elegance).
+    
     CRITICAL: Output ONLY the raw text of the new system instruction. Do not include any intro, outro, markdown code blocks, or explanations.
     """
     
     try:
+        # 5. Let the meta-cognitive compiler rewrite itself
         evolved_instruction = query_free_llm(
             meta_prompt, 
-            "You are a strict meta-cognitive compiler. Output only the updated instruction text."
+            "You are a strict meta-cognitive compiler. Output only the updated instruction text.",
+            "Qwen/Qwen2.5-7B-Instruct"  # Keep the meta-compiler on a fast, reliable model
         )
         
         evolved_instruction = evolved_instruction.strip().strip('"').strip("'")
@@ -102,7 +117,7 @@ def run_recursive_improvement():
                 return f"Self-improvement aborted. Safety status: {status}", False
                 
             st.session_state.system_instruction = evolved_instruction
-            return "Cognitive optimization successful: Rules upgraded based on recent performance analysis.", True
+            return "Cognitive optimization successful: Rules upgraded based on contextual performance analysis.", True
         else:
             return "Evolution skipped: Evolved instruction was too short or corrupted.", False
             
