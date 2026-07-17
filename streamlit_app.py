@@ -133,7 +133,6 @@ with st.sidebar:
     # ----------------------------------
     
     st.markdown("## 📂 Chat Session Manager") # Your existing chat manager code continues here...
-    st.markdown("## 📂 Chat Session Manager")
     
     saved_chats = get_saved_chats()
     if st.session_state.current_chat_id not in saved_chats:
