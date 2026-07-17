@@ -7,17 +7,27 @@ import base64
 
 # Set up your Hugging Face Token securely from Streamlit secrets
 HF_TOKEN = st.secrets.get("HF_TOKEN", "")
-# File where the AI's long-term memory is stored
-MEMORY_FILE = "asi_long_term_memory.json"
+import glob
+from datetime import datetime
 
-# The reset function to clear out the chat history file
-def reset_conversations():
-    st.session_state.chat_history = []
-    if os.path.exists(MEMORY_FILE):
-        try:
-            os.remove(MEMORY_FILE)
-        except Exception as e:
-            st.error(f"Error resetting memory file: {e}")
+# Directory where all your different chats will live
+CHATS_DIR = "saved_chats"
+if not os.path.exists(CHATS_DIR):
+    os.makedirs(CHATS_DIR)
+
+# Get a list of all saved chats
+def get_saved_chats():
+    files = glob.glob(os.path.join(CHATS_DIR, "*.json"))
+    # Return just the filenames without the folder path and extension
+    return [os.path.basename(f).replace(".json", "") for f in files]
+
+# Initialize the active session in Streamlit's memory
+if "current_chat_id" not in st.session_state:
+    # Default to a new timestamped chat name
+    st.session_state.current_chat_id = f"Chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+# Set the active memory file dynamically based on the selected chat
+MEMORY_FILE = os.path.join(CHATS_DIR, f"{st.session_state.current_chat_id}.json")
 
 # Initialize session state for the active system instruction
 if "system_instruction" not in st.session_state:
@@ -103,6 +113,35 @@ def run_recursive_improvement():
 # 0. THE COMMAND CENTER SIDEBAR
 # ==========================================
 with st.sidebar:
+    st.markdown("## 📂 Chat Session Manager")
+    
+    saved_chats = get_saved_chats()
+    if st.session_state.current_chat_id not in saved_chats:
+        saved_chats.append(st.session_state.current_chat_id)
+        
+    selected_chat = st.selectbox(
+        "Switch to a saved chat:",
+        options=sorted(saved_chats, reverse=True),
+        index=sorted(saved_chats, reverse=True).index(st.session_state.current_chat_id)
+    )
+    
+    if selected_chat != st.session_state.current_chat_id:
+        st.session_state.current_chat_id = selected_chat
+        if os.path.exists(os.path.join(CHATS_DIR, f"{selected_chat}.json")):
+            with open(os.path.join(CHATS_DIR, f"{selected_chat}.json"), "r") as f:
+                st.session_state.chat_history = json.load(f)
+        else:
+            st.session_state.chat_history = []
+        st.rerun()
+
+    if st.button("➕ Start New Chat", use_container_width=True):
+        new_id = f"Chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        st.session_state.current_chat_id = new_id
+        st.session_state.chat_history = []
+        st.success("New chat session created!")
+        st.rerun()
+        
+    st.write("---")
     st.title("⚙️ ASI Control Panel")
     st.write("Fine-tune the neural network's parameters:")
     
@@ -127,8 +166,14 @@ with st.sidebar:
         st.rerun()
         
     st.write("---")
-    if st.button("🗑️ Clear Chat History", type="primary", use_container_width=True):
-        reset_conversations()
+    if st.button("🗑️ Delete Current Chat", type="primary", use_container_width=True):
+        current_file = os.path.join(CHATS_DIR, f"{st.session_state.current_chat_id}.json")
+        if os.path.exists(current_file):
+            os.remove(current_file)
+        
+        st.session_state.chat_history = []
+        st.session_state.current_chat_id = f"Chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        st.success("Chat deleted!")
         st.rerun()
     st.markdown("### 🧠 Diagnostics")
     st.markdown(f"**Token Level:** {tokens_slider}")
