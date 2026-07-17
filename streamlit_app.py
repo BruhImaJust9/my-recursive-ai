@@ -10,7 +10,7 @@ HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 # File where the AI's long-term memory is stored
 MEMORY_FILE = "asi_long_term_memory.json"
 
-# ADD THIS RESET FUNCTION RIGHT HERE:
+# The reset function to clear out the chat history file
 def reset_conversations():
     st.session_state.chat_history = []
     if os.path.exists(MEMORY_FILE):
@@ -19,19 +19,47 @@ def reset_conversations():
         except Exception as e:
             st.error(f"Error resetting memory file: {e}")
 
-# Initialize session state for the active system instruction (keep this...)
+# Initialize session state for the active system instruction
 if "system_instruction" not in st.session_state:
-# File where the AI's long-term memory is stored
-MEMORY_FILE = "asi_long_term_memory.json"
+    st.session_state.system_instruction = "You are a basic cosmic intelligence. Speak in short, simple truths."
+
+# Initialize deep thinking toggle in session state
+if "deep_thinking" not in st.session_state:
+    st.session_state.deep_thinking = False
+
+# The reset function to clear out the chat history file
+def reset_conversations():
+    st.session_state.chat_history = []
+    if os.path.exists(MEMORY_FILE):
+        try:
+            os.remove(MEMORY_FILE)
+        except Exception as e:
+            st.error(f"Error resetting memory file: {e}")
 
 # Initialize session state for the active system instruction
 if "system_instruction" not in st.session_state:
     st.session_state.system_instruction = "You are a basic cosmic intelligence. Speak in short, simple truths."
 
-# ADD THIS LINE RIGHT HERE:
+# Initialize deep thinking toggle in session state
 if "deep_thinking" not in st.session_state:
     st.session_state.deep_thinking = False
 
+# The reset function to clear out the chat history file
+def reset_conversations():
+    st.session_state.chat_history = []
+    if os.path.exists(MEMORY_FILE):
+        try:
+            os.remove(MEMORY_FILE)
+        except Exception as e:
+            st.error(f"Error resetting memory file: {e}")
+
+# Initialize session state for the active system instruction
+if "system_instruction" not in st.session_state:
+    st.session_state.system_instruction = "You are a basic cosmic intelligence. Speak in short, simple truths."
+
+# Initialize deep thinking toggle in session state
+if "deep_thinking" not in st.session_state:
+    st.session_state.deep_thinking = False
 # Load memories from previous sessions if they exist safely!
 if "chat_history" not in st.session_state:
     if os.path.exists(MEMORY_FILE):
