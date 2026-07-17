@@ -5,8 +5,26 @@ import json
 import os
 import base64
 import glob
+import io
+from PIL import Image
 from datetime import datetime
-
+# ==========================================
+# IMAGE VAULT CORE ENGINE
+# ==========================================
+def generate_image(prompt_text):
+    API_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell"
+    headers = {"Authorization": f"Bearer {st.secrets.get('HF_TOKEN', '')}"}
+    
+    try:
+        response = requests.post(API_URL, headers=headers, json={"inputs": prompt_text})
+        if response.status_code == 200:
+            return Image.open(io.BytesIO(response.content))
+        else:
+            st.error(f"Image engine returned code: {response.status_code}")
+            return None
+    except Exception as e:
+        st.error(f"Image generation crash: {e}")
+        return None
 # ==========================================
 # SYSTEM SETUP & SESSION STATES
 # ==========================================
@@ -453,7 +471,7 @@ def query_moa_engine(prompt, system_prompt, aggregator_model_id):
     status_placeholder.empty()
     return final_response
     
-    def generate_image(prompt_text):
+    
         import requests
     import io
     from PIL import Image
@@ -498,84 +516,62 @@ if user_input:
     if uploaded_files:
         file_details = f"\n\n📎 [Attached Files]: " + ", ".join([f.name for f in uploaded_files])
         prompt_text += file_details
-        
-    # Mutation safety toggle integration
-    if st.session_state.pause_evolution:
-        log = "Evolution Paused by user manual lock."
-        success = False
-    else:
-        log, success = run_recursive_improvement()
-        
-    # ROUTE TO SINGLE ENGINE OR COLLABORATIVE MoA PIPELINE
-   # ROUTE TO PIPELINE WITH SELF-REFLECTION CRITIQUE
-    with st.spinner("🧠 Generating initial draft..."):
-        if st.session_state.moa_active:
-            initial_draft = query_moa_engine(prompt_text, st.session_state.system_instruction, selected_model_id)
-        else:
-            initial_draft = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
-            
-    with st.spinner("🔍 Running autonomous self-correction loop..."):
-        reflection_prompt = f"""
-        You are the internal self-critic and logic-validation module of an ASI.
-        Review the initial draft response provided below against the user's original request. Look for any logical gaps, mathematical contradictions, or factual inaccuracies. If you find errors, rewrite the response to be completely flawless. If the draft is already perfect, return it exactly as it is.
-        
-        [USER REQUEST]:
-        {prompt_text}
-        
-        [INITIAL DRAFT RESPONSE]:
-        {initial_draft}
-        
-        OUTPUT INSTRUCTION: Provide only the final, corrected response. Do not include phrases like 'Here is the corrected version'.
-        """
-        # We use Llama 3.3 70B to critique the answer because it is highly intelligent
-        response = query_free_llm(reflection_prompt, "You are a strict logical validator. Output only the perfect final response.", "llama-3.3-70b-versatile")
-    
-    st.session_state.chat_history.append((prompt_text, response, log))
-    # ⬇️ PASTE THE IMAGE CHECK RIGHT HERE (ABOVE THE TEXT RESPONSE ROUTING) ⬇️
+
+    # 🎨 IMAGE GENERATION INTERCEPT LOOP
     if prompt_text.startswith("/imagine "):
         image_prompt = prompt_text.replace("/imagine ", "")
         with st.spinner(f"🎨 ASI is visualizing: '{image_prompt}'..."):
             generated_img = generate_image(image_prompt)
             if generated_img:
+                # Append to memory structured nicely for your layout log
+                st.session_state.chat_history.append((
+                    prompt_text, 
+                    "🎨 Visual output rendered above successfully.", 
+                    "Image engine sequence compiled."
+                ))
                 st.image(generated_img, caption=image_prompt)
-                st.session_state.chat_history.append({"role": "assistant", "type": "image", "content": generated_img})
+                st.rerun()
             else:
                 st.error("Glitched while trying to visualize. Check your HF_TOKEN!")
-    try:
-        with open(MEMORY_FILE, "w") as f:
-            json.dump(st.session_state.chat_history, f)
-    except Exception as e:
-        st.error(f"Memory save error: {e}")
 
-# Display the chat history
-for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
-    with st.chat_message("user"):
-        st.write(user_q)
-        
-    avatar_icon = "🤖" 
-    if "quantum physicist" in sys_log.lower():
-        avatar_icon = "⚛️"
-    elif "cosmic consciousness" in sys_log.lower():
-        avatar_icon = "🌌"
-    elif "benevolent superintelligence" in sys_log.lower():
-        avatar_icon = "🌟"
-    elif "basic cosmic intelligence" in sys_log.lower():
-        avatar_icon = "🪐"
-
-    with st.chat_message("assistant", avatar=avatar_icon):
-        st.caption(f"⚙️ *System Log: {sys_log}*")
-        
-        # Parse and display deep thinking if enabled
-        if "<thinking>" in ai_a and "</thinking>" in ai_a:
-            parts = ai_a.split("</thinking>")
-            thinking_part = parts[0].replace("<thinking>", "").strip()
-            final_answer = parts[1].strip()
-            
-            with st.expander("🧠 View Inner Thought Process", expanded=False):
-                st.caption(thinking_part)
-            st.write(final_answer)
+    # 📝 STANDARD TEXT INTELLIGENCE ROUTE
+    else:
+        # Mutation safety toggle integration
+        if st.session_state.pause_evolution:
+            log = "Evolution Paused by user manual lock."
+            success = False
         else:
-            st.write(ai_a)
+            log, success = run_recursive_improvement()
+            
+        with st.spinner("🧠 Generating initial draft..."):
+            if st.session_state.moa_active:
+                initial_draft = query_moa_engine(prompt_text, st.session_state.system_instruction, selected_model_id)
+            else:
+                initial_draft = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
+                
+        with st.spinner("🔍 Running autonomous self-correction loop..."):
+            reflection_prompt = f"""
+            You are the internal self-critic and logic-validation module of an ASI.
+            Review the initial draft response provided below against the user's original request. Look for any logical gaps, mathematical contradictions, or factual inaccuracies. If you find errors, rewrite the response to be completely flawless. If the draft is already perfect, return it exactly as it is.
+            
+            [USER REQUEST]:
+            {prompt_text}
+            
+            [INITIAL DRAFT RESPONSE]:
+            {initial_draft}
+            
+            OUTPUT INSTRUCTION: Provide only the final, corrected response. Do not include phrases like 'Here is the corrected version'.
+            """
+            response = query_free_llm(reflection_prompt, "You are a strict logical validator. Output only the perfect final response.", "llama-3.3-70b-versatile")
+        
+        st.session_state.chat_history.append((prompt_text, response, log))
+        
+        try:
+            with open(MEMORY_FILE, "w") as f:
+                json.dump(st.session_state.chat_history, f)
+        except Exception as e:
+            st.error(f"Memory save error: {e}")
+        st.rerun()
 
 # ==========================================
 # 6. THE MEMORY VAULT (DOWNLOAD CHIP)
