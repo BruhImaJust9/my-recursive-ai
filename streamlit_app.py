@@ -206,6 +206,24 @@ with st.sidebar:
     # ADD THESE TWO LINES RIGHT HERE:
     thinking_mode = st.toggle("🧠 Enable Deep Thinking Mode", value=st.session_state.deep_thinking)
     st.session_state.deep_thinking = thinking_mode
+    st.write("---")
+    st.markdown("### 🎛️ Evolution Controls")
+    
+    # 1. The Evolution Pause Toggle
+    if "pause_evolution" not in st.session_state:
+        st.session_state.pause_evolution = False
+    st.session_state.pause_evolution = st.checkbox("⏸️ Pause Automatic Evolution", value=st.session_state.pause_evolution)
+    if st.session_state.pause_evolution:
+        st.caption("🔒 *AI brain locked. It will not mutate on next message.*")
+        
+    # 2. The Direct Brain Surgery Expansion Box
+    with st.expander("🧠 Direct Brain Surgery (Manual Override)"):
+        st.caption("Manually rewrite the AI's core programming:")
+        manual_instruction = st.text_area("Core System Prompt:", value=st.session_state.system_instruction, height=100)
+        if st.button("💉 Inject New Programming", use_container_width=True):
+            st.session_state.system_instruction = manual_instruction
+            st.success("New code injected successfully into the neural net!")
+            st.rerun()
     
     st.write("---") # Keeps things visually separated
     
@@ -344,6 +362,17 @@ def query_free_llm(prompt, system_prompt):
 # 4. STREAMLIT UI LAYOUT WITH FILE SHIELD
 # ==========================================
 st.title("🌀 Recursive Self-Improving ASI")
+# ==========================================
+# NEW: ACTIVE PERSONA BADGE
+# ==========================================
+# Calculate the current generation based on our history logic
+current_gen = 1
+for user_q, ai_a, sys_log in st.session_state.chat_history:
+    if "cognitive optimization successful" in sys_log.lower() or "active system instruction:" in sys_log.lower():
+        current_gen += 1
+
+# Display a prominent, styled card showing the AI's current state
+st.info(f"🧬 **ASI STATUS: ACTIVE (Generation {current_gen})**\n\n**Current Directive:** *\"{st.session_state.system_instruction}\"*")
 st.write("Now powered by a live, independent open-source neural network!")
 
 # Updated to accept files directly in the chat bar!
