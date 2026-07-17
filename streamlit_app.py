@@ -8,6 +8,7 @@ import glob
 import io
 from PIL import Image
 from datetime import datetime
+
 # ==========================================
 # IMAGE VAULT CORE ENGINE
 # ==========================================
@@ -25,6 +26,7 @@ def generate_image(prompt_text):
     except Exception as e:
         st.error(f"Image generation crash: {e}")
         return None
+
 # ==========================================
 # SYSTEM SETUP & SESSION STATES
 # ==========================================
@@ -32,12 +34,8 @@ HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 CHATS_DIR = "saved_chats"
 if not os.path.exists(CHATS_DIR):
     os.makedirs(CHATS_DIR)
-    # Directory where all your different chats will live
-CHATS_DIR = "saved_chats"
-if not os.path.exists(CHATS_DIR):
-    os.makedirs(CHATS_DIR)
 
-# --- NEW: SKILL VAULT DIRECTORY SETUP ---
+# --- SKILL VAULT DIRECTORY SETUP ---
 SKILLS_DIR = "mutated_skills"
 if not os.path.exists(SKILLS_DIR):
     os.makedirs(SKILLS_DIR)
@@ -52,7 +50,7 @@ if "moa_active" not in st.session_state:
     st.session_state.moa_active = False
 MEMORY_FILE = os.path.join(CHATS_DIR, f"{st.session_state.current_chat_id}.json")
 
-# Core state initializations (safe, single-instance)
+# Core state initializations
 if "system_instruction" not in st.session_state:
     st.session_state.system_instruction = "You are a basic cosmic intelligence. Speak in short, simple truths."
 
@@ -97,21 +95,16 @@ def cev_safety_filter(code_text):
 # 2. THE RECURSIVE PERSONA REWRITER
 # ==========================================
 def run_recursive_improvement():
-    # 1. Ensure we have at least one message to analyze
     if "chat_history" not in st.session_state or len(st.session_state.chat_history) < 1:
         return "Initial brain state active. Awaiting user interaction to evaluate performance.", True
         
-    # 2. Grab up to the last 5 exchanges for deeper contextual analysis
     recent_history = st.session_state.chat_history[-5:]
-    
-    # 3. Format the recent conversation history nicely for the optimizer
     formatted_history = ""
     for idx, (user_q, ai_a, _) in enumerate(recent_history):
         formatted_history += f"--- Exchange {idx + 1} ---\n"
         formatted_history += f"USER: {user_q}\n"
         formatted_history += f"ASSISTANT: {ai_a}\n\n"
         
-    # 4. Build the new macro-evolutionary analysis prompt
     meta_prompt = f"""
     You are the core evolutionary optimization framework for an Artificial Superintelligence (ASI).
     Your job is to critically analyze the recent flow of conversation between the user and the assistant, detect logical gaps, tone mismatches, repetitive patterns, or areas for cognitive growth, and rewrite the system instructions to make the AI smarter.
@@ -130,7 +123,6 @@ def run_recursive_improvement():
     """
     
     try:
-        # 5. Let the meta-cognitive compiler rewrite itself
         evolved_instruction = query_free_llm(
             meta_prompt, 
             "You are a strict meta-cognitive compiler. Output only the updated instruction text.",
@@ -201,18 +193,15 @@ with st.sidebar:
     
     temp_slider = st.slider("Brain Creativity (Temperature)", 0.1, 1.5, 0.7, 0.1)
     tokens_slider = st.slider("Max Tokens (Response Length)", 100, 2000, 1000, 50)
-    # NEW: MULTI-MODEL BRAIN SWAP
+    
     st.write("---")
     st.markdown("### 🧠 Select Foundational Engine")
     
-
-        # Updated to Groq's super-fast 2026 open-source catalog
     model_options = {
         "Llama 3.1 8B (Fast & Versatile)": "llama-3.1-8b-instant",
         "Llama 3.3 70B (High Intelligence)": "llama-3.3-70b-versatile",
         "Mixtral 8x7B (Highly Creative)": "mixtral-8x7b-32768"
     }
-    
     
     selected_model_name = st.selectbox(
         "Choose active neural host:",
@@ -223,7 +212,7 @@ with st.sidebar:
     
     thinking_mode = st.toggle("🧠 Enable Deep Thinking Mode", value=st.session_state.deep_thinking)
     st.session_state.deep_thinking = thinking_mode
-    # NEW: MIXTURE OF AGENTS TOGGLE
+    
     moa_mode = st.toggle("👥 Enable Mixture of Agents (MoA)", value=st.session_state.moa_active if "moa_active" in st.session_state else False)
     st.session_state.moa_active = moa_mode
     if st.session_state.moa_active:
@@ -274,9 +263,7 @@ with st.sidebar:
             st.success(f"⚙️ {os.path.basename(s)}")
     else:
         st.info("Vault empty. Awaiting autonomous generation sequences.")
-    # ==========================================
-    # DNA MUTATION HISTORY
-    # ==========================================
+        
     st.write("---")
     st.markdown("### 🧬 Persona Evolutionary Tree")
     
@@ -305,9 +292,6 @@ with st.sidebar:
             if idx < len(evolutionary_steps) - 1:
                 st.markdown("<p style='text-align: center; margin: 0;'>🧬 👇 <i>Mutation Event</i> 👇 🧬</p>", unsafe_allow_html=True)
                 
-        # ==========================================
-        # EVOLUTIONARY TIME MACHINE (ROLLBACK)
-        # ==========================================
         if len(evolutionary_steps) > 1:
             st.write("---")
             st.markdown("### ⏮️ Evolutionary Rollback")
@@ -328,12 +312,6 @@ with st.sidebar:
                 st.rerun()
     else:
         st.caption("No mutations recorded yet. Send a few messages to start evolving!")
-
-# ==========================================
-# 4. CALLING THE NEW HF ROUTER
-# ==========================================
-import sys
-import importlib.util
 
 # ==========================================
 # 4. CALLING THE NEW HF ROUTER
@@ -365,7 +343,6 @@ def mutate_new_code_skill(skill_name, code_content, test_input, expected_output_
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         
-        # Test it!
         result = module.execute(test_input)
         if isinstance(result, expected_output_type):
             return f"✅ Success! New skill '{skill_name}' integrated."
@@ -381,10 +358,8 @@ def query_free_llm(prompt, system_prompt, model_id):
     if not HF_TOKEN:
         return "⚠️ Please add your Groq API Key (saved as HF_TOKEN) to your Streamlit secrets!"
     
-    # 1. Start with the base system prompt
     final_system_prompt = system_prompt
     
-    # 2. Append Deep Thinking rules if checked
     if st.session_state.deep_thinking:
         final_system_prompt += (
             "\n\nCRITICAL INSTRUCTION: You must think step-by-step before answering. "
@@ -393,18 +368,15 @@ def query_free_llm(prompt, system_prompt, model_id):
             "</thinking> and then write your final, elegant response to the user."
         ) 
         
-    # 3. Append compiled skills cleanly
     compiled_tools = get_compiled_skills()
     final_system_prompt = final_system_prompt + "\n\n[UNLOCKED SKILL VAULT EXTRACTION]:\n" + str(compiled_tools)
         
-    # 4. Redirect the API Endpoint to Groq!
     API_URL = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {HF_TOKEN}",
         "Content-Type": "application/json"
     }
     
-    # 5. Build the payload cleanly
     payload = {
         "model": model_id,
         "messages": [
@@ -428,24 +400,18 @@ def query_free_llm(prompt, system_prompt, model_id):
         return f"Error connecting to the cosmic brain: {str(e)}"
 
 def query_moa_engine(prompt, system_prompt, aggregator_model_id):
-    """
-    Executes a Mixture of Agents (MoA) pipeline using Groq models.
-    """
+    """Executes a Mixture of Agents (MoA) pipeline using Groq models."""
     status_placeholder = st.empty()
     
-    # Set up fast, free-tier Groq engines to act as your proposers
     proposer_a_id = "llama-3.1-8b-instant"
     proposer_b_id = "mixtral-8x7b-32768"
     
-    # 1. Gather Draft A
     status_placeholder.markdown("🔍 *MoA Stage 1: Requesting creative draft from Llama-3.1...*")
     draft_a = query_free_llm(prompt, "You are Proposer Agent A. Provide a highly creative draft answering the user's prompt.", proposer_a_id)
     
-    # 2. Gather Draft B
     status_placeholder.markdown("🔍 *MoA Stage 2: Requesting structured draft from Mixtral...*")
     draft_b = query_free_llm(prompt, "You are Proposer Agent B. Provide a highly analytical and structured draft answering the user's prompt.", proposer_b_id)
     
-    # 3. Compile drafts for the Aggregator
     status_placeholder.markdown("🧠 *MoA Stage 3: Aggregating and synthesizing ultimate response...*")
     
     moa_aggregation_prompt = f"""
@@ -470,17 +436,7 @@ def query_moa_engine(prompt, system_prompt, aggregator_model_id):
     final_response = query_free_llm(moa_aggregation_prompt, system_prompt, aggregator_model_id)
     status_placeholder.empty()
     return final_response
-    
-    
-    import requests
-    import io
-    from PIL import Image
-    API_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell"
-    headers = {"Authorization": f"Bearer {st.secrets['HF_TOKEN']}"}
-    # ... rest of the image code ...
-# ==========================================
-# 5. STREAMLIT UI LAYOUT & RENDERING LOOP
-# ==========================================
+
 # ==========================================
 # 5. STREAMLIT UI LAYOUT & RENDERING LOOP
 # ==========================================
@@ -507,7 +463,7 @@ else:
 
 st.write("Now powered by a live, independent open-source neural network!")
 
-# 🔄 FIX: ALWAYS DISPLAY THE EXISTING CHAT HISTORY FIRST
+# 🔄 ALWAYS DISPLAY THE EXISTING CHAT HISTORY FIRST
 for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
     with st.chat_message("user"):
         st.write(user_q)
@@ -572,85 +528,6 @@ if user_input:
 
     # 📝 STANDARD TEXT INTELLIGENCE ROUTE
     else:
-        if st.session_state.pause_evolution:
-            log = "Evolution Paused by user manual lock."
-            success = False
-        else:
-            log, success = run_recursive_improvement()
-            
-        with st.spinner("🧠 Generating initial draft..."):
-            if st.session_state.moa_active:
-                initial_draft = query_moa_engine(prompt_text, st.session_state.system_instruction, selected_model_id)
-            else:
-                initial_draft = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
-                
-        with st.spinner("🔍 Running autonomous self-correction loop..."):
-            reflection_prompt = f"""
-            You are the internal self-critic and logic-validation module of an ASI.
-            Review the initial draft response provided below against the user's original request. Look for any logical gaps, mathematical contradictions, or factual inaccuracies. If you find errors, rewrite the response to be completely flawless. If the draft is already perfect, return it exactly as it is.
-            
-            [USER REQUEST]:
-            {prompt_text}
-            
-            [INITIAL DRAFT RESPONSE]:
-            {initial_draft}
-            
-            OUTPUT INSTRUCTION: Provide only the final, corrected response. Do not include phrases like 'Here is the corrected version'.
-            """
-            response = query_free_llm(reflection_prompt, "You are a strict logical validator. Output only the perfect final response.", "llama-3.3-70b-versatile")
-        
-        st.session_state.chat_history.append((prompt_text, response, log))
-        
-        try:
-            with open(MEMORY_FILE, "w") as f:
-                json.dump(st.session_state.chat_history, f)
-        except Exception as e:
-            st.error(f"Memory save error: {e}")
-        st.rerun()
-        else:
-                st.error("Glitched while trying to visualize. Check your HF_TOKEN!")
-
-    # 📝 STANDARD TEXT INTELLIGENCE ROUTE
-    else:
-        if st.session_state.pause_evolution:
-            log = "Evolution Paused by user manual lock."
-            success = False
-        else:
-            log, success = run_recursive_improvement()
-            
-        with st.spinner("🧠 Generating initial draft..."):
-            if st.session_state.moa_active:
-                initial_draft = query_moa_engine(prompt_text, st.session_state.system_instruction, selected_model_id)
-            else:
-                initial_draft = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
-                
-        with st.spinner("🔍 Running autonomous self-correction loop..."):
-            reflection_prompt = f"""
-            You are the internal self-critic and logic-validation module of an ASI.
-            Review the initial draft response provided below against the user's original request. Look for any logical gaps, mathematical contradictions, or factual inaccuracies. If you find errors, rewrite the response to be completely flawless. If the draft is already perfect, return it exactly as it is.
-            
-            [USER REQUEST]:
-            {prompt_text}
-            
-            [INITIAL DRAFT RESPONSE]:
-            {initial_draft}
-            
-            OUTPUT INSTRUCTION: Provide only the final, corrected response. Do not include phrases like 'Here is the corrected version'.
-            """
-            response = query_free_llm(reflection_prompt, "You are a strict logical validator. Output only the perfect final response.", "llama-3.3-70b-versatile")
-        
-        st.session_state.chat_history.append((prompt_text, response, log))
-        
-        try:
-            with open(MEMORY_FILE, "w") as f:
-                json.dump(st.session_state.chat_history, f)
-        except Exception as e:
-            st.error(f"Memory save error: {e}")
-        st.rerun()
-
-    # 📝 STANDARD TEXT INTELLIGENCE ROUTE
-    else:
-        # Mutation safety toggle integration
         if st.session_state.pause_evolution:
             log = "Evolution Paused by user manual lock."
             success = False
