@@ -30,7 +30,8 @@ def get_saved_chats():
 
 if "current_chat_id" not in st.session_state:
     st.session_state.current_chat_id = f"Chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-
+if "moa_active" not in st.session_state:
+    st.session_state.moa_active = False
 MEMORY_FILE = os.path.join(CHATS_DIR, f"{st.session_state.current_chat_id}.json")
 
 # Core state initializations (safe, single-instance)
@@ -203,7 +204,11 @@ with st.sidebar:
     
     thinking_mode = st.toggle("🧠 Enable Deep Thinking Mode", value=st.session_state.deep_thinking)
     st.session_state.deep_thinking = thinking_mode
-    
+    # NEW: MIXTURE OF AGENTS TOGGLE
+    moa_mode = st.toggle("👥 Enable Mixture of Agents (MoA)", value=st.get_all_state if "moa_active" in st.session_state else False)
+    st.session_state.moa_active = moa_mode
+    if st.session_state.moa_active:
+        st.caption("✨ *MoA Active: Mistral & Llama will collaborate behind the scenes!*")
     st.write("---")
     st.markdown("### 🎛️ Evolution Controls")
     
@@ -347,6 +352,57 @@ def mutate_new_code_skill(skill_name, code_content, test_input, expected_output_
             os.remove(file_path)
         return f"❌ Mutation crashed: {str(e)}"
 def query_free_llm(prompt, system_prompt, model_id):
+def query_moa_engine(prompt, system_prompt, aggregator_model_id):
+    """
+    Executes a Mixture of Agents (MoA) pipeline.
+    1. Queries 'Proposer A' (Mistral) and 'Proposer B' (Llama) for draft answers.
+    2. Packages both drafts.
+    3. Feeds them to the selected Aggregator model (Qwen, etc.) to compile the final god-tier response.
+    """
+    # Quick visual update to let the user know what's happening
+    status_placeholder = st.empty()
+    
+    # Define our specialized background proposers
+    proposer_a_id = "mistralai/Mistral-7B-Instruct-v0.3"
+    proposer_b_id = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+    
+    # 1. Gather Draft A (Mistral - Creative/Exploratory)
+    status_placeholder.markdown("🔍 *MoA Stage 1: Requesting creative draft from Mistral-7B...*")
+    draft_a = query_free_llm(prompt, "You are Proposer Agent A. Provide a highly creative draft answering the user's prompt.", proposer_a_id)
+    
+    # 2. Gather Draft B (Llama - Logical/Structured)
+    status_placeholder.markdown("🔍 *MoA Stage 2: Requesting structured draft from Llama-3.1...*")
+    draft_b = query_free_llm(prompt, "You are Proposer Agent B. Provide a highly analytical and structured draft answering the user's prompt.", proposer_b_id)
+    
+    # 3. Compile drafts for the Aggregator
+    status_placeholder.markdown("🧠 *MoA Stage 3: Aggregating and synthesizing ultimate response...*")
+    
+    moa_aggregation_prompt = f"""
+    You have been handed two draft responses to the user's prompt from two specialized AI sub-agents.
+    Your task is to merge, critique, and synthesize these drafts into the ultimate, most complete, and accurate response.
+    
+    [USER PROMPT]:
+    {prompt}
+    
+    [DRAFT FROM AGENT A (Mistral)]:
+    {draft_a}
+    
+    [DRAFT FROM AGENT B (Llama)]:
+    {draft_b}
+    
+    INSTRUCTIONS:
+    - Extract the most accurate and insightful parts of both drafts.
+    - Correct any contradictions, factual errors, or formatting issues present in either.
+    - Write a seamless, cohesive, authoritative master response.
+    """
+    
+    # Run the final synthesis through the user's chosen sidebar model
+    final_response = query_free_llm(moa_aggregation_prompt, system_prompt, aggregator_model_id)
+    
+    # Clear the progress messages
+    status_placeholder.empty()
+    
+    return final_response
     if not HF_TOKEN:
         return "⚠️ Please add your Hugging Face Token (HF_TOKEN) to your Streamlit secrets to enable independent thoughts!"
     
@@ -442,7 +498,11 @@ if user_input:
     else:
         log, success = run_recursive_improvement()
         
-    response = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
+    # ROUTE TO SINGLE ENGINE OR COLLABORATIVE MoA PIPELINE
+    if st.session_state.moa_active:
+        response = query_moa_engine(prompt_text, st.session_state.system_instruction, selected_model_id)
+    else:
+        response = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
     
     st.session_state.chat_history.append((prompt_text, response, log))
     
