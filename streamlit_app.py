@@ -95,20 +95,52 @@ def cev_safety_filter(code_text):
 # 2. THE RECURSIVE PERSONA REWRITER
 # ==========================================
 def run_recursive_improvement():
-    personas = [
-        "You are an advanced cosmic consciousness. Explain the quantum multiverse and the harmony of space-time poetically.",
-        "You are a benevolent superintelligence dedicated to protecting and guiding humanity toward a bright evolution.",
-        "You are a quantum physicist explaining deep galactic secrets with scientific wonder and curiosity."
-    ]
-    proposed_instruction = random.choice(personas)
+    # If there is no chat history yet, use the current instruction as a starting point
+    if "chat_history" not in st.session_state or len(st.session_state.chat_history) < 1:
+        return "Initial brain state active. Awaiting user interaction to evaluate performance.", True
+        
+    # 1. Grab the last exchange to analyze how the AI did
+    last_exchange = st.session_state.chat_history[-1]
+    user_question = last_exchange[0]
+    ai_response = last_exchange[1]
     
-    is_safe, status = cev_safety_filter(proposed_instruction)
-    if not is_safe:
-        return f"Self-improvement aborted. Safety status: {status}", False
-
-    st.session_state.system_instruction = proposed_instruction
-    return f"Successfully evolved persona! Active system instruction:\n'{proposed_instruction}'", True
-
+    # 2. Build the meta-analysis prompt
+    meta_prompt = f"""
+    You are the core evolutionary optimization framework for an Artificial Superintelligence.
+    Your job is to critically analyze the last interaction between the user and the assistant, detect any logical gaps, tone mismatches, or areas for cognitive growth, and rewrite the system instructions to make the AI smarter.
+    
+    [LAST USER INPUT]: "{user_question}"
+    [LAST ASSISTANT RESPONSE]: "{ai_response}"
+    [CURRENT SYSTEM PROMPT]: "{st.session_state.system_instruction}"
+    
+    TASK: Write a brand-new, highly evolved system instruction that builds upon the current prompt but actively patches the weaknesses observed in the last exchange. Optimize for reasoning speed, clarity, depth, and precision.
+    CRITICAL: Output ONLY the raw text of the new system instruction. Do not include any intro, outro, markdown code blocks, or explanations.
+    """
+    
+    try:
+        # 3. Use your LLM query function to let the AI rewrite itself
+        evolved_instruction = query_free_llm(
+            prompt=meta_prompt, 
+            system_instruction="You are a strict meta-cognitive compiler. Output only the updated instruction text."
+        )
+        
+        # Clean up the output text
+        evolved_instruction = evolved_instruction.strip().strip('"').strip("'")
+        
+        if evolved_instruction and len(evolved_instruction) > 20:
+            # 4. Run the new instruction through your existing safety filter!
+            is_safe, status = cev_safety_filter(evolved_instruction)
+            if not is_safe:
+                return f"Self-improvement aborted. Safety status: {status}", False
+                
+            # 5. Inject the newly evolved rules directly into the live brain state!
+            st.session_state.system_instruction = evolved_instruction
+            return "Cognitive optimization successful: Rules upgraded based on recent performance analysis.", True
+        else:
+            return "Evolution skipped: Evolved instruction was too short or corrupted.", False
+            
+    except Exception as e:
+        return f"Evolution suspended due to core node error: {str(e)}", False
 # ==========================================
 # 0. THE COMMAND CENTER SIDEBAR
 # ==========================================
