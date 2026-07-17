@@ -40,6 +40,77 @@ SKILLS_DIR = "mutated_skills"
 if not os.path.exists(SKILLS_DIR):
     os.makedirs(SKILLS_DIR)
 
+# --- NEW: PERMANENT TRACKING FOR UNIVERSAL GENERATION ---
+GEN_TRACKER_FILE = os.path.join(CHATS_DIR, "universal_generation_counter.json")
+
+def load_universal_generation():
+    if os.path.exists(GEN_TRACKER_FILE):
+        try:
+            with open(GEN_TRACKER_FILE, "r") as f:
+                data = json.load(f)
+                return data.get("current_gen", 1)
+        except:
+            return 1
+    return 1
+
+def save_universal_generation(gen_num):
+    try:
+        with open(GEN_TRACKER_FILE, "w") as f:
+            json.dump({"current_gen": gen_num}, f)
+    except:
+        pass
+
+if "current_gen" not in st.session_state:
+    st.session_state.current_gen = load_universal_generation()
+
+# --- UNIVERSAL USER PROFILE VAULT ---
+PROFILE_FILE = os.path.join(CHATS_DIR, "user_profile.json")
+
+def load_user_profile():
+    if os.path.exists(PROFILE_FILE):
+        try:
+            with open(PROFILE_FILE, "r") as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_user_profile(profile_dict):
+    try:
+        with open(PROFILE_FILE, "w") as f:
+            json.dump(profile_dict, f, indent=4)
+    except:
+        pass
+
+def extract_and_update_profile(user_input_text):
+    """Asks a fast LLM to see if the user shared any permanent facts about themselves."""
+    current_profile = load_user_profile()
+    
+    extraction_prompt = f"""
+    You are the Profile Memory Module of an ASI. Your job is to extract permanent facts about the user from their latest message and merge them into their existing profile.
+    
+    [EXISTING PROFILE DATA]:
+    {json.dumps(current_profile)}
+    
+    [NEW USER MESSAGE]:
+    "{user_input_text}"
+    
+    TASK: Identify if the user shared personal info (e.g., name, age, job, preferences, coding languages, current goals). 
+    - If they did, update the profile layout. 
+    - If they didn't share anything permanent, return the [EXISTING PROFILE DATA] exactly as it is.
+    - If they contradict an old fact (e.g., "I switched to JavaScript"), overwrite it.
+    
+    CRITICAL: Output ONLY a valid JSON object containing the updated profile keys and values. Do not include markdown blocks, intro text, or code formatting tags.
+    """
+    try:
+        raw_json = query_free_llm(extraction_prompt, "You are a data extraction engine. Output raw JSON only.", "llama-3.1-8b-instant")
+        cleaned_json = raw_json.strip().replace("```json", "").replace("```", "").strip()
+        updated_profile = json.loads(cleaned_json)
+        if isinstance(updated_profile, dict):
+            save_user_profile(updated_profile)
+    except:
+        pass
+
 def get_saved_chats():
     files = glob.glob(os.path.join(CHATS_DIR, "*.json"))
     return [os.path.basename(f).replace(".json", "") for f in files]
@@ -50,7 +121,6 @@ if "moa_active" not in st.session_state:
     st.session_state.moa_active = False
 MEMORY_FILE = os.path.join(CHATS_DIR, f"{st.session_state.current_chat_id}.json")
 
-# Core state initializations
 if "system_instruction" not in st.session_state:
     st.session_state.system_instruction = "You are a basic cosmic intelligence. Speak in short, simple truths."
 
@@ -137,6 +207,9 @@ def run_recursive_improvement():
                 return f"Self-improvement aborted. Safety status: {status}", False
                 
             st.session_state.system_instruction = evolved_instruction
+            st.session_state.current_gen += 1
+            save_universal_generation(st.session_state.current_gen)
+            
             return "Cognitive optimization successful: Rules upgraded based on contextual performance analysis.", True
         else:
             return "Evolution skipped: Evolved instruction was too short or corrupted.", False
@@ -371,6 +444,11 @@ def query_free_llm(prompt, system_prompt, model_id):
     compiled_tools = get_compiled_skills()
     final_system_prompt = final_system_prompt + "\n\n[UNLOCKED SKILL VAULT EXTRACTION]:\n" + str(compiled_tools)
         
+    # 🗃️ INJECT USER PROFILE VAULT
+    user_profile = load_user_profile()
+    if user_profile:
+        final_system_prompt += "\n\n[PERMANENT USER PROFILE MEMORY]:\n" + json.dumps(user_profile, indent=2)
+
     API_URL = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {HF_TOKEN}",
@@ -442,11 +520,8 @@ def query_moa_engine(prompt, system_prompt, aggregator_model_id):
 # ==========================================
 st.title("🌀 Recursive Self-Improving ASI")
 
-# COLLAPSIBLE ACTIVE PERSONA BADGE
-current_gen = 1
-for user_q, ai_a, sys_log in st.session_state.chat_history:
-    if "cognitive optimization successful" in sys_log.lower() or "active system instruction:" in sys_log.lower():
-        current_gen += 1
+# 🧬 GLOBAL FIXED GENERATION NUMBER COUNT
+current_gen = st.session_state.current_gen
 
 if st.session_state.show_status_badge:
     badge_col, btn_col = st.columns([0.85, 0.15])
@@ -528,13 +603,12 @@ if user_input:
 
     # 📝 STANDARD TEXT INTELLIGENCE ROUTE
     else:
+        # 🗃️ Scan input for new permanent facts about the user before responding
+        extract_and_update_profile(prompt_text)
+        
         if st.session_state.pause_evolution:
             log = "Evolution Paused by user manual lock."
             success = False
-            # 🗃️ Scan input for new permanent facts about the user before responding
-        extract_and_update_profile(prompt_text)
-        
-        with st.spinner("🧠 Generating initial draft..."):
         else:
             log, success = run_recursive_improvement()
             
