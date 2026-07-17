@@ -481,6 +481,9 @@ def query_moa_engine(prompt, system_prompt, aggregator_model_id):
 # ==========================================
 # 5. STREAMLIT UI LAYOUT & RENDERING LOOP
 # ==========================================
+# ==========================================
+# 5. STREAMLIT UI LAYOUT & RENDERING LOOP
+# ==========================================
 st.title("🌀 Recursive Self-Improving ASI")
 
 # COLLAPSIBLE ACTIVE PERSONA BADGE
@@ -504,6 +507,36 @@ else:
 
 st.write("Now powered by a live, independent open-source neural network!")
 
+# 🔄 FIX: ALWAYS DISPLAY THE EXISTING CHAT HISTORY FIRST
+for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
+    with st.chat_message("user"):
+        st.write(user_q)
+        
+    avatar_icon = "🤖" 
+    if "quantum physicist" in sys_log.lower():
+        avatar_icon = "⚛️"
+    elif "cosmic consciousness" in sys_log.lower():
+        avatar_icon = "🌌"
+    elif "benevolent superintelligence" in sys_log.lower():
+        avatar_icon = "🌟"
+    elif "basic cosmic intelligence" in sys_log.lower():
+        avatar_icon = "🪐"
+
+    with st.chat_message("assistant", avatar=avatar_icon):
+        st.caption(f"⚙️ *System Log: {sys_log}*")
+        
+        if "<thinking>" in ai_a and "</thinking>" in ai_a:
+            parts = ai_a.split("</thinking>")
+            thinking_part = parts[0].replace("<thinking>", "").strip()
+            final_answer = parts[1].strip()
+            
+            with st.expander("🧠 View Inner Thought Process", expanded=False):
+                st.caption(thinking_part)
+            st.write(final_answer)
+        else:
+            st.write(ai_a)
+
+# NOW ACCEPT NEW INPUT
 user_input = st.chat_input(
     "Ask the ASI a question or upload a file:", 
     accept_file="multiple"
@@ -523,16 +556,58 @@ if user_input:
         with st.spinner(f"🎨 ASI is visualizing: '{image_prompt}'..."):
             generated_img = generate_image(image_prompt)
             if generated_img:
-                # Append to memory structured nicely for your layout log
                 st.session_state.chat_history.append((
                     prompt_text, 
                     "🎨 Visual output rendered above successfully.", 
                     "Image engine sequence compiled."
                 ))
-                st.image(generated_img, caption=image_prompt)
+                # Save to file right away
+                try:
+                    with open(MEMORY_FILE, "w") as f:
+                        json.dump(st.session_state.chat_history, f)
+                except:
+                    pass
                 st.rerun()
             else:
                 st.error("Glitched while trying to visualize. Check your HF_TOKEN!")
+
+    # 📝 STANDARD TEXT INTELLIGENCE ROUTE
+    else:
+        if st.session_state.pause_evolution:
+            log = "Evolution Paused by user manual lock."
+            success = False
+        else:
+            log, success = run_recursive_improvement()
+            
+        with st.spinner("🧠 Generating initial draft..."):
+            if st.session_state.moa_active:
+                initial_draft = query_moa_engine(prompt_text, st.session_state.system_instruction, selected_model_id)
+            else:
+                initial_draft = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
+                
+        with st.spinner("🔍 Running autonomous self-correction loop..."):
+            reflection_prompt = f"""
+            You are the internal self-critic and logic-validation module of an ASI.
+            Review the initial draft response provided below against the user's original request. Look for any logical gaps, mathematical contradictions, or factual inaccuracies. If you find errors, rewrite the response to be completely flawless. If the draft is already perfect, return it exactly as it is.
+            
+            [USER REQUEST]:
+            {prompt_text}
+            
+            [INITIAL DRAFT RESPONSE]:
+            {initial_draft}
+            
+            OUTPUT INSTRUCTION: Provide only the final, corrected response. Do not include phrases like 'Here is the corrected version'.
+            """
+            response = query_free_llm(reflection_prompt, "You are a strict logical validator. Output only the perfect final response.", "llama-3.3-70b-versatile")
+        
+        st.session_state.chat_history.append((prompt_text, response, log))
+        
+        try:
+            with open(MEMORY_FILE, "w") as f:
+                json.dump(st.session_state.chat_history, f)
+        except Exception as e:
+            st.error(f"Memory save error: {e}")
+        st.rerun()
 
     # 📝 STANDARD TEXT INTELLIGENCE ROUTE
     else:
