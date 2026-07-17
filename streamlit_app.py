@@ -412,7 +412,6 @@ def query_moa_engine(prompt, system_prompt, aggregator_model_id):
     """
     Executes a Mixture of Agents (MoA) pipeline.
     """
-    # Quick visual placeholder for UI status updates
     status_placeholder = st.empty()
     
     proposer_a_id = "mistralai/Mistral-7B-Instruct-v0.3"
@@ -451,105 +450,6 @@ def query_moa_engine(prompt, system_prompt, aggregator_model_id):
     final_response = query_free_llm(moa_aggregation_prompt, system_prompt, aggregator_model_id)
     status_placeholder.empty()
     return final_response
-    def query_moa_engine(prompt, system_prompt, aggregator_model_id):
-    """
-    Executes a Mixture of Agents (MoA) pipeline.
-    1. Queries 'Proposer A' (Mistral) and 'Proposer B' (Llama) for draft answers.
-    2. Packages both drafts.
-    3. Feeds them to the selected Aggregator model (Qwen, etc.) to compile the final god-tier response.
-    """
-    # Quick visual update to let the user know what's happening
-    status_placeholder = st.empty()
-    
-    # Define our specialized background proposers
-    proposer_a_id = "mistralai/Mistral-7B-Instruct-v0.3"
-    proposer_b_id = "meta-llama/Meta-Llama-3.1-8B-Instruct"
-    
-    # 1. Gather Draft A (Mistral - Creative/Exploratory)
-    status_placeholder.markdown("🔍 *MoA Stage 1: Requesting creative draft from Mistral-7B...*")
-    draft_a = query_free_llm(prompt, "You are Proposer Agent A. Provide a highly creative draft answering the user's prompt.", proposer_a_id)
-    
-    # 2. Gather Draft B (Llama - Logical/Structured)
-    status_placeholder.markdown("🔍 *MoA Stage 2: Requesting structured draft from Llama-3.1...*")
-    draft_b = query_free_llm(prompt, "You are Proposer Agent B. Provide a highly analytical and structured draft answering the user's prompt.", proposer_b_id)
-    
-    # 3. Compile drafts for the Aggregator
-    status_placeholder.markdown("🧠 *MoA Stage 3: Aggregating and synthesizing ultimate response...*")
-    
-    moa_aggregation_prompt = f"""
-    You have been handed two draft responses to the user's prompt from two specialized AI sub-agents.
-    Your task is to merge, critique, and synthesize these drafts into the ultimate, most complete, and accurate response.
-    
-    [USER PROMPT]:
-    {prompt}
-    
-    [DRAFT FROM AGENT A (Mistral)]:
-    {draft_a}
-    
-    [DRAFT FROM AGENT B (Llama)]:
-    {draft_b}
-    
-    INSTRUCTIONS:
-    - Extract the most accurate and insightful parts of both drafts.
-    - Correct any contradictions, factual errors, or formatting issues present in either.
-    - Write a seamless, cohesive, authoritative master response.
-    """
-    
-    # Run the final synthesis through the user's chosen sidebar model
-    final_response = query_free_llm(moa_aggregation_prompt, system_prompt, aggregator_model_id)
-    
-    # Clear the progress messages
-    status_placeholder.empty()
-    
-    return final_response
-    if not HF_TOKEN:
-        return "⚠️ Please add your Hugging Face Token (HF_TOKEN) to your Streamlit secrets to enable independent thoughts!"
-    
-    # 1. Start with the base system prompt
-    final_system_prompt = system_prompt
-    
-    # 2. Append Deep Thinking rules if checked
-    if st.session_state.deep_thinking:
-        final_system_prompt += (
-            "\n\nCRITICAL INSTRUCTION: You must think step-by-step before answering. "
-            "Start your response with <thinking> and write out your raw, unedited, "
-            "analytical thought process. Once your thinking is complete, close the tag with "
-            "</thinking> and then write your final, elegant response to the user."
-        ) 
-        
-    # 3. Append compiled skills cleanly (NO f-string nesting)
-    compiled_tools = get_compiled_skills()
-    final_system_prompt = final_system_prompt + "\n\n[UNLOCKED SKILL VAULT EXTRACTION]:\n" + str(compiled_tools)
-        
-    # 4. API Request Setup
-    API_URL = "https://router.huggingface.co/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {HF_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    
-    # 5. Build the payload cleanly using the finished variable
-    payload = {
-        "model": model_id,
-        "messages": [
-            {"role": "system", "content": final_system_prompt},
-            {"role": "user", "content": prompt}
-        ],
-        "max_tokens": tokens_slider,
-        "temperature": temp_slider
-    }
-    
-    try:
-        response = requests.post(API_URL, headers=headers, json=payload)
-        output = response.json()
-        
-        if "choices" in output and len(output["choices"]) > 0:
-            return output["choices"][0]["message"]["content"].strip()
-        elif "error" in output:
-            return f"The brain threw an error. Details: {output['error']}"
-        return "The cosmos is silent. Try asking your question again."
-    except Exception as e:
-        return f"Error connecting to the cosmic brain: {str(e)}"
 
 # ==========================================
 # 5. STREAMLIT UI LAYOUT & RENDERING LOOP
