@@ -119,10 +119,11 @@ def run_recursive_improvement():
     
     try:
         # 3. Use your LLM query function to let the AI rewrite itself
+        # We pass the system prompt directly as the second argument
         evolved_instruction = query_free_llm(
-            prompt=meta_prompt, 
-            system_instruction="You are a strict meta-cognitive compiler. Output only the updated instruction text."
-        )
+            meta_prompt, 
+            "You are a strict meta-cognitive compiler. Output only the updated instruction text."
+        ))
         
         # Clean up the output text
         evolved_instruction = evolved_instruction.strip().strip('"').strip("'")
