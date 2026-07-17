@@ -270,10 +270,10 @@ with st.sidebar:
             if idx < len(evolutionary_steps) - 1:
                 st.markdown("<p style='text-align: center; margin: 0;'>🧬 👇 <i>Mutation Event</i> 👇 🧬</p>", unsafe_allow_html=True)
     else:
-    # ==========================================
-    # NEW: EVOLUTIONARY TIME MACHINE (ROLLBACK)
-    # ==========================================
-    if len(evolutionary_steps) > 1:
+        # ==========================================
+        # NEW: EVOLUTIONARY TIME MACHINE (ROLLBACK)
+        # ==========================================
+        if len(evolutionary_steps) > 1:
         st.write("---")
         st.markdown("### ⏮️ Evolutionary Rollback")
         st.caption("Override the AI's current brain state with a past generation:")
