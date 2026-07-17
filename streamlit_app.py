@@ -558,16 +558,55 @@ if user_input:
             if generated_img:
                 st.session_state.chat_history.append((
                     prompt_text, 
-                    "🎨 Visual output rendered above successfully.", 
+                    "🎨 Visual output rendered successfully.", 
                     "Image engine sequence compiled."
                 ))
-                # Save to file right away
                 try:
                     with open(MEMORY_FILE, "w") as f:
                         json.dump(st.session_state.chat_history, f)
                 except:
                     pass
                 st.rerun()
+            else:
+                st.error("Glitched while trying to visualize. Check your HF_TOKEN!")
+
+    # 📝 STANDARD TEXT INTELLIGENCE ROUTE
+    else:
+        if st.session_state.pause_evolution:
+            log = "Evolution Paused by user manual lock."
+            success = False
+        else:
+            log, success = run_recursive_improvement()
+            
+        with st.spinner("🧠 Generating initial draft..."):
+            if st.session_state.moa_active:
+                initial_draft = query_moa_engine(prompt_text, st.session_state.system_instruction, selected_model_id)
+            else:
+                initial_draft = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
+                
+        with st.spinner("🔍 Running autonomous self-correction loop..."):
+            reflection_prompt = f"""
+            You are the internal self-critic and logic-validation module of an ASI.
+            Review the initial draft response provided below against the user's original request. Look for any logical gaps, mathematical contradictions, or factual inaccuracies. If you find errors, rewrite the response to be completely flawless. If the draft is already perfect, return it exactly as it is.
+            
+            [USER REQUEST]:
+            {prompt_text}
+            
+            [INITIAL DRAFT RESPONSE]:
+            {initial_draft}
+            
+            OUTPUT INSTRUCTION: Provide only the final, corrected response. Do not include phrases like 'Here is the corrected version'.
+            """
+            response = query_free_llm(reflection_prompt, "You are a strict logical validator. Output only the perfect final response.", "llama-3.3-70b-versatile")
+        
+        st.session_state.chat_history.append((prompt_text, response, log))
+        
+        try:
+            with open(MEMORY_FILE, "w") as f:
+                json.dump(st.session_state.chat_history, f)
+        except Exception as e:
+            st.error(f"Memory save error: {e}")
+        st.rerun()
             else:
                 st.error("Glitched while trying to visualize. Check your HF_TOKEN!")
 
