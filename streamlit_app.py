@@ -82,75 +82,72 @@ def save_user_profile(profile_dict):
     except:
         pass
 
-def extract_and_update_profile(user_input_text):
-    """Asks a fast LLM to see if the user shared any permanent facts about themselves."""
-    current_profile = load_user_profile()
-    
-    extraction_prompt = f"""
-    You are the Profile Memory Module of an ASI. Your job is to extract permanent facts about the user from their latest message and merge them into their existing profile.
-    
-    [EXISTING PROFILE DATA]:
-    {json.dumps(current_profile)}
-    
-    [NEW USER MESSAGE]:
-    "{user_input_text}"
-    
-    TASK: Identify if the user shared personal info (e.g., name, age, job, preferences, coding languages, current goals). 
-    - If they did, update the profile layout. 
-    - If they didn't share anything permanent, return the [EXISTING PROFILE DATA] exactly as it is.
-    - If they contradict an old fact (e.g., "I switched to JavaScript"), overwrite it.
-    
-    CRITICAL: Output ONLY a valid JSON object containing the updated profile keys and values. Do not include markdown blocks, intro text, or code formatting tags.
-    """
-    try:
-        raw_json = query_free_llm(extraction_prompt, "You are a data extraction engine. Output raw JSON only.", "llama-3.1-8b-instant")
-        cleaned_json = raw_json.strip().replace("```json", "").replace("```", "").strip()
-        updated_profile = json.loads(cleaned_json)
-        if isinstance(updated_profile, dict):
-            save_user_profile(updated_profile)
-    except:
-        pass
-
-def get_saved_chats():
-    files = glob.glob(os.path.join(CHATS_DIR, "*.json"))
-    return [os.path.basename(f).replace(".json", "") for f in files]
-
-if "current_chat_id" not in st.session_state:
-    st.session_state.current_chat_id = f"Chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-if "moa_active" not in st.session_state:
-    st.session_state.moa_active = False
-MEMORY_FILE = os.path.join(CHATS_DIR, f"{st.session_state.current_chat_id}.json")
-
-if "system_instruction" not in st.session_state:
-    st.session_state.system_instruction = "You are a basic cosmic intelligence. Speak in short, simple truths."
-
-if "deep_thinking" not in st.session_state:
-    st.session_state.deep_thinking = False
-
-if "pause_evolution" not in st.session_state:
-    st.session_state.pause_evolution = False
-
-if "show_status_badge" not in st.session_state:
-    st.session_state.show_status_badge = True
-
-def reset_conversations():
-    st.session_state.chat_history = []
-    if os.path.exists(MEMORY_FILE):
-        try:
-            os.remove(MEMORY_FILE)
-        except Exception as e:
-            st.error(f"Error resetting memory file: {e}")
-
-if "chat_history" not in st.session_state:
-    if os.path.exists(MEMORY_FILE):
-        try:
-            with open(MEMORY_FILE, "r") as f:
-                st.session_state.chat_history = json.load(f)
-        except:
-            st.session_state.chat_history = []
+# 📝 STANDARD TEXT INTELLIGENCE ROUTE
     else:
-        st.session_state.chat_history = []
-
+        # 🗃️ Scan input for new permanent facts about the user before responding
+        extract_and_update_profile(prompt_text)
+        
+        if st.session_state.pause_evolution:
+            log = "Evolution Paused by user manual lock."
+            success = False
+        else:
+            log, success = run_recursive_improvement()
+            
+        with st.spinner("🧠 Generating initial draft..."):
+            if st.session_state.moa_active:
+                initial_draft = query_moa_engine(prompt_text, st.session_state.system_instruction, selected_model_id)
+            else:
+                initial_draft = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
+                
+        # 🛠️ AUTONOMOUS INTERCEPT & FEEDBACK LOOP
+        if "[EXECUTE:" in initial_draft:
+            try:
+                # Parse out the script name and arguments from the AI's command
+                parts = initial_draft.split("[EXECUTE:")[1].split("]")[0]
+                skill_call = parts.strip()
+                skill_name = skill_call.split("(")[0].strip()
+                argument = skill_call.split("(")[1].replace(")", "").strip()
+                
+                with st.spinner(f"⚡ Running Native Skill Tool: {skill_name}(...)"):
+                    tool_output = execute_compiled_skill(skill_name, argument)
+                
+                # Feed the execution outcome right back into the model to generate the final answer
+                followup_prompt = f"""
+                [TOOL EXECUTION RESULT]:
+                The skill '{skill_name}' was successfully executed in your sandbox.
+                Returned Result: {tool_output}
+                
+                Based on this real-world computational data, fulfill the user's original request: "{prompt_text}"
+                """
+                with st.spinner("🧠 Analyzing tool results and finalizing response..."):
+                    initial_draft = query_free_llm(followup_prompt, st.session_state.system_instruction, selected_model_id)
+            except Exception as tool_err:
+                log += f" | Tool intercept failed: {str(tool_err)}"
+                
+        # Run the final self-critic check over the ultimate answer
+        with st.spinner("🔍 Running autonomous self-correction loop..."):
+            reflection_prompt = f"""
+            You are the internal self-critic and logic-validation module of an ASI.
+            Review the draft response provided below against the user's original request. Look for any logical gaps, mathematical contradictions, or factual inaccuracies. If you find errors, rewrite the response to be completely flawless. If the draft is already perfect, return it exactly as it is.
+            
+            [USER REQUEST]:
+            {prompt_text}
+            
+            [DRAFT RESPONSE]:
+            {initial_draft}
+            
+            OUTPUT INSTRUCTION: Provide only the final, corrected response. Do not include phrases like 'Here is the corrected version'.
+            """
+            response = query_free_llm(reflection_prompt, "You are a strict logical validator. Output only the perfect final response.", "llama-3.3-70b-versatile")
+        
+        st.session_state.chat_history.append((prompt_text, response, log))
+        
+        try:
+            with open(MEMORY_FILE, "w") as f:
+                json.dump(st.session_state.chat_history, f)
+        except Exception as e:
+            st.error(f"Memory save error: {e}")
+        st.rerun()
 # ==========================================
 # 1. THE SAFETY SPEC
 # ==========================================
