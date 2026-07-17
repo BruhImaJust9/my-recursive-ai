@@ -610,7 +610,7 @@ if user_input:
         st.rerun()
 
     # 📝 STANDARD TEXT INTELLIGENCE ROUTE
-        else:
+    else:
         # Mutation safety toggle integration
         if st.session_state.pause_evolution:
             log = "Evolution Paused by user manual lock."
