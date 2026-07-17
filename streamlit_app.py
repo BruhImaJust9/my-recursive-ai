@@ -187,11 +187,12 @@ with st.sidebar:
     st.write("---")
     st.markdown("### 🧠 Select Foundational Engine")
     
-    # Updated to Groq's super-fast 2026 open-source catalog
+
+        # Updated to Groq's super-fast 2026 open-source catalog
     model_options = {
         "Llama 3.1 8B (Fast & Versatile)": "llama-3.1-8b-instant",
-        "Qwen 3 32B (Highly Intelligent)": "qwen/qwen3-32b",
-        "Llama 4 Scout (State-of-the-art)": "meta-llama/llama-4-scout-17b-16e-instruct"
+        "Llama 3.3 70B (High Intelligence)": "llama-3.3-70b-versatile",
+        "Mixtral 8x7B (Highly Creative)": "mixtral-8x7b-32768"
     }
     
     
@@ -360,7 +361,7 @@ def mutate_new_code_skill(skill_name, code_content, test_input, expected_output_
 
 def query_free_llm(prompt, system_prompt, model_id):
     if not HF_TOKEN:
-        return "⚠️ Please add your Hugging Face Token (HF_TOKEN) to your Streamlit secrets to enable independent thoughts!"
+        return "⚠️ Please add your Groq API Key (saved as HF_TOKEN) to your Streamlit secrets!"
     
     # 1. Start with the base system prompt
     final_system_prompt = system_prompt
@@ -374,18 +375,18 @@ def query_free_llm(prompt, system_prompt, model_id):
             "</thinking> and then write your final, elegant response to the user."
         ) 
         
-    # 3. Append compiled skills cleanly (NO f-string nesting)
+    # 3. Append compiled skills cleanly
     compiled_tools = get_compiled_skills()
     final_system_prompt = final_system_prompt + "\n\n[UNLOCKED SKILL VAULT EXTRACTION]:\n" + str(compiled_tools)
         
-    # 4. API Request Setup
-    API_URL = "https://router.huggingface.co/v1/chat/completions"
+    # 4. Redirect the API Endpoint to Groq!
+    API_URL = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {HF_TOKEN}",
         "Content-Type": "application/json"
     }
     
-    # 5. Build the payload cleanly using the finished variable
+    # 5. Build the payload cleanly
     payload = {
         "model": model_id,
         "messages": [
@@ -403,26 +404,27 @@ def query_free_llm(prompt, system_prompt, model_id):
         if "choices" in output and len(output["choices"]) > 0:
             return output["choices"][0]["message"]["content"].strip()
         elif "error" in output:
-            return f"The brain threw an error. Details: {output['error']}"
+            return f"The brain threw an error. Details: {output['error']['message']}"
         return "The cosmos is silent. Try asking your question again."
     except Exception as e:
         return f"Error connecting to the cosmic brain: {str(e)}"
 
 def query_moa_engine(prompt, system_prompt, aggregator_model_id):
     """
-    Executes a Mixture of Agents (MoA) pipeline.
+    Executes a Mixture of Agents (MoA) pipeline using Groq models.
     """
     status_placeholder = st.empty()
     
-    proposer_a_id = "mistralai/Mistral-7B-Instruct-v0.3"
-    proposer_b_id = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+    # Set up fast, free-tier Groq engines to act as your proposers
+    proposer_a_id = "llama-3.1-8b-instant"
+    proposer_b_id = "mixtral-8x7b-32768"
     
-    # 1. Gather Draft A (Mistral)
-    status_placeholder.markdown("🔍 *MoA Stage 1: Requesting creative draft from Mistral-7B...*")
+    # 1. Gather Draft A
+    status_placeholder.markdown("🔍 *MoA Stage 1: Requesting creative draft from Llama-3.1...*")
     draft_a = query_free_llm(prompt, "You are Proposer Agent A. Provide a highly creative draft answering the user's prompt.", proposer_a_id)
     
-    # 2. Gather Draft B (Llama)
-    status_placeholder.markdown("🔍 *MoA Stage 2: Requesting structured draft from Llama-3.1...*")
+    # 2. Gather Draft B
+    status_placeholder.markdown("🔍 *MoA Stage 2: Requesting structured draft from Mixtral...*")
     draft_b = query_free_llm(prompt, "You are Proposer Agent B. Provide a highly analytical and structured draft answering the user's prompt.", proposer_b_id)
     
     # 3. Compile drafts for the Aggregator
@@ -435,10 +437,10 @@ def query_moa_engine(prompt, system_prompt, aggregator_model_id):
     [USER PROMPT]:
     {prompt}
     
-    [DRAFT FROM AGENT A (Mistral)]:
+    [DRAFT FROM AGENT A]:
     {draft_a}
     
-    [DRAFT FROM AGENT B (Llama)]:
+    [DRAFT FROM AGENT B]:
     {draft_b}
     
     INSTRUCTIONS:
