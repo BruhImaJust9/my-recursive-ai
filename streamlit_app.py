@@ -352,7 +352,7 @@ def mutate_new_code_skill(skill_name, code_content, test_input, expected_output_
             os.remove(file_path)
         return f"❌ Mutation crashed: {str(e)}"
 def query_free_llm(prompt, system_prompt, model_id):
-def query_moa_engine(prompt, system_prompt, aggregator_model_id):
+    def query_moa_engine(prompt, system_prompt, aggregator_model_id):
     """
     Executes a Mixture of Agents (MoA) pipeline.
     1. Queries 'Proposer A' (Mistral) and 'Proposer B' (Llama) for draft answers.
