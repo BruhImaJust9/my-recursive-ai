@@ -187,13 +187,13 @@ with st.sidebar:
     st.write("---")
     st.markdown("### 🧠 Select Foundational Engine")
     
-    # Define a dictionary of top-tier models available on the Hugging Face Router
+    # Updated to Groq's super-fast 2026 open-source catalog
     model_options = {
-        "Qwen 2.5 (7B) - Default": "Qwen/Qwen2.5-7B-Instruct",
-        "Llama 3.1 (8B) - Versatile": "meta-llama/Meta-Llama-3.1-8B-Instruct",
-        "Mistral (7B) - Creative": "mistralai/Mistral-7B-Instruct-v0.3",
-        "Phi-3 Medium - Logical": "microsoft/Phi-3-medium-4k-instruct"
+        "Llama 3.1 8B (Fast & Versatile)": "llama-3.1-8b-instant",
+        "Qwen 3 32B (Highly Intelligent)": "qwen/qwen3-32b",
+        "Llama 4 Scout (State-of-the-art)": "meta-llama/llama-4-scout-17b-16e-instruct"
     }
+    
     
     selected_model_name = st.selectbox(
         "Choose active neural host:",
