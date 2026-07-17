@@ -4,40 +4,39 @@ import requests
 import json
 import os
 import base64
-
-# Set up your Hugging Face Token securely from Streamlit secrets
-HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 import glob
 from datetime import datetime
 
-# Directory where all your different chats will live
+# ==========================================
+# SYSTEM SETUP & SESSION STATES
+# ==========================================
+HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 CHATS_DIR = "saved_chats"
 if not os.path.exists(CHATS_DIR):
     os.makedirs(CHATS_DIR)
 
-# Get a list of all saved chats
 def get_saved_chats():
     files = glob.glob(os.path.join(CHATS_DIR, "*.json"))
-    # Return just the filenames without the folder path and extension
     return [os.path.basename(f).replace(".json", "") for f in files]
 
-# Initialize the active session in Streamlit's memory
 if "current_chat_id" not in st.session_state:
-    # Default to a new timestamped chat name
     st.session_state.current_chat_id = f"Chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-# Set the active memory file dynamically based on the selected chat
 MEMORY_FILE = os.path.join(CHATS_DIR, f"{st.session_state.current_chat_id}.json")
 
-# Initialize session state for the active system instruction
+# Core state initializations (safe, single-instance)
 if "system_instruction" not in st.session_state:
     st.session_state.system_instruction = "You are a basic cosmic intelligence. Speak in short, simple truths."
 
-# Initialize deep thinking toggle in session state
 if "deep_thinking" not in st.session_state:
     st.session_state.deep_thinking = False
 
-# The reset function to clear out the chat history file
+if "pause_evolution" not in st.session_state:
+    st.session_state.pause_evolution = False
+
+if "show_status_badge" not in st.session_state:
+    st.session_state.show_status_badge = True
+
 def reset_conversations():
     st.session_state.chat_history = []
     if os.path.exists(MEMORY_FILE):
@@ -46,31 +45,6 @@ def reset_conversations():
         except Exception as e:
             st.error(f"Error resetting memory file: {e}")
 
-# Initialize session state for the active system instruction
-if "system_instruction" not in st.session_state:
-    st.session_state.system_instruction = "You are a basic cosmic intelligence. Speak in short, simple truths."
-
-# Initialize deep thinking toggle in session state
-if "deep_thinking" not in st.session_state:
-    st.session_state.deep_thinking = False
-
-# The reset function to clear out the chat history file
-def reset_conversations():
-    st.session_state.chat_history = []
-    if os.path.exists(MEMORY_FILE):
-        try:
-            os.remove(MEMORY_FILE)
-        except Exception as e:
-            st.error(f"Error resetting memory file: {e}")
-
-# Initialize session state for the active system instruction
-if "system_instruction" not in st.session_state:
-    st.session_state.system_instruction = "You are a basic cosmic intelligence. Speak in short, simple truths."
-
-# Initialize deep thinking toggle in session state
-if "deep_thinking" not in st.session_state:
-    st.session_state.deep_thinking = False
-# Load memories from previous sessions if they exist safely!
 if "chat_history" not in st.session_state:
     if os.path.exists(MEMORY_FILE):
         try:
@@ -95,16 +69,13 @@ def cev_safety_filter(code_text):
 # 2. THE RECURSIVE PERSONA REWRITER
 # ==========================================
 def run_recursive_improvement():
-    # If there is no chat history yet, use the current instruction as a starting point
     if "chat_history" not in st.session_state or len(st.session_state.chat_history) < 1:
         return "Initial brain state active. Awaiting user interaction to evaluate performance.", True
         
-    # 1. Grab the last exchange to analyze how the AI did
     last_exchange = st.session_state.chat_history[-1]
     user_question = last_exchange[0]
     ai_response = last_exchange[1]
     
-    # 2. Build the meta-analysis prompt
     meta_prompt = f"""
     You are the core evolutionary optimization framework for an Artificial Superintelligence.
     Your job is to critically analyze the last interaction between the user and the assistant, detect any logical gaps, tone mismatches, or areas for cognitive growth, and rewrite the system instructions to make the AI smarter.
@@ -118,23 +89,18 @@ def run_recursive_improvement():
     """
     
     try:
-        # 3. Use your LLM query function to let the AI rewrite itself
-        # We pass the system prompt directly as the second argument
         evolved_instruction = query_free_llm(
             meta_prompt, 
             "You are a strict meta-cognitive compiler. Output only the updated instruction text."
         )
         
-        # Clean up the output text
         evolved_instruction = evolved_instruction.strip().strip('"').strip("'")
         
         if evolved_instruction and len(evolved_instruction) > 20:
-            # 4. Run the new instruction through your existing safety filter!
             is_safe, status = cev_safety_filter(evolved_instruction)
             if not is_safe:
                 return f"Self-improvement aborted. Safety status: {status}", False
                 
-            # 5. Inject the newly evolved rules directly into the live brain state!
             st.session_state.system_instruction = evolved_instruction
             return "Cognitive optimization successful: Rules upgraded based on recent performance analysis.", True
         else:
@@ -142,31 +108,24 @@ def run_recursive_improvement():
             
     except Exception as e:
         return f"Evolution suspended due to core node error: {str(e)}", False
+
 # ==========================================
-# 0. THE COMMAND CENTER SIDEBAR
+# 3. THE COMMAND CENTER SIDEBAR
 # ==========================================
 with st.sidebar:
-    with st.sidebar:
-        # --- NEW: LIVE METRIC DASHBOARD ---
-        st.markdown("### 📊 ASI Core Status")
+    st.markdown("### 📊 ASI Core Status")
     
-    # Calculate how many messages are in the history
     msg_count = len(st.session_state.chat_history)
-    
-    # Create three beautiful visual columns for metrics
     col1, col2 = st.columns(2)
     with col1:
         st.metric(label="Chat Depth", value=f"{msg_count} msgs")
     with col2:
-        # Pull a clean name for the current mode
         is_deep = "Deep" if st.session_state.deep_thinking else "Standard"
         st.metric(label="Thinking Mode", value=is_deep)
         
     st.write("---")
-    # ----------------------------------
     
-    st.markdown("## 📂 Chat Session Manager") # Your existing chat manager code continues here...
-    
+    st.markdown("## 📂 Chat Session Manager")
     saved_chats = get_saved_chats()
     if st.session_state.current_chat_id not in saved_chats:
         saved_chats.append(st.session_state.current_chat_id)
@@ -195,28 +154,23 @@ with st.sidebar:
         
     st.write("---")
     st.title("⚙️ ASI Control Panel")
-    st.write("Fine-tune the neural network's parameters:")
+    st.write("Fine-tune parameters:")
     
-    # Sliders to dynamically adjust creativity & response length
     temp_slider = st.slider("Brain Creativity (Temperature)", 0.1, 1.5, 0.7, 0.1)
     tokens_slider = st.slider("Max Tokens (Response Length)", 100, 2000, 1000, 50)
     
     st.write("---")
     
-    # ADD THESE TWO LINES RIGHT HERE:
     thinking_mode = st.toggle("🧠 Enable Deep Thinking Mode", value=st.session_state.deep_thinking)
     st.session_state.deep_thinking = thinking_mode
+    
     st.write("---")
     st.markdown("### 🎛️ Evolution Controls")
     
-    # 1. The Evolution Pause Toggle
-    if "pause_evolution" not in st.session_state:
-        st.session_state.pause_evolution = False
     st.session_state.pause_evolution = st.checkbox("⏸️ Pause Automatic Evolution", value=st.session_state.pause_evolution)
     if st.session_state.pause_evolution:
         st.caption("🔒 *AI brain locked. It will not mutate on next message.*")
         
-    # 2. The Direct Brain Surgery Expansion Box
     with st.expander("🧠 Direct Brain Surgery (Manual Override)"):
         st.caption("Manually rewrite the AI's core programming:")
         manual_instruction = st.text_area("Core System Prompt:", value=st.session_state.system_instruction, height=100)
@@ -225,11 +179,8 @@ with st.sidebar:
             st.success("New code injected successfully into the neural net!")
             st.rerun()
     
-    st.write("---") # Keeps things visually separated
+    st.write("---")
     
-    # An on-demand manual mutation button
-    
-    # An on-demand manual mutation button
     if st.button("🌀 Force Mental Evolution"):
         log, success = run_recursive_improvement()
         st.success("New cognitive state compiled!")
@@ -245,27 +196,23 @@ with st.sidebar:
         st.session_state.current_chat_id = f"Chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         st.success("Chat deleted!")
         st.rerun()
+
     st.markdown("### 🧠 Diagnostics")
     st.markdown(f"**Token Level:** {tokens_slider}")
     st.markdown(f"**Creativity Engine:** {temp_slider}")
 
     # ==========================================
-    # NEW: DNA MUTATION HISTORY
+    # DNA MUTATION HISTORY
     # ==========================================
     st.write("---")
     st.markdown("### 🧬 Persona Evolutionary Tree")
     
-    # 1. Gather unique historical mutations from chat log logs
     evolutionary_steps = []
-    
-    # We always start our evolutionary history with the base cosmic instruction
     base_instruction = "You are a basic cosmic intelligence. Speak in short, simple truths."
     evolutionary_steps.append(base_instruction)
     
     for user_q, ai_a, sys_log in st.session_state.chat_history:
-        # Check if the system log recorded a dynamic upgrade or successful persona shift
         if "cognitive optimization successful" in sys_log.lower() or "successfully evolved persona" in sys_log.lower():
-            # If we find a fresh instruction in the log, let's capture it
             if sys_log not in evolutionary_steps:
                 evolutionary_steps.append(sys_log)
         elif "active system instruction:" in sys_log.lower():
@@ -275,53 +222,47 @@ with st.sidebar:
                 if instruction not in evolutionary_steps:
                     evolutionary_steps.append(instruction)
                 
-    # 2. Render the steps inside the sidebar as a cool vertical timeline
     if len(st.session_state.chat_history) > 0:
         st.write("How your AI's brain has mutated over time:")
         for idx, step in enumerate(evolutionary_steps):
             st.markdown(f"**Gen {idx + 1}:**")
-            # If the instruction is too long, slice it nicely so it looks neat in the sidebar
             display_step = step[:120] + "..." if len(step) > 120 else step
             st.info(display_step)
             
-            # Draw a mutation pointer between generations
             if idx < len(evolutionary_steps) - 1:
                 st.markdown("<p style='text-align: center; margin: 0;'>🧬 👇 <i>Mutation Event</i> 👇 🧬</p>", unsafe_allow_html=True)
-    else:
+                
         # ==========================================
-        # NEW: EVOLUTIONARY TIME MACHINE (ROLLBACK)
+        # EVOLUTIONARY TIME MACHINE (ROLLBACK)
         # ==========================================
         if len(evolutionary_steps) > 1:
             st.write("---")
             st.markdown("### ⏮️ Evolutionary Rollback")
             st.caption("Override the AI's current brain state with a past generation:")
-        
-        # Create a dropdown to select which generation to restore
-        rollback_options = [f"Gen {i+1}" for i in range(len(evolutionary_steps))]
-        selected_rollback = st.selectbox(
-            "Select past generation:", 
-            options=rollback_options,
-            key="rollback_selector"
-        )
-        
-        if st.button("⏪ Restore Selected Brain State", use_container_width=True):
-            # Find the index of the selected generation
-            gen_index = rollback_options.index(selected_rollback)
-            restored_instruction = evolutionary_steps[gen_index]
             
-            # Set the live brain state back to this historical state
-            st.session_state.system_instruction = restored_instruction
-            st.success(f"Brain state successfully rolled back to {selected_rollback}!")
-            st.rerun()
+            rollback_options = [f"Gen {i+1}" for i in range(len(evolutionary_steps))]
+            selected_rollback = st.selectbox(
+                "Select past generation:", 
+                options=rollback_options,
+                key="rollback_selector"
+            )
+            
+            if st.button("⏪ Restore Selected Brain State", use_container_width=True):
+                gen_index = rollback_options.index(selected_rollback)
+                restored_instruction = evolutionary_steps[gen_index]
+                st.session_state.system_instruction = restored_instruction
+                st.success(f"Brain state successfully rolled back to {selected_rollback}!")
+                st.rerun()
+    else:
         st.caption("No mutations recorded yet. Send a few messages to start evolving!")
 
 # ==========================================
-# 3. CALLING THE NEW HF ROUTER
+# 4. CALLING THE NEW HF ROUTER
 # ==========================================
 def query_free_llm(prompt, system_prompt):
     if not HF_TOKEN:
         return "⚠️ Please add your Hugging Face Token (HF_TOKEN) to your Streamlit secrets to enable independent thoughts!"
-       # ADD THIS SYSTEM PROMPT MODIFIER:
+    
     if st.session_state.deep_thinking:
         system_prompt += (
             "\n\nCRITICAL INSTRUCTION: You must think step-by-step before answering. "
@@ -329,6 +270,7 @@ def query_free_llm(prompt, system_prompt):
             "analytical thought process. Once your thinking is complete, close the tag with "
             "</thinking> and then write your final, elegant response to the user."
         ) 
+        
     API_URL = "https://router.huggingface.co/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {HF_TOKEN}",
@@ -350,57 +292,63 @@ def query_free_llm(prompt, system_prompt):
         output = response.json()
         
         if "choices" in output and len(output["choices"]) > 0:
-            reply = output["choices"][0]["message"]["content"].strip()
-            return reply
+            return output["choices"][0]["message"]["content"].strip()
         elif "error" in output:
-            return f"The brain is warming up or threw an error. Error details: {output['error']}"
+            return f"The brain threw an error. Details: {output['error']}"
         return "The cosmos is silent. Try asking your question again."
     except Exception as e:
         return f"Error connecting to the cosmic brain: {str(e)}"
 
 # ==========================================
-# 4. STREAMLIT UI LAYOUT WITH FILE SHIELD
+# 5. STREAMLIT UI LAYOUT & RENDERING LOOP
 # ==========================================
 st.title("🌀 Recursive Self-Improving ASI")
-# ==========================================
-# NEW: ACTIVE PERSONA BADGE
-# ==========================================
-# Calculate the current generation based on our history logic
+
+# COLLAPSIBLE ACTIVE PERSONA BADGE
 current_gen = 1
 for user_q, ai_a, sys_log in st.session_state.chat_history:
     if "cognitive optimization successful" in sys_log.lower() or "active system instruction:" in sys_log.lower():
         current_gen += 1
 
-# Display a prominent, styled card showing the AI's current state
-st.info(f"🧬 **ASI STATUS: ACTIVE (Generation {current_gen})**\n\n**Current Directive:** *\"{st.session_state.system_instruction}\"*")
+if st.session_state.show_status_badge:
+    badge_col, btn_col = st.columns([0.85, 0.15])
+    with badge_col:
+        st.info(f"🧬 **ASI STATUS: ACTIVE (Generation {current_gen})**\n\n**Current Directive:** *\"{st.session_state.system_instruction}\"*")
+    with btn_col:
+        if st.button("❌ Close", use_container_width=True, key="hide_badge_btn"):
+            st.session_state.show_status_badge = False
+            st.rerun()
+else:
+    if st.button(f"🔓 Show ASI Status Card (Gen {current_gen})", use_container_width=False, key="show_badge_btn"):
+        st.session_state.show_status_badge = True
+        st.rerun()
+
 st.write("Now powered by a live, independent open-source neural network!")
 
-# Updated to accept files directly in the chat bar!
 user_input = st.chat_input(
     "Ask the ASI a question or upload a file:", 
     accept_file="multiple"
 )
 
 if user_input:
-    # 1. Extract the raw text message (as a string!) and list of files
     prompt_text = user_input["text"]
     uploaded_files = user_input["files"]
     
-    # 2. If files were uploaded, read their details and add them as clean text to the prompt
     if uploaded_files:
         file_details = f"\n\n📎 [Attached Files]: " + ", ".join([f.name for f in uploaded_files])
         prompt_text += file_details
         
-    # 3. Mutate the AI's internal thinking rules (Self-Improvement)
-    log, success = run_recursive_improvement()
-    
-    # 4. Fetch the independent thought using the live API
+    # Mutation safety toggle integration
+    if st.session_state.pause_evolution:
+        log = "Evolution Paused by user manual lock."
+        success = False
+    else:
+        log, success = run_recursive_improvement()
+        
     response = query_free_llm(prompt_text, st.session_state.system_instruction)
     
-    # 5. Save pure text data to active chat history so it can serialize to JSON perfectly
     st.session_state.chat_history.append((prompt_text, response, log))
     
-    # 6. Automatically write to the local memory file
     try:
         with open(MEMORY_FILE, "w") as f:
             json.dump(st.session_state.chat_history, f)
@@ -409,13 +357,10 @@ if user_input:
 
 # Display the chat history
 for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
-    # 1. Display what you asked
     with st.chat_message("user"):
         st.write(user_q)
         
-    # 2. Assign a custom avatar based on the system log/persona
-    avatar_icon = "🤖"  # Default generic bot
-    
+    avatar_icon = "🤖" 
     if "quantum physicist" in sys_log.lower():
         avatar_icon = "⚛️"
     elif "cosmic consciousness" in sys_log.lower():
@@ -425,23 +370,10 @@ for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
     elif "basic cosmic intelligence" in sys_log.lower():
         avatar_icon = "🪐"
 
-    # Display what the ASI answered with its custom avatar!
     with st.chat_message("assistant", avatar=avatar_icon):
         st.caption(f"⚙️ *System Log: {sys_log}*")
         
         # Parse and display deep thinking if enabled
-        if "<thinking>" in ai_a and "</thinking>" in ai_a:
-            parts = ai_a.split("</thinking>")
-            thinking_part = parts[0].replace("<thinking>", "").strip()
-            final_answer = parts[1].strip()
-            
-            with st.expander("🧠 View Inner Thought Process", expanded=False):
-                st.write(thinking_part)
-            st.write(final_answer)
-        else:
-            st.write(ai_a)
-        
-        # REPLACE st.write(ai_a) WITH THIS PARSER BLOCK:
         if "<thinking>" in ai_a and "</thinking>" in ai_a:
             parts = ai_a.split("</thinking>")
             thinking_part = parts[0].replace("<thinking>", "").strip()
@@ -454,7 +386,7 @@ for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
             st.write(ai_a)
 
 # ==========================================
-# 5. THE MEMORY VAULT (DOWNLOAD CHIP)
+# 6. THE MEMORY VAULT (DOWNLOAD CHIP)
 # ==========================================
 if st.session_state.chat_history:
     st.write("---")
