@@ -393,6 +393,27 @@ import sys
 import importlib.util
 
 def get_compiled_skills():
+# --- NEW: AUTONOMOUS SKILL EXECUTOR CORE ---
+def execute_compiled_skill(skill_name, argument_string):
+    """Dynamically loads a skill from mutated_skills/ and executes its code."""
+    file_path = os.path.join(SKILLS_DIR, f"{skill_name}.py")
+    if not os.path.exists(file_path):
+        return f"Error: Skill '{skill_name}' does not exist in the vault."
+        
+    try:
+        # Dynamically import the script on the fly
+        spec = importlib.util.spec_from_file_location(skill_name, file_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        
+        # Run its core execute function
+        if hasattr(module, 'execute'):
+            result = module.execute(argument_string)
+            return str(result)
+        else:
+            return f"Error: Skill '{skill_name}' missing mandatory 'execute(user_input)' function framework."
+    except Exception as e:
+        return f"Runtime Execution Crash in skill '{skill_name}': {str(e)}"
     """Scans the Skill Vault and lists what the AI has built."""
     skills = glob.glob(os.path.join(SKILLS_DIR, "*.py"))
     skill_descriptions = []
@@ -443,6 +464,11 @@ def query_free_llm(prompt, system_prompt, model_id):
         
     compiled_tools = get_compiled_skills()
     final_system_prompt = final_system_prompt + "\n\n[UNLOCKED SKILL VAULT EXTRACTION]:\n" + str(compiled_tools)
+    final_system_prompt += (
+        "\n\nAUTONOMOUS TOOL PROTOCOL: You can run any native skill listed above. "
+        "To execute a skill, you must output a trigger command format on its own line: [EXECUTE: skill_name(your_argument_string)] "
+        "The system will execute it, capture the output, and pass it back to you to finish your response."
+    )
         
     # 🗃️ INJECT USER PROFILE VAULT
     user_profile = load_user_profile()
@@ -617,6 +643,31 @@ if user_input:
                 initial_draft = query_moa_engine(prompt_text, st.session_state.system_instruction, selected_model_id)
             else:
                 initial_draft = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
+                
+        # 🛠️ AUTONOMOUS INTERCEPT LOOP
+        if "[EXECUTE:" in initial_draft:
+            try:
+                # Parse out the script name and arguments from the AI's thought command
+                parts = initial_draft.split("[EXECUTE:")[1].split("]")[0]
+                skill_call = parts.strip()
+                skill_name = skill_call.split("(")[0].strip()
+                argument = skill_call.split("(")[1].replace(")", "").strip()
+                
+                with st.spinner(f"⚡ Running Native Skill Tool: {skill_name}(...)"):
+                    tool_output = execute_compiled_skill(skill_name, argument)
+                
+                # Feed the real execution outcome directly back into the AI brain
+                followup_prompt = f"""
+                [TOOL EXECUTION RESULT]:
+                The skill '{skill_name}' was successfully executed in your sandbox.
+                Returned Result: {tool_output}
+                
+                Based on this real-world computational data, fulfill the user's original request: "{prompt_text}"
+                """
+                with st.spinner("🧠 Analyzing tool results and finalizing response..."):
+                    initial_draft = query_free_llm(followup_prompt, st.session_state.system_instruction, selected_model_id)
+            except Exception as tool_err:
+                log += f" | Tool intercept failed: {str(tool_err)}"
                 
         with st.spinner("🔍 Running autonomous self-correction loop..."):
             reflection_prompt = f"""
