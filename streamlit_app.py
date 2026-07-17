@@ -268,7 +268,7 @@ with st.sidebar:
             
             # Draw a mutation pointer between generations
             if idx < len(evolutionary_steps) - 1:
-                st.markdown("<p style='text-align: center; margin: 0;'>🧬 👇 <i>Mutation Event</i> 👇 🧬</p>", unsafe_html=True)
+                st.markdown("<p style='text-align: center; margin: 0;'>🧬 👇 <i>Mutation Event</i> 👇 🧬</p>", unsafe_allow_html=True)
     else:
         st.caption("No mutations recorded yet. Send a few messages to start evolving!")
 
