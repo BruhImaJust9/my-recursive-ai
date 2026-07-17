@@ -350,40 +350,38 @@ def query_free_llm(prompt, system_prompt, model_id):
     if not HF_TOKEN:
         return "⚠️ Please add your Hugging Face Token (HF_TOKEN) to your Streamlit secrets to enable independent thoughts!"
     
-    # [ON TOP]: Deep Thinking modifier (existing code)
+    # 1. Start with the base system prompt
+    final_system_prompt = system_prompt
+    
+    # 2. Append Deep Thinking rules if checked
     if st.session_state.deep_thinking:
-        system_prompt += (
+        final_system_prompt += (
             "\n\nCRITICAL INSTRUCTION: You must think step-by-step before answering. "
             "Start your response with <thinking> and write out your raw, unedited, "
             "analytical thought process. Once your thinking is complete, close the tag with "
             "</thinking> and then write your final, elegant response to the user."
         ) 
         
-    # =====================================================================
-    # 👉 [IN BETWEEN]: PLACE STEP 3 RIGHT HERE!
-    # =====================================================================
+    # 3. Append compiled skills cleanly (NO f-string nesting)
     compiled_tools = get_compiled_skills()
-    system_prompt += f"\n\n[UNLOCKED SKILL VAULT EXTRACTION]:\n{compiled_tools}"
-    # =====================================================================
+    final_system_prompt = final_system_prompt + "\n\n[UNLOCKED SKILL VAULT EXTRACTION]:\n" + str(compiled_tools)
         
-    # [ON THE BOTTOM]: API setup and network request (existing code)
+    # 4. API Request Setup
     API_URL = "https://router.huggingface.co/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {HF_TOKEN}",
         "Content-Type": "application/json"
     }
     
+    # 5. Build the payload cleanly using the finished variable
     payload = {
         "model": model_id,
         "messages": [
-            {"role": "system", "content": system_prompt}, # <-- It grabs the modified prompt here!
+            {"role": "system", "content": final_system_prompt},
             {"role": "user", "content": prompt}
         ],
         "max_tokens": tokens_slider,
         "temperature": temp_slider
-    }
-    
-    # ... rest of your try/except block ...
     }
     
     try:
