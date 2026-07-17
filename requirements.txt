@@ -1,1 +1,2 @@
 streamlit
+duckduckgo-search
