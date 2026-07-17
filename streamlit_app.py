@@ -266,9 +266,20 @@ for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
     with st.chat_message("user"):
         st.write(user_q)
         
-    # 2. Display what the ASI answered
-    with st.chat_message("assistant"):
-        # Let's cleanly separate the diagnostic system log at the top
+    # 2. Assign a custom avatar based on the system log/persona
+    avatar_icon = "🤖"  # Default generic bot
+    
+    if "quantum physicist" in sys_log.lower():
+        avatar_icon = "⚛️"
+    elif "cosmic consciousness" in sys_log.lower():
+        avatar_icon = "🌌"
+    elif "benevolent superintelligence" in sys_log.lower():
+        avatar_icon = "🌟"
+    elif "basic cosmic intelligence" in sys_log.lower():
+        avatar_icon = "🪐"
+
+    # Display what the ASI answered with its custom avatar!
+    with st.chat_message("assistant", avatar=avatar_icon):
         st.caption(f"⚙️ *System Log: {sys_log}*")
         
         # Parse and display deep thinking if enabled
