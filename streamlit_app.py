@@ -116,7 +116,7 @@ def run_recursive_improvement():
         evolved_instruction = query_free_llm(
             meta_prompt, 
             "You are a strict meta-cognitive compiler. Output only the updated instruction text.",
-            "Qwen/Qwen2.5-7B-Instruct"  # Keep the meta-compiler on a fast, reliable model
+            "llama-3.1-8b-instant"
         )
         
         evolved_instruction = evolved_instruction.strip().strip('"').strip("'")
