@@ -454,7 +454,7 @@ def query_moa_engine(prompt, system_prompt, aggregator_model_id):
     return final_response
     
     def generate_image(prompt_text):
-    import requests
+        import requests
     import io
     from PIL import Image
     API_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell"
