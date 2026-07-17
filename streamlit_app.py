@@ -158,7 +158,23 @@ with st.sidebar:
     
     temp_slider = st.slider("Brain Creativity (Temperature)", 0.1, 1.5, 0.7, 0.1)
     tokens_slider = st.slider("Max Tokens (Response Length)", 100, 2000, 1000, 50)
+    # NEW: MULTI-MODEL BRAIN SWAP
+    st.write("---")
+    st.markdown("### 🧠 Select Foundational Engine")
     
+    # Define a dictionary of top-tier models available on the Hugging Face Router
+    model_options = {
+        "Qwen 2.5 (7B) - Default": "Qwen/Qwen2.5-7B-Instruct",
+        "Llama 3.1 (8B) - Versatile": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+        "Mistral (7B) - Creative": "mistralai/Mistral-7B-Instruct-v0.3",
+        "Phi-3 Medium - Logical": "microsoft/Phi-3-medium-4k-instruct"
+    }
+    
+    selected_model_name = st.selectbox(
+        "Choose active neural host:",
+        options=list(model_options.keys())
+    )
+    selected_model_id = model_options[selected_model_name]
     st.write("---")
     
     thinking_mode = st.toggle("🧠 Enable Deep Thinking Mode", value=st.session_state.deep_thinking)
@@ -259,7 +275,7 @@ with st.sidebar:
 # ==========================================
 # 4. CALLING THE NEW HF ROUTER
 # ==========================================
-def query_free_llm(prompt, system_prompt):
+def query_free_llm(prompt, system_prompt, model_id): # <-- Added model_id here
     if not HF_TOKEN:
         return "⚠️ Please add your Hugging Face Token (HF_TOKEN) to your Streamlit secrets to enable independent thoughts!"
     
@@ -278,7 +294,7 @@ def query_free_llm(prompt, system_prompt):
     }
     
     payload = {
-        "model": "Qwen/Qwen2.5-7B-Instruct",
+        "model": model_id, # <-- Dynamically use the selected model!
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}
@@ -345,7 +361,7 @@ if user_input:
     else:
         log, success = run_recursive_improvement()
         
-    response = query_free_llm(prompt_text, st.session_state.system_instruction)
+    response = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
     
     st.session_state.chat_history.append((prompt_text, response, log))
     
