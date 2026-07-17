@@ -113,6 +113,26 @@ def run_recursive_improvement():
 # 0. THE COMMAND CENTER SIDEBAR
 # ==========================================
 with st.sidebar:
+    with st.sidebar:
+    # --- NEW: LIVE METRIC DASHBOARD ---
+    st.markdown("### 📊 ASI Core Status")
+    
+    # Calculate how many messages are in the history
+    msg_count = len(st.session_state.chat_history)
+    
+    # Create three beautiful visual columns for metrics
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric(label="Chat Depth", value=f"{msg_count} msgs")
+    with col2:
+        # Pull a clean name for the current mode
+        is_deep = "Deep" if st.session_state.deep_thinking else "Standard"
+        st.metric(label="Thinking Mode", value=is_deep)
+        
+    st.write("---")
+    # ----------------------------------
+    
+    st.markdown("## 📂 Chat Session Manager") # Your existing chat manager code continues here...
     st.markdown("## 📂 Chat Session Manager")
     
     saved_chats = get_saved_chats()
