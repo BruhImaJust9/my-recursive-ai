@@ -123,7 +123,7 @@ def run_recursive_improvement():
         evolved_instruction = query_free_llm(
             meta_prompt, 
             "You are a strict meta-cognitive compiler. Output only the updated instruction text."
-        ))
+        )
         
         # Clean up the output text
         evolved_instruction = evolved_instruction.strip().strip('"').strip("'")
