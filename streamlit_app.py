@@ -205,7 +205,7 @@ with st.sidebar:
     thinking_mode = st.toggle("🧠 Enable Deep Thinking Mode", value=st.session_state.deep_thinking)
     st.session_state.deep_thinking = thinking_mode
     # NEW: MIXTURE OF AGENTS TOGGLE
-    moa_mode = st.toggle("👥 Enable Mixture of Agents (MoA)", value=st.get_all_state if "moa_active" in st.session_state else False)
+    moa_mode = st.toggle("👥 Enable Mixture of Agents (MoA)", value=st.session_state.moa_active if "moa_active" in st.session_state else False)
     st.session_state.moa_active = moa_mode
     if st.session_state.moa_active:
         st.caption("✨ *MoA Active: Mistral & Llama will collaborate behind the scenes!*")
