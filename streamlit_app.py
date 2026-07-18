@@ -202,7 +202,7 @@ def execute_internet_search(query):
     return "Search executed, but page layout returned blank data structures after multiple synchronization retries."
                 
                 # Ultimate Fallback: Scrape raw anchor text strings if divs are hidden
-                if not results:
+                    if not results:
                     results = [r.get_text().strip() for r in soup.find_all('a') if 'result__url' in str(r.get('class', []))][:4]
 
                 final_context = "\n\n".join([r for r in results if r])
