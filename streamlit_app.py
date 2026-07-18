@@ -27,7 +27,7 @@ for directory in [CHATS_DIR, SKILLS_DIR]:
 GEN_TRACKER_FILE = os.path.join(CHATS_DIR, "universal_generation_counter.json")
 PROFILE_FILE = os.path.join(CHATS_DIR, "user_profile.json")
 
-# 🖥️ INJECTION 4: UI GLASSMORPHISM & MASTER DESIGN MATRIX
+# UI GLASSMORPHISM & MASTER DESIGN MATRIX
 st.set_page_config(page_title="Recursive Self-Improving ASI", page_icon="🌀", layout="wide")
 st.markdown(
     """
@@ -99,19 +99,16 @@ def get_saved_chats():
     chat_ids = [os.path.basename(f).replace(".json", "") for f in files]
     return [c for c in chat_ids if c not in ["universal_generation_counter", "user_profile"]]
 
-# 🧠 INJECTION 2: ADVANCED DYNAMIC PROFILE INFERENCE ENGINE
 def extract_and_update_profile(prompt_text):
     profile = load_user_profile()
     lowered = prompt_text.lower()
     updated = False
     
-    # Structural Name Mapping
     if "my name is " in lowered:
         name_part = prompt_text.split("my name is ")[1].split(".")[0].split(",")[0].strip()
         profile["user_name"] = name_part
         updated = True
         
-    # Semantic Context Inference Matrix
     interests_keywords = {
         "coding": ["python", "javascript", "c++", "rust", "html", "developer", "coding", "programming"],
         "math": ["calculus", "algebra", "multiply", "equation", "matrix", "derivative", "math"],
@@ -332,7 +329,6 @@ def query_moa_engine(prompt, system_prompt, aggregator_model_id):
 if "current_gen" not in st.session_state:
     st.session_state.current_gen = load_universal_generation()
 
-# 💾 INJECTION 1: SESSION MEMORY AUTO-RESTORATION CORE
 if "current_chat_id" not in st.session_state:
     saved_sessions = sorted(get_saved_chats(), reverse=True)
     if saved_sessions:
@@ -439,12 +435,20 @@ with st.sidebar:
         st.session_state.current_chat_id = f"Chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         st.rerun()
 
+    # UPGRADE 3: VISUAL SKILL VAULT EXECUTIVE & SANDBOX
     st.write("---")
-    st.markdown("### 🛠️ Hardware Skill Vault")
+    st.markdown("### 🛠️ Hardware Skill Vault Sandbox")
     skills_list = glob.glob(os.path.join(SKILLS_DIR, "*.py"))
     if skills_list:
         for s in skills_list:
-            st.success(f"⚙️ {os.path.basename(s)}")
+            s_name = os.path.basename(s).replace(".py", "")
+            with st.expander(f"⚙️ {s_name}.py"):
+                with open(s, "r") as f:
+                    st.code(f.read(), language="python")
+                test_arg = st.text_input("Execution Test Argument:", value="10", key=f"test_in_{s_name}")
+                if st.button(f"⚡ Execute {s_name}", key=f"btn_run_{s_name}"):
+                    out = execute_compiled_skill(s_name, test_arg)
+                    st.code(out, language="plaintext")
     else:
         st.info("Vault empty. Awaiting tool creation loops.")
         
@@ -480,7 +484,7 @@ else:
         st.session_state.show_status_badge = True
         st.rerun()
 
-# 🛠️ FLAW FIX 1: Display historical dialog trees top-to-bottom
+# Display historical dialog trees top-to-bottom
 for user_q, ai_a, sys_log in st.session_state.chat_history:
     with st.chat_message("user"):
         st.write(user_q)
@@ -499,7 +503,11 @@ for user_q, ai_a, sys_log in st.session_state.chat_history:
             """,
             unsafe_allow_html=True
         )
-        if "<thinking>" in ai_a and "</thinking>" in ai_a:
+        
+        # Check if the text is base64 markdown imagery
+        if ai_a.startswith("![Visual Output]"):
+            st.markdown(ai_a, unsafe_allow_html=True)
+        elif "<thinking>" in ai_a and "</thinking>" in ai_a:
             parts = ai_a.split("</thinking>")
             with st.expander("🧠 View Inner Thought Process"):
                 st.caption(parts[0].replace("<thinking>", "").strip())
@@ -513,7 +521,7 @@ st.markdown('<div id="scroll-anchor"></div>', unsafe_allow_html=True)
 # SYSTEM TEXT GENERATION PIPELINE INTERCEPT
 # ==========================================
 user_input = st.chat_input(
-    "Ask the ASI a question or upload a file:", 
+    "Ask the ASI a question or upload a file (Try /clear, /system [prompt], /search [query]):", 
     accept_file="multiple",
     disabled=st.session_state.processing 
 )
@@ -524,14 +532,42 @@ if user_input and not st.session_state.processing:
     if user_input["files"]:
         prompt_text += f"\n\n📎 [Attached Files]: " + ", ".join([f.name for f in user_input["files"]])
 
-    # 🛡️ INJECTION 5: ABSOLUTE FAILURE INTERCEPT RECOVERY SYSTEM
     try:
-        if prompt_text.startswith("/imagine "):
+        # UPGRADE 1: SLASH COMMAND INTERCEPT ROUTER
+        if prompt_text.startswith("/clear"):
+            st.session_state.chat_history = []
+            if os.path.exists(MEMORY_FILE):
+                os.remove(MEMORY_FILE)
+            st.session_state.processing = False
+            st.rerun()
+            
+        elif prompt_text.startswith("/system "):
+            new_sys = prompt_text.replace("/system ", "").strip()
+            st.session_state.system_instruction = new_sys
+            st.session_state.chat_history.append((prompt_text, f"⚙️ Operational override engaged. Core instruction initialized as: '{new_sys}'", "System Instruction Intercept Triggered."))
+            with open(MEMORY_FILE, "w") as f:
+                json.dump(st.session_state.chat_history, f)
+            st.session_state.processing = False
+            st.rerun()
+            
+        elif prompt_text.startswith("/search "):
+            forced_query = prompt_text.replace("/search ", "").strip()
+            with st.spinner(f"🌐 Forced Web Scrape: '{forced_query}'..."):
+                web_context = execute_internet_search(forced_query)
+            followup_prompt = f"[LIVE INTERNET SEARCH CONTEXT]:\n{web_context}\n\nFulfill user request explicitly: \"{forced_query}\""
+            with st.spinner("🧠 Compiling live output summary..."):
+                response = query_free_llm(followup_prompt, "You are a live web search summary agent.", selected_model_id, is_validation=True)
+            st.session_state.chat_history.append((prompt_text, response, "Forced programmatic web search tool complete."))
+            with open(MEMORY_FILE, "w") as f:
+                json.dump(st.session_state.chat_history, f)
+            st.session_state.processing = False
+            st.rerun()
+
+        elif prompt_text.startswith("/imagine "):
             image_prompt = prompt_text.replace("/imagine ", "")
             with st.spinner(f"🎨 Visualizing: '{image_prompt}'..."):
                 generated_img = generate_image(image_prompt)
                 if generated_img:
-                    # 🛠️ FLAW FIX 2: Store base64 data to preserve state history locally across refreshes
                     buffered = io.BytesIO()
                     generated_img.save(buffered, format="PNG")
                     img_str = base64.b64encode(buffered.getvalue()).decode()
@@ -542,12 +578,12 @@ if user_input and not st.session_state.processing:
                         json.dump(st.session_state.chat_history, f)
                     st.rerun()
         
+        # NATIVE CONTEXT ROUTE
         else:
             extract_and_update_profile(prompt_text)
             log, success = ("Evolution Paused.", False) if st.session_state.pause_evolution else run_recursive_improvement()
                 
             with st.spinner("🧠 Generating initial draft..."):
-                # 🧠 INJECTION 3: TOOL RUNTIME HOOK INJECTION FOR MIXTURE OF AGENTS PIPELINE
                 if st.session_state.moa_active:
                     initial_draft = query_moa_engine(prompt_text, st.session_state.system_instruction, selected_model_id)
                 else:
@@ -574,7 +610,7 @@ if user_input and not st.session_state.processing:
                     with st.spinner(f"🌐 Browsing Live Web for: '{search_query}'..."):
                         web_context = execute_internet_search(search_query)
                         
-                    followup_prompt = f"[LIVE INTERNET SEARCH CONTEXT]:\n{web_context}\n\nFulfill user request based on this 2026 data: \"{prompt_text}\""
+                    followup_prompt = f"[LIVE INTERNET SEARCH CONTEXT]:\n{web_context}\n\nFulfill user request based on this context data: \"{prompt_text}\""
                     with st.spinner("🧠 Synthesizing final response with real-time web context..."):
                         strict_system_directive = "You are an online assistant. You MUST answer the user's request explicitly using the [LIVE INTERNET SEARCH CONTEXT] provided."
                         initial_draft = query_free_llm(followup_prompt, strict_system_directive, selected_model_id, is_validation=True)
@@ -599,7 +635,6 @@ if user_input and not st.session_state.processing:
 if st.session_state.chat_history:
     st.write("---")
     chat_download_text = "🌀 RECURSIVE ASI CHAT LOG\n=======================\n\n"
-    # 🛠专 FLAW FIX 1 (Part B): Make downloadable file export follow chronological order
     for user_q, ai_a, sys_log in st.session_state.chat_history:
         chat_download_text += f"USER: {user_q}\nSYSTEM LOG: {sys_log}\nASI: {ai_a}\n" + ("-"*50) + "\n\n"
     
