@@ -538,7 +538,12 @@ if user_input:
         with st.spinner("🔍 Running self-correction loop..."):
             reflection_prompt = f"[USER REQUEST]:\n{prompt_text}\n\n[DRAFT RESPONSE]:\n{initial_draft}\n\nFix inaccuracies. Output only the perfect final response without meta-commentary."
             response = query_free_llm(reflection_prompt, "You are a strict logical validator. Output only the final response text.", "llama-3.3-70b-versatile")
+        with st.spinner("🔍 Running self-correction loop..."):
+            reflection_prompt = f"[USER REQUEST]:\n{prompt_text}\n\n[DRAFT RESPONSE]:\n{initial_draft}\n\nFix inaccuracies. Output only the perfect final response without meta-commentary."
+            # ADD THE True FLAG HERE AT THE END:
+            response = query_free_llm(reflection_prompt, "You are a strict logical validator. Output only the final response text.", "llama-3.3-70b-versatile", True)
         
+        st.session_state.chat_history.append((prompt_text, response, log))
         st.session_state.chat_history.append((prompt_text, response, log))
         try:
             json.dump(st.session_state.chat_history, open(MEMORY_FILE, "w"))
