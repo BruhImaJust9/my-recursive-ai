@@ -436,7 +436,15 @@ for user_q, ai_a, sys_log in (st.session_state.chat_history):
     elif "optimization" in sys_log.lower(): avatar_icon = "🌟"
 
     with st.chat_message("assistant", avatar=avatar_icon):
-        st.caption(f"⚙️ *System Log: {sys_log}*")
+        st.markdown(
+    f"""
+    <div style="background-color: rgba(255, 255, 255, 0.05); padding: 8px 12px; border-left: 3px solid #FFD700; border-radius: 4px; margin-bottom: 10px;">
+        <span style="color: #FFD700; font-size: 0.85rem; font-weight: bold; font-family: monospace;">🧬 COGNITIVE MUTATION LOG:</span>
+        <p style="margin: 4px 0 0 0; font-size: 0.9rem; font-style: italic; color: #b0b3b8;">{sys_log}</p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
         if "<thinking>" in ai_a and "</thinking>" in ai_a:
             parts = ai_a.split("</thinking>")
             with st.expander("🧠 View Inner Thought Process"):
@@ -444,11 +452,25 @@ for user_q, ai_a, sys_log in (st.session_state.chat_history):
             st.write(parts[1].strip())
         else:
             st.write(ai_a)
-
+# Force-scroll the page container smoothly to the newest chat item
+st.markdown(
+    """
+    <div id="scroll-anchor"></div>
+    <script>
+        var element = document.getElementById('scroll-anchor');
+        element.scrollIntoView({behavior: 'smooth', block: 'end'});
+    </script>
+    """,
+    unsafe_allow_html=True
+)
 # ==========================================
 # SYSTEM TEXT GENERATION PIPELINE INTERCEPT
 # ==========================================
-user_input = st.chat_input("Ask the ASI a question or upload a file:", accept_file="multiple")
+user_input = st.chat_input(
+    "Ask the ASI a question or upload a file:", 
+    accept_file="multiple",
+    disabled=st.session_state.processing  # Disables the text bar while processing!
+)
 
 # Safety Intercept: Only process input if state is idle to eliminate duplications
 if user_input and not st.session_state.processing:
