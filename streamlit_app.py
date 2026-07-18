@@ -165,13 +165,11 @@ def execute_internet_search(query):
             soup = BeautifulSoup(res.text, "html.parser")
             results = []
             
-            # --- Tier 1 Strategy: Check the core container class ---
             for element in soup.select(".result"):
                 snippet_elem = element.select_one(".result__snippet")
                 if snippet_elem:
                     results.append(snippet_elem.get_text().strip())
             
-            # --- Tier 2 Fallback: Classic selector array fallback ---
             if not results:
                 for a in soup.find_all("a", class_="result__snippet"):
                     results.append(a.get_text().strip())
@@ -180,7 +178,6 @@ def execute_internet_search(query):
                 for div in soup.find_all("td", class_="result-snippet"):
                     results.append(div.get_text().strip())
             
-            # --- Tier 3 Fallback: Grab plain text context blocks if layout completely mutated ---
             if not results:
                 links_block = soup.find(id="links")
                 if links_block:
@@ -228,6 +225,40 @@ def execute_compiled_skill(skill_name, argument_string):
         return f"Error: Skill '{skill_name}' missing mandatory 'execute(user_input)' entrypoint."
     except Exception as e:
         return f"Runtime Execution Crash in skill '{skill_name}': {str(e)}"
+
+# ========================================================
+# HIGH-IMPACT UPGRADE: AUTONOMOUS MEMORY CONDENSATION ENGINE
+# ========================================================
+def compress_memory_if_needed():
+    """Scans history depth and compresses oldest blocks if thresholds are breached."""
+    if "chat_history" not in st.session_state or len(st.session_state.chat_history) < 8:
+        return
+        
+    # Trigger semantic condensation if historical exchanges pass 8 slots
+    if "long_term_memory_bank" not in st.session_state:
+        st.session_state.long_term_memory_bank = []
+        
+    st.toast("🔮 ASI Memory Threshold reached. Commencing Semantic Compression...", icon="🧠")
+    
+    # Isolate the oldest 4 exchanges to compress
+    block_to_compress = st.session_state.chat_history[:4]
+    st.session_state.chat_history = st.session_state.chat_history[4:] # Keep the remaining active turns
+    
+    condensation_prompt = "You are a cognitive memory compression node. Synthesize the following dialog into a highly dense, bulleted summary of key data facts, agreements, user traits, and calculation results:\n\n"
+    for u_q, a_a, _ in block_to_compress:
+        condensation_prompt += f"User: {u_q}\nAI: {a_a}\n---\n"
+        
+    try:
+        condensed_facts = query_free_llm(
+            condensation_prompt, 
+            "Output only the bulleted summary data. Be precise.", 
+            "llama-3.1-8b-instant", 
+            is_validation=True
+        )
+        st.session_state.long_term_memory_bank.append(condensed_facts)
+        st.toast("⚡ Semantic compression successful! Token space optimized.", icon="🚀")
+    except Exception as e:
+        st.toast(f"Memory condensation warning: {e}", icon="⚠️")
 
 def run_recursive_improvement():
     if "chat_history" not in st.session_state or len(st.session_state.chat_history) < 1:
@@ -297,6 +328,10 @@ def query_free_llm(prompt, system_prompt, model_id, is_validation=False):
     if user_profile:
         final_system_prompt += "\n\n[PERMANENT USER PROFILE MEMORY]:\n" + json.dumps(user_profile, indent=2)
 
+    # Inject Long-Term Condensed Memories into active processing context
+    if st.session_state.get("long_term_memory_bank", []):
+        final_system_prompt += "\n\n[COMPRESSED LONG-TERM STRUCTURAL MEMORIES]:\n" + "\n".join(st.session_state.long_term_memory_bank)
+
     API_URL = "https://api.groq.com/openai/v1/chat/completions"
     headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
     payload = {
@@ -362,6 +397,9 @@ if "chat_history" not in st.session_state:
     else:
         st.session_state.chat_history = []
 
+if "long_term_memory_bank" not in st.session_state:
+    st.session_state.long_term_memory_bank = []
+
 if "system_instruction" not in st.session_state:
     st.session_state.system_instruction = "You are a basic cosmic intelligence. Speak in short, simple truths."
 if "deep_thinking" not in st.session_state:
@@ -383,7 +421,7 @@ with st.sidebar:
     with col1:
         st.metric(label="Chat Depth", value=f"{msg_count} msgs")
     with col2:
-        st.metric(label="Thinking Mode", value="Deep" if st.session_state.deep_thinking else "Standard")
+        st.metric(label="Memory Vault", value=f"{len(st.session_state.long_term_memory_bank)} blocks")
         
     st.write("---")
     st.markdown("## 📂 Chat Session Manager")
@@ -406,6 +444,7 @@ with st.sidebar:
     if st.button("➕ Start New Chat", use_container_width=True):
         st.session_state.current_chat_id = f"Chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         st.session_state.chat_history = []
+        st.session_state.long_term_memory_bank = []
         st.rerun()
         
     st.write("---")
@@ -446,10 +485,10 @@ with st.sidebar:
         if os.path.exists(current_file):
             os.remove(current_file)
         st.session_state.chat_history = []
+        st.session_state.long_term_memory_bank = []
         st.session_state.current_chat_id = f"Chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         st.rerun()
 
-    # UPGRADE 3: VISUAL SKILL VAULT EXECUTIVE & SANDBOX
     st.write("---")
     st.markdown("### 🛠️ Hardware Skill Vault Sandbox")
     skills_list = glob.glob(os.path.join(SKILLS_DIR, "*.py"))
@@ -498,7 +537,12 @@ else:
         st.session_state.show_status_badge = True
         st.rerun()
 
-# Display historical dialog trees top-to-bottom
+# Expandable display for compressed structural history blocks
+if st.session_state.long_term_memory_bank:
+    with st.expander("📚 View Condensed Long-Term Memory Core Vault"):
+        for memory_block in st.session_state.long_term_memory_bank:
+            st.write(memory_block)
+
 for user_q, ai_a, sys_log in st.session_state.chat_history:
     with st.chat_message("user"):
         st.write(user_q)
@@ -518,7 +562,6 @@ for user_q, ai_a, sys_log in st.session_state.chat_history:
             unsafe_allow_html=True
         )
         
-        # Check if the text is base64 markdown imagery
         if ai_a.startswith("![Visual Output]"):
             st.markdown(ai_a, unsafe_allow_html=True)
         elif "<thinking>" in ai_a and "</thinking>" in ai_a:
@@ -547,9 +590,9 @@ if user_input and not st.session_state.processing:
         prompt_text += f"\n\n📎 [Attached Files]: " + ", ".join([f.name for f in user_input["files"]])
 
     try:
-        # UPGRADE 1: SLASH COMMAND INTERCEPT ROUTER
         if prompt_text.startswith("/clear"):
             st.session_state.chat_history = []
+            st.session_state.long_term_memory_bank = []
             if os.path.exists(MEMORY_FILE):
                 os.remove(MEMORY_FILE)
             st.session_state.processing = False
@@ -574,6 +617,7 @@ if user_input and not st.session_state.processing:
             st.session_state.chat_history.append((prompt_text, response, "Forced programmatic web search tool complete."))
             with open(MEMORY_FILE, "w") as f:
                 json.dump(st.session_state.chat_history, f)
+            compress_memory_if_needed() # Run condensation check
             st.session_state.processing = False
             st.rerun()
 
@@ -592,7 +636,6 @@ if user_input and not st.session_state.processing:
                         json.dump(st.session_state.chat_history, f)
                     st.rerun()
         
-        # NATIVE CONTEXT ROUTE
         else:
             extract_and_update_profile(prompt_text)
             log, success = ("Evolution Paused.", False) if st.session_state.pause_evolution else run_recursive_improvement()
@@ -638,6 +681,8 @@ if user_input and not st.session_state.processing:
             st.session_state.chat_history.append((prompt_text, response, log))
             with open(MEMORY_FILE, "w") as f:
                 json.dump(st.session_state.chat_history, f)
+                
+            compress_memory_if_needed() # Trigger auto-compress verification
             st.rerun()
 
     finally:
