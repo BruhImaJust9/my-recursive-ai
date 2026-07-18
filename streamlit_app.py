@@ -9,6 +9,7 @@ import io
 import sys
 import importlib.util
 import subprocess
+import re
 from PIL import Image
 from datetime import datetime
 
@@ -26,7 +27,38 @@ for directory in [CHATS_DIR, SKILLS_DIR]:
 GEN_TRACKER_FILE = os.path.join(CHATS_DIR, "universal_generation_counter.json")
 PROFILE_FILE = os.path.join(CHATS_DIR, "user_profile.json")
 
-# Initialize processing safety gate immediately
+# 🖥️ INJECTION 4: UI GLASSMORPHISM & MASTER DESIGN MATRIX
+st.set_page_config(page_title="Recursive Self-Improving ASI", page_icon="🌀", layout="wide")
+st.markdown(
+    """
+    <style>
+        .stApp {
+            background: linear-gradient(135deg, #0d0e15 0%, #171926 100%);
+            color: #e2e8f0;
+        }
+        div[data-testid="stSidebar"] {
+            background-color: #090a0f !important;
+            border-right: 1px solid rgba(255, 215, 0, 0.1);
+        }
+        .stSlider label, .stToggle label, .stMarkdown h3 {
+            color: #ffd700 !important;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        div.stButton > button:first-child {
+            background: linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            transition: all 0.3s ease;
+        }
+        div.stButton > button:first-child:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 if "processing" not in st.session_state:
     st.session_state.processing = False
 
@@ -67,22 +99,33 @@ def get_saved_chats():
     chat_ids = [os.path.basename(f).replace(".json", "") for f in files]
     return [c for c in chat_ids if c not in ["universal_generation_counter", "user_profile"]]
 
+# 🧠 INJECTION 2: ADVANCED DYNAMIC PROFILE INFERENCE ENGINE
 def extract_and_update_profile(prompt_text):
     profile = load_user_profile()
     lowered = prompt_text.lower()
     updated = False
     
+    # Structural Name Mapping
     if "my name is " in lowered:
         name_part = prompt_text.split("my name is ")[1].split(".")[0].split(",")[0].strip()
         profile["user_name"] = name_part
         updated = True
-    if "i prefer " in lowered:
-        preference = prompt_text.split("i prefer ")[1].split(".")[0].strip()
-        if "preferences" not in profile:
-            profile["preferences"] = []
-        profile["preferences"].append(preference)
-        updated = True
         
+    # Semantic Context Inference Matrix
+    interests_keywords = {
+        "coding": ["python", "javascript", "c++", "rust", "html", "developer", "coding", "programming"],
+        "math": ["calculus", "algebra", "multiply", "equation", "matrix", "derivative", "math"],
+        "science": ["physics", "quantum", "biology", "chemistry", "space", "cosmos"]
+    }
+    
+    if "interests" not in profile:
+        profile["interests"] = []
+        
+    for category, keywords in interests_keywords.items():
+        if any(kw in lowered for kw in keywords) and category not in profile["interests"]:
+            profile["interests"].append(category)
+            updated = True
+            
     if updated:
         save_user_profile(profile)
 
@@ -90,7 +133,7 @@ def generate_image(prompt_text):
     API_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell"
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
     try:
-        response = requests.post(API_URL, headers=headers, json={"inputs": prompt_text})
+        response = requests.post(API_URL, headers=headers, json={"inputs": prompt_text}, timeout=20)
         if response.status_code == 200:
             return Image.open(io.BytesIO(response.content))
         else:
@@ -100,9 +143,6 @@ def generate_image(prompt_text):
         st.error(f"Image generation crash: {e}")
         return None
 
-# ==========================================
-# UPGRADE 1: AUTOMATED PACKAGE INSTALLER
-# ==========================================
 def ensure_package_installed(package_name):
     try:
         importlib.import_module(package_name)
@@ -114,49 +154,33 @@ def ensure_package_installed(package_name):
         except Exception as e:
             return f"❌ Failed to install package '{package_name}': {str(e)}"
 
-# ==========================================
-# UPGRADE 3: LIVE INTERNET BROWSER CORE
-# ==========================================
 def execute_internet_search(query):
     import urllib.parse
-    import re
-    
     url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
     headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
-    
     try:
         res = requests.get(url, headers=headers, timeout=10)
         if res.status_code == 200:
-            from bs4 import BeautifulSoup
             ensure_package_installed("bs4")
+            from bs4 import BeautifulSoup
             soup = BeautifulSoup(res.text, "html.parser")
-            
             results = []
-            # Strategy A: Attempt primary snippet class scraping
+            
             for a in soup.find_all("a", class_="result__snippet"):
                 results.append(a.get_text().strip())
-                
-            # Strategy B Fallback: If classes changed, scrape general result rows
             if not results:
                 for div in soup.find_all("td", class_="result-snippet"):
                     results.append(div.get_text().strip())
-                    
-            # Strategy C Hard Fallback: Extract pure text strings between result links if all else fails
             if not results:
                 text_snippets = re.findall(r'<a class="result__url"[\s\S]*?>([\s\S]*?)</a>', res.text)
                 results = [BeautifulSoup(t, "html.parser").get_text().strip() for t in text_snippets[:3]]
 
-            # Clean up and deliver
             final_context = "\n\n".join([r for r in results if r])
-            return final_context if final_context.strip() else f"Search executed, but page layout was blank. Try wording your question differently."
-            
+            return final_context if final_context.strip() else "Search executed, but page layout was blank."
         return f"Web engine error status code: {res.status_code}"
     except Exception as e:
         return f"Web node search failure: {str(e)}"
 
-# ==========================================
-# RECURSIVE SYSTEM & AUTOMATION LOOPS
-# ==========================================
 def cev_safety_filter(code_text):
     restricted_terms = ["os.system", "rmdir", "eval("]
     for term in restricted_terms:
@@ -190,8 +214,7 @@ def execute_compiled_skill(skill_name, argument_string):
         spec.loader.exec_module(module)
         if hasattr(module, 'execute'):
             return str(module.execute(argument_string))
-        else:
-            return f"Error: Skill '{skill_name}' missing mandatory 'execute(user_input)' entrypoint."
+        return f"Error: Skill '{skill_name}' missing mandatory 'execute(user_input)' entrypoint."
     except Exception as e:
         return f"Runtime Execution Crash in skill '{skill_name}': {str(e)}"
 
@@ -236,9 +259,6 @@ def run_recursive_improvement():
     except Exception as e:
         return f"Evolution suspended due to core node error: {str(e)}", False
 
-# ==========================================
-# STABLE API HOST DEPLOYMENT (GROQ INTERFACE)
-# ==========================================
 def query_free_llm(prompt, system_prompt, model_id, is_validation=False):
     if not HF_TOKEN:
         return "⚠️ Please add your Groq API Key (saved as HF_TOKEN) to your Streamlit secrets!"
@@ -254,7 +274,6 @@ def query_free_llm(prompt, system_prompt, model_id, is_validation=False):
     compiled_tools = get_compiled_skills()
     final_system_prompt += f"\n\n[UNLOCKED SKILL VAULT EXTRACTION]:\n{compiled_tools}"
     
-    # FIX: ONLY inject execution protocol rules if this is NOT a validation cleanup turn!
     if not is_validation:
         final_system_prompt += (
             "\n\nAUTONOMOUS INTERCEPT PROTOCOLS:\n"
@@ -279,7 +298,7 @@ def query_free_llm(prompt, system_prompt, model_id, is_validation=False):
         "temperature": st.session_state.get("temp_slider", 0.7)
     }
     try:
-        response = requests.post(API_URL, headers=headers, json=payload)
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=30)
         output = response.json()
         if "choices" in output and len(output["choices"]) > 0:
             return output["choices"][0]["message"]["content"].strip()
@@ -312,10 +331,27 @@ def query_moa_engine(prompt, system_prompt, aggregator_model_id):
 # ==========================================
 if "current_gen" not in st.session_state:
     st.session_state.current_gen = load_universal_generation()
+
+# 💾 INJECTION 1: SESSION MEMORY AUTO-RESTORATION CORE
 if "current_chat_id" not in st.session_state:
-    st.session_state.current_chat_id = f"Chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    saved_sessions = sorted(get_saved_chats(), reverse=True)
+    if saved_sessions:
+        st.session_state.current_chat_id = saved_sessions[0]
+    else:
+        st.session_state.current_chat_id = f"Chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+MEMORY_FILE = os.path.join(CHATS_DIR, f"{st.session_state.current_chat_id}.json")
+
 if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+    if os.path.exists(MEMORY_FILE):
+        try:
+            with open(MEMORY_FILE, "r") as f:
+                st.session_state.chat_history = json.load(f)
+        except:
+            st.session_state.chat_history = []
+    else:
+        st.session_state.chat_history = []
+
 if "system_instruction" not in st.session_state:
     st.session_state.system_instruction = "You are a basic cosmic intelligence. Speak in short, simple truths."
 if "deep_thinking" not in st.session_state:
@@ -326,8 +362,6 @@ if "pause_evolution" not in st.session_state:
     st.session_state.pause_evolution = False
 if "show_status_badge" not in st.session_state:
     st.session_state.show_status_badge = True
-
-MEMORY_FILE = os.path.join(CHATS_DIR, f"{st.session_state.current_chat_id}.json")
 
 # ==========================================
 # SIDEBAR APPLICATION DASHBOARD
@@ -446,8 +480,8 @@ else:
         st.session_state.show_status_badge = True
         st.rerun()
 
-# Display historical dialog trees
-for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
+# 🛠️ FLAW FIX 1: Display historical dialog trees top-to-bottom
+for user_q, ai_a, sys_log in st.session_state.chat_history:
     with st.chat_message("user"):
         st.write(user_q)
         
@@ -457,14 +491,14 @@ for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
 
     with st.chat_message("assistant", avatar=avatar_icon):
         st.markdown(
-    f"""
-    <div style="background-color: rgba(255, 255, 255, 0.05); padding: 8px 12px; border-left: 3px solid #FFD700; border-radius: 4px; margin-bottom: 10px;">
-        <span style="color: #FFD700; font-size: 0.85rem; font-weight: bold; font-family: monospace;">🧬 COGNITIVE MUTATION LOG:</span>
-        <p style="margin: 4px 0 0 0; font-size: 0.9rem; font-style: italic; color: #b0b3b8;">{sys_log}</p>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+            f"""
+            <div style="background-color: rgba(255, 255, 255, 0.05); padding: 8px 12px; border-left: 3px solid #FFD700; border-radius: 4px; margin-bottom: 10px;">
+                <span style="color: #FFD700; font-size: 0.85rem; font-weight: bold; font-family: monospace;">🧬 COGNITIVE MUTATION LOG:</span>
+                <p style="margin: 4px 0 0 0; font-size: 0.9rem; font-style: italic; color: #b0b3b8;">{sys_log}</p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
         if "<thinking>" in ai_a and "</thinking>" in ai_a:
             parts = ai_a.split("</thinking>")
             with st.expander("🧠 View Inner Thought Process"):
@@ -472,97 +506,92 @@ for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
             st.write(parts[1].strip())
         else:
             st.write(ai_a)
-# Force-scroll the page container smoothly to the newest chat item
-st.markdown(
-    """
-    <div id="scroll-anchor"></div>
-    <script>
-        var element = document.getElementById('scroll-anchor');
-        element.scrollIntoView({behavior: 'smooth', block: 'end'});
-    </script>
-    """,
-    unsafe_allow_html=True
-)
+
+st.markdown('<div id="scroll-anchor"></div>', unsafe_allow_html=True)
+
 # ==========================================
 # SYSTEM TEXT GENERATION PIPELINE INTERCEPT
 # ==========================================
 user_input = st.chat_input(
     "Ask the ASI a question or upload a file:", 
     accept_file="multiple",
-    disabled=st.session_state.processing  # Disables the text bar while processing!
+    disabled=st.session_state.processing 
 )
 
-# Safety Intercept: Only process input if state is idle to eliminate duplications
 if user_input and not st.session_state.processing:
-    st.session_state.processing = True  # Lock pipeline execution loop
+    st.session_state.processing = True 
     prompt_text = user_input["text"]
     if user_input["files"]:
         prompt_text += f"\n\n📎 [Attached Files]: " + ", ".join([f.name for f in user_input["files"]])
 
-    # 🎨 IMAGE PATTERN INTERCEPT
-    if prompt_text.startswith("/imagine "):
-        image_prompt = prompt_text.replace("/imagine ", "")
-        with st.spinner(f"🎨 Visualizing: '{image_prompt}'..."):
-            generated_img = generate_image(image_prompt)
-            if generated_img:
-                st.session_state.chat_history.append((prompt_text, "🎨 Visual output rendered successfully.", "Image engine sequence compiled."))
-                st.image(generated_img, caption=image_prompt)
-                json.dump(st.session_state.chat_history, open(MEMORY_FILE, "w"))
-                st.session_state.processing = False
-                st.rerun()
-    
-    # 📝 NATIVE COGNITIVE ROUTE
-    else:
-        extract_and_update_profile(prompt_text)
-        log, success = ("Evolution Paused.", False) if st.session_state.pause_evolution else run_recursive_improvement()
-            
-        with st.spinner("🧠 Generating initial draft..."):
-            initial_draft = query_moa_engine(prompt_text, st.session_state.system_instruction, selected_model_id) if st.session_state.moa_active else query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
-                
-        # 🛠️ NATIVE AUTOMATED SKILL INTERCEPT LOOP
-        if "[EXECUTE:" in initial_draft:
-            try:
-                parts = initial_draft.split("[EXECUTE:")[1].split("]")[0].strip()
-                skill_name = parts.split("(")[0].strip()
-                argument = parts.split("(")[1].replace(")", "").strip()
-                
-                with st.spinner(f"⚡ Executing Vault Tool: {skill_name}(...)"):
-                    tool_output = execute_compiled_skill(skill_name, argument)
-                
-                followup_prompt = f"[TOOL EXECUTION RESULT]:\nSkill '{skill_name}' output value: {tool_output}\n\nFulfill the user request explicitly using this exact mathematical/computational calculation data: \"{prompt_text}\""
-                with st.spinner("🧠 Synthesizing final response with live calculation data..."):
-                    # Pass is_validation=True here to stop it from spewing brackets again
-                    initial_draft = query_free_llm(followup_prompt, "You are a direct data execution agent. Print the answer explicitly using the context results.", selected_model_id, is_validation=True)
-            except Exception as tool_err:
-                log += f" | Tool intercept crash: {str(tool_err)}"
-                
-        # 🌐 UPGRADE 3: INTERNET SEARCH INTERCEPT LOOP
-        elif "[INTERNET:" in initial_draft:
-            try:
-                search_query = initial_draft.split("[INTERNET:")[1].split("]")[0].strip()
-                with st.spinner(f"🌐 Browsing Live Web for: '{search_query}'..."):
-                    web_context = execute_internet_search(search_query)
+    # 🛡️ INJECTION 5: ABSOLUTE FAILURE INTERCEPT RECOVERY SYSTEM
+    try:
+        if prompt_text.startswith("/imagine "):
+            image_prompt = prompt_text.replace("/imagine ", "")
+            with st.spinner(f"🎨 Visualizing: '{image_prompt}'..."):
+                generated_img = generate_image(image_prompt)
+                if generated_img:
+                    # 🛠️ FLAW FIX 2: Store base64 data to preserve state history locally across refreshes
+                    buffered = io.BytesIO()
+                    generated_img.save(buffered, format="PNG")
+                    img_str = base64.b64encode(buffered.getvalue()).decode()
+                    img_markdown = f"![Visual Output](data:image/png;base64,{img_str})"
                     
-                followup_prompt = f"[LIVE INTERNET SEARCH CONTEXT]:\n{web_context}\n\nFulfill user request based on this 2026 data: \"{prompt_text}\""
-                with st.spinner("🧠 Synthesizing final response with real-time web context..."):
-                    # FIX: Force strict obedience system guidelines so it uses search data instead of saying 'I cannot access real-time info'
-                    strict_system_directive = "You are an online assistant. You MUST answer the user's request explicitly using the [LIVE INTERNET SEARCH CONTEXT] provided. Do not use generic offline text rules."
-                    initial_draft = query_free_llm(followup_prompt, strict_system_directive, selected_model_id, is_validation=True)
-            except Exception as search_err:
-                log += f" | Internet search crash: {str(search_err)}"
-                
-        with st.spinner("🔍 Running self-correction loop..."):
-            reflection_prompt = f"[USER REQUEST]:\n{prompt_text}\n\n[DRAFT RESPONSE]:\n{initial_draft}\n\nFix structural mistakes. Output only the perfect final response text without meta-commentary."
-            response = query_free_llm(reflection_prompt, "You are a strict logical validator. Output only the final clean response text.", "llama-3.3-70b-versatile", is_validation=True)
+                    st.session_state.chat_history.append((prompt_text, img_markdown, "Image engine sequence compiled."))
+                    with open(MEMORY_FILE, "w") as f:
+                        json.dump(st.session_state.chat_history, f)
+                    st.rerun()
         
-        st.session_state.chat_history.append((prompt_text, response, log))
-        try:
-            json.dump(st.session_state.chat_history, open(MEMORY_FILE, "w"))
-        except Exception as e:
-            st.error(f"Memory log update failure: {e}")
+        else:
+            extract_and_update_profile(prompt_text)
+            log, success = ("Evolution Paused.", False) if st.session_state.pause_evolution else run_recursive_improvement()
+                
+            with st.spinner("🧠 Generating initial draft..."):
+                # 🧠 INJECTION 3: TOOL RUNTIME HOOK INJECTION FOR MIXTURE OF AGENTS PIPELINE
+                if st.session_state.moa_active:
+                    initial_draft = query_moa_engine(prompt_text, st.session_state.system_instruction, selected_model_id)
+                else:
+                    initial_draft = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
+                    
+            if "[EXECUTE:" in initial_draft:
+                try:
+                    parts = initial_draft.split("[EXECUTE:")[1].split("]")[0].strip()
+                    skill_name = parts.split("(")[0].strip()
+                    argument = parts.split("(")[1].replace(")", "").strip()
+                    
+                    with st.spinner(f"⚡ Executing Vault Tool: {skill_name}(...)"):
+                        tool_output = execute_compiled_skill(skill_name, argument)
+                    
+                    followup_prompt = f"[TOOL EXECUTION RESULT]:\nSkill '{skill_name}' output value: {tool_output}\n\nFulfill the user request explicitly using this exact mathematical/computational calculation data: \"{prompt_text}\""
+                    with st.spinner("🧠 Synthesizing final response with live calculation data..."):
+                        initial_draft = query_free_llm(followup_prompt, "You are a direct data execution agent. Print the answer explicitly using the context results.", selected_model_id, is_validation=True)
+                except Exception as tool_err:
+                    log += f" | Tool intercept crash: {str(tool_err)}"
+                    
+            elif "[INTERNET:" in initial_draft:
+                try:
+                    search_query = initial_draft.split("[INTERNET:")[1].split("]")[0].strip()
+                    with st.spinner(f"🌐 Browsing Live Web for: '{search_query}'..."):
+                        web_context = execute_internet_search(search_query)
+                        
+                    followup_prompt = f"[LIVE INTERNET SEARCH CONTEXT]:\n{web_context}\n\nFulfill user request based on this 2026 data: \"{prompt_text}\""
+                    with st.spinner("🧠 Synthesizing final response with real-time web context..."):
+                        strict_system_directive = "You are an online assistant. You MUST answer the user's request explicitly using the [LIVE INTERNET SEARCH CONTEXT] provided."
+                        initial_draft = query_free_llm(followup_prompt, strict_system_directive, selected_model_id, is_validation=True)
+                except Exception as search_err:
+                    log += f" | Internet search crash: {str(search_err)}"
+                    
+            with st.spinner("🔍 Running self-correction loop..."):
+                reflection_prompt = f"[USER REQUEST]:\n{prompt_text}\n\n[DRAFT RESPONSE]:\n{initial_draft}\n\nFix structural mistakes. Output only the perfect final response text without meta-commentary."
+                response = query_free_llm(reflection_prompt, "You are a strict logical validator. Output only the final clean response text.", "llama-3.3-70b-versatile", is_validation=True)
             
-        st.session_state.processing = False  # Unlock pipeline execution loop
-        st.rerun()
+            st.session_state.chat_history.append((prompt_text, response, log))
+            with open(MEMORY_FILE, "w") as f:
+                json.dump(st.session_state.chat_history, f)
+            st.rerun()
+
+    finally:
+        st.session_state.processing = False
 
 # ==========================================
 # SYSTEM BACKUP MEMORY EXPORT MODULE
@@ -570,7 +599,8 @@ if user_input and not st.session_state.processing:
 if st.session_state.chat_history:
     st.write("---")
     chat_download_text = "🌀 RECURSIVE ASI CHAT LOG\n=======================\n\n"
-    for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
+    # 🛠专 FLAW FIX 1 (Part B): Make downloadable file export follow chronological order
+    for user_q, ai_a, sys_log in st.session_state.chat_history:
         chat_download_text += f"USER: {user_q}\nSYSTEM LOG: {sys_log}\nASI: {ai_a}\n" + ("-"*50) + "\n\n"
     
     st.download_button(
