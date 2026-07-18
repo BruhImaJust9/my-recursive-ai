@@ -427,7 +427,7 @@ else:
         st.rerun()
 
 # Display historical dialog trees
-for user_q, ai_a, sys_log in (st.session_state.chat_history):
+for user_q, ai_a, sys_log in reversed(st.session_state.chat_history):
     with st.chat_message("user"):
         st.write(user_q)
         
