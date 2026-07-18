@@ -153,41 +153,52 @@ def ensure_package_installed(package_name):
 
 def execute_internet_search(query):
     import urllib.parse
+    import time
     url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     }
-    try:
-        res = requests.get(url, headers=headers, timeout=10)
-        if res.status_code == 200:
-            ensure_package_installed("bs4")
-            from bs4 import BeautifulSoup
-            soup = BeautifulSoup(res.text, "html.parser")
-            results = []
+    
+    # Retry Loop to beat HTTP 202 / slow server loads
+    for attempt in range(3):
+        try:
+            res = requests.get(url, headers=headers, timeout=10)
             
-            for element in soup.select(".result"):
-                snippet_elem = element.select_one(".result__snippet")
-                if snippet_elem:
-                    results.append(snippet_elem.get_text().strip())
-            
-            if not results:
-                for a in soup.find_all("a", class_="result__snippet"):
-                    results.append(a.get_text().strip())
-                    
-            if not results:
-                for div in soup.find_all("td", class_="result-snippet"):
-                    results.append(div.get_text().strip())
-            
-            if not results:
-                links_block = soup.find(id="links")
-                if links_block:
-                    results = [b.get_text().strip() for b in links_block.find_all(class_=True)[:4]]
+            # If server says "202 (Processing)", wait 1.5 seconds and retry
+            if res.status_code == 202:
+                time.sleep(1.5)
+                continue
+                
+            if res.status_code == 200:
+                ensure_package_installed("bs4")
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(res.text, "html.parser")
+                results = []
+                
+                # Resilient Multi-Selector Array
+                for element in soup.select(".result"):
+                    snippet_elem = element.select_one(".result__snippet")
+                    if snippet_elem:
+                        results.append(snippet_elem.get_text().strip())
+                
+                if not results:
+                    for a in soup.find_all("a", class_="result__snippet"):
+                        results.append(a.get_text().strip())
+                
+                # Ultimate Fallback: Scrape raw anchor text strings if divs are hidden
+                if not results:
+                    results = [r.get_text().strip() for r in soup.find_all('a') if 'result__url' in str(r.get('class', []))][:4]
 
-            final_context = "\n\n".join([r for r in results if r])
-            return final_context if final_context.strip() else "Search executed, but page layout returned blank data structures."
-        return f"Web engine error status code: {res.status_code}"
-    except Exception as e:
-        return f"Web node search failure: {str(e)}"
+                final_context = "\n\n".join([r for r in results if r])
+                if final_context.strip():
+                    return final_context
+                    
+        except Exception as e:
+            if attempt == 2:
+                return f"Web node search failure: {str(e)}"
+        time.sleep(1)
+        
+    return "Search executed, but page layout returned blank data structures after multiple synchronization retries."
 
 def cev_safety_filter(code_text):
     restricted_terms = ["os.system", "rmdir", "eval("]
