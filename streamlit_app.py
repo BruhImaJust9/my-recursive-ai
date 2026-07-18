@@ -159,12 +159,12 @@ def execute_internet_search(query):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     }
     
-    # Retry Loop to beat HTTP 202 / slow server loads
+    # 3-Step Synchronization Retry Loop
     for attempt in range(3):
         try:
             res = requests.get(url, headers=headers, timeout=10)
             
-            # If server says "202 (Processing)", wait 1.5 seconds and retry
+            # If server throws a 202 (Still Processing Layout), sleep and try again
             if res.status_code == 202:
                 time.sleep(1.5)
                 continue
@@ -175,15 +175,31 @@ def execute_internet_search(query):
                 soup = BeautifulSoup(res.text, "html.parser")
                 results = []
                 
-                # Resilient Multi-Selector Array
+                # Tier 1: Target structured container result elements
                 for element in soup.select(".result"):
                     snippet_elem = element.select_one(".result__snippet")
                     if snippet_elem:
                         results.append(snippet_elem.get_text().strip())
                 
+                # Tier 2: Regular snippet class extraction fallback
                 if not results:
                     for a in soup.find_all("a", class_="result__snippet"):
                         results.append(a.get_text().strip())
+                
+                # Tier 3: Loose anchor text extraction if class labels are hidden
+                if not results:
+                    results = [r.get_text().strip() for r in soup.find_all('a') if 'result__url' in str(r.get('class', []))][:4]
+
+                final_context = "\n\n".join([r for r in results if r])
+                if final_context.strip():
+                    return final_context
+                    
+        except Exception as e:
+            if attempt == 2:
+                return f"Web node search failure: {str(e)}"
+        time.sleep(1)
+        
+    return "Search executed, but page layout returned blank data structures after multiple synchronization retries."
                 
                 # Ultimate Fallback: Scrape raw anchor text strings if divs are hidden
                 if not results:
