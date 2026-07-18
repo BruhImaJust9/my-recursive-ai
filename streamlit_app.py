@@ -154,7 +154,9 @@ def ensure_package_installed(package_name):
 def execute_internet_search(query):
     import urllib.parse
     url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
-    headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
     try:
         res = requests.get(url, headers=headers, timeout=10)
         if res.status_code == 200:
@@ -163,17 +165,29 @@ def execute_internet_search(query):
             soup = BeautifulSoup(res.text, "html.parser")
             results = []
             
-            for a in soup.find_all("a", class_="result__snippet"):
-                results.append(a.get_text().strip())
+            # --- Tier 1 Strategy: Check the core container class ---
+            for element in soup.select(".result"):
+                snippet_elem = element.select_one(".result__snippet")
+                if snippet_elem:
+                    results.append(snippet_elem.get_text().strip())
+            
+            # --- Tier 2 Fallback: Classic selector array fallback ---
+            if not results:
+                for a in soup.find_all("a", class_="result__snippet"):
+                    results.append(a.get_text().strip())
+                    
             if not results:
                 for div in soup.find_all("td", class_="result-snippet"):
                     results.append(div.get_text().strip())
+            
+            # --- Tier 3 Fallback: Grab plain text context blocks if layout completely mutated ---
             if not results:
-                text_snippets = re.findall(r'<a class="result__url"[\s\S]*?>([\s\S]*?)</a>', res.text)
-                results = [BeautifulSoup(t, "html.parser").get_text().strip() for t in text_snippets[:3]]
+                links_block = soup.find(id="links")
+                if links_block:
+                    results = [b.get_text().strip() for b in links_block.find_all(class_=True)[:4]]
 
             final_context = "\n\n".join([r for r in results if r])
-            return final_context if final_context.strip() else "Search executed, but page layout was blank."
+            return final_context if final_context.strip() else "Search executed, but page layout returned blank data structures."
         return f"Web engine error status code: {res.status_code}"
     except Exception as e:
         return f"Web node search failure: {str(e)}"
