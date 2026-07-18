@@ -245,27 +245,27 @@ def run_recursive_improvement():
 # ==========================================
 # STABLE API HOST DEPLOYMENT (GROQ INTERFACE)
 # ==========================================
-def query_free_llm(prompt, system_prompt, model_id):
+def query_free_llm(prompt, system_prompt, model_id, is_validation=False):
     if not HF_TOKEN:
         return "⚠️ Please add your Groq API Key (saved as HF_TOKEN) to your Streamlit secrets!"
         
     final_system_prompt = system_prompt
     if st.session_state.get("deep_thinking", False):
         final_system_prompt += (
-            "\n\nCRITICAL INSTRUCTION: You must think step-by-step before answering. "
-            "Start your response with <thinking> and write out your raw, unedited, "
-            "analytical thought process. Once your thinking is complete, close the tag with "
-            "</thinking> and then write your final response to the user."
+            "\n\nCRITICAL INSTRUCTION: You must think step-by-step before answering... "
         ) 
         
     compiled_tools = get_compiled_skills()
     final_system_prompt += f"\n\n[UNLOCKED SKILL VAULT EXTRACTION]:\n{compiled_tools}"
-    final_system_prompt += (
-        "\n\nAUTONOMOUS INTERCEPT PROTOCOLS:\n"
-        "1. To run a native skill tool, output exactly on its own line: [EXECUTE: skill_name(argument_string)]\n"
-        "2. To browse the live internet for current data, output exactly on its own line: [INTERNET: web_search_query]\n"
-        "If you use a protocol line, stop writing immediately after it. The system will catch it and supply the data."
-    )
+    
+    # ONLY inject intercept protocols if this is NOT a final validation cleanup
+    if not is_validation:
+        final_system_prompt += (
+            "\n\nAUTONOMOUS INTERCEPT PROTOCOLS:\n"
+            "1. To run a native skill tool, output exactly on its own line: [EXECUTE: skill_name(argument_string)]\n"
+            "2. To browse the live internet for current data, output exactly on its own line: [INTERNET: web_search_query]\n"
+            "If you use a protocol line, stop writing immediately after it. The system will catch it and supply the data."
+        )
     
     user_profile = load_user_profile()
     if user_profile:
