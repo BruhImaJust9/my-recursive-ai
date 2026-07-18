@@ -118,18 +118,38 @@ def ensure_package_installed(package_name):
 # UPGRADE 3: LIVE INTERNET BROWSER CORE
 # ==========================================
 def execute_internet_search(query):
-    url = f"https://html.duckduckgo.com/html/?q={requests.utils.quote(query)}"
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    import urllib.parse
+    import re
+    
+    url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
+    headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+    
     try:
         res = requests.get(url, headers=headers, timeout=10)
         if res.status_code == 200:
             from bs4 import BeautifulSoup
             ensure_package_installed("bs4")
             soup = BeautifulSoup(res.text, "html.parser")
+            
             results = []
-            for a in soup.find_all("a", class_="result__snippet")[:4]:
+            # Strategy A: Attempt primary snippet class scraping
+            for a in soup.find_all("a", class_="result__snippet"):
                 results.append(a.get_text().strip())
-            return "\n\n".join(results) if results else "Search executed, but no relevant data text snippets found."
+                
+            # Strategy B Fallback: If classes changed, scrape general result rows
+            if not results:
+                for div in soup.find_all("td", class_="result-snippet"):
+                    results.append(div.get_text().strip())
+                    
+            # Strategy C Hard Fallback: Extract pure text strings between result links if all else fails
+            if not results:
+                text_snippets = re.findall(r'<a class="result__url"[\s\S]*?>([\s\S]*?)</a>', res.text)
+                results = [BeautifulSoup(t, "html.parser").get_text().strip() for t in text_snippets[:3]]
+
+            # Clean up and deliver
+            final_context = "\n\n".join([r for r in results if r])
+            return final_context if final_context.strip() else f"Search executed, but page layout was blank. Try wording your question differently."
+            
         return f"Web engine error status code: {res.status_code}"
     except Exception as e:
         return f"Web node search failure: {str(e)}"
