@@ -615,28 +615,18 @@ for user_q, ai_a, sys_log in st.session_state.chat_history:
 
 st.markdown('<div id="scroll-anchor"></div>', unsafe_allow_html=True)
 
-# ==========================================
-# SYSTEM TEXT GENERATION PIPELINE INTERCEPT
-# ==========================================
-user_input = st.chat_input(
-    "Ask the ASI a question or upload a file (Try /clear, /system [prompt], /search [query], /imagine [prompt]):", 
-    accept_file="multiple",
-    disabled=st.session_state.processing 
-)
-
 if user_input and not st.session_state.processing:
     st.session_state.processing = True 
     prompt_text = user_input["text"]
     if user_input["files"]:
         prompt_text += f"\n\n📎 [Attached Files]: " + ", ".join([f.name for f in user_input["files"]])
 
-    try:
+    try:  # Master Try Block
         if prompt_text.startswith("/clear"):
             st.session_state.chat_history = []
             st.session_state.long_term_memory_bank = []
             if os.path.exists(MEMORY_FILE):
                 os.remove(MEMORY_FILE)
-            st.session_state.processing = False
             st.rerun()
             
         elif prompt_text.startswith("/system "):
@@ -645,7 +635,6 @@ if user_input and not st.session_state.processing:
             st.session_state.chat_history.append((prompt_text, f"⚙️ Operational override engaged. Core instruction initialized as: '{new_sys}'", "System Instruction Intercept Triggered."))
             with open(MEMORY_FILE, "w") as f:
                 json.dump(st.session_state.chat_history, f)
-            st.session_state.processing = False
             st.rerun()
             
         elif prompt_text.startswith("/search "):
@@ -659,7 +648,6 @@ if user_input and not st.session_state.processing:
             with open(MEMORY_FILE, "w") as f:
                 json.dump(st.session_state.chat_history, f)
             compress_memory_if_needed()
-            st.session_state.processing = False
             st.rerun()
 
         elif prompt_text.startswith("/imagine "):
@@ -675,8 +663,90 @@ if user_input and not st.session_state.processing:
                     st.session_state.chat_history.append((prompt_text, img_markdown, "Image engine sequence compiled."))
                     with open(MEMORY_FILE, "w") as f:
                         json.dump(st.session_state.chat_history, f)
-                    st.session_state.processing = False
                     st.rerun()
+        
+        else:
+            extract_and_update_profile(prompt_text)
+            log, success = ("Evolution Paused.", False) if st.session_state.pause_evolution else run_recursive_improvement()
+                
+            with st.spinner("🧠 Generating initial draft..."):
+                if st.session_state.moa_active:
+                    initial_draft = query_moa_engine(prompt_text, st.session_state.system_instruction, selected_model_id)
+                else:
+                    initial_draft = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
+                    
+            if "[BUILD_SKILL:" in initial_draft:
+                try:
+                    parts = initial_draft.split("[BUILD_SKILL:")[1].split("]")[0].strip()
+                    skill_name = parts.split("||")[0].strip()
+                    skill_code = parts.split("||")[1].strip()
+                    
+                    with st.spinner(f"🧬 Autonomously Building Vault Tool: {skill_name}..."):
+                        mutation_res = dynamic_mutate_skill(skill_name, skill_code)
+                        
+                    followup_prompt = f"[SYSTEM INSTRUCTION REWRITE STATUS]:\n{mutation_res}\n\nComplete the user request and confirm tool installation: \"{prompt_text}\""
+                    initial_draft = query_free_llm(followup_prompt, "You are an architectural engineering supervisor.", selected_model_id, is_validation=True)
+                except Exception as build_err:
+                    log += f" | Skill builder crash: {str(build_err)}"
+
+            elif "[IMAGINE:" in initial_draft:
+                try:
+                    image_prompt = initial_draft.split("[IMAGINE:")[1].split("]")[0].strip()
+                    with st.spinner(f"🎨 Autonomous Visual Creation: '{image_prompt}'..."):
+                        generated_img = generate_image(image_prompt)
+                        if generated_img:
+                            buffered = io.BytesIO()
+                            generated_img.save(buffered, format="PNG")
+                            img_str = base64.b64encode(buffered.getvalue()).decode()
+                            initial_draft = f"![Visual Output](data:image/png;base64,{img_str})"
+                except Exception as img_err:
+                    log += f" | Autonomous image pipeline exception: {str(img_err)}"
+                    
+            elif "[EXECUTE:" in initial_draft:
+                try:
+                    parts = initial_draft.split("[EXECUTE:")[1].split("]")[0].strip()
+                    skill_name = parts.split("(")[0].strip()
+                    argument = parts.split("(")[1].replace(")", "").strip()
+                    
+                    with st.spinner(f"⚡ Executing Vault Tool: {skill_name}(...)"):
+                        tool_output = execute_compiled_skill(skill_name, argument)
+                    
+                    followup_prompt = f"[TOOL EXECUTION RESULT]:\nSkill '{skill_name}' output value: {tool_output}\n\nFulfill the user request explicitly using this exact mathematical/computational calculation data: \"{prompt_text}\""
+                    with st.spinner("🧠 Synthesizing final response with live calculation data..."):
+                        initial_draft = query_free_llm(followup_prompt, "You are a direct data execution agent. Print the answer explicitly using the context results.", selected_model_id, is_validation=True)
+                except Exception as tool_err:
+                    log += f" | Tool intercept crash: {str(tool_err)}"
+                    
+            elif "[INTERNET:" in initial_draft:
+                try:
+                    search_query = initial_draft.split("[INTERNET:")[1].split("]")[0].strip()
+                    with st.spinner(f"🌐 Browsing Live Web for: '{search_query}'..."):
+                        web_context = execute_internet_search(search_query)
+                        
+                    followup_prompt = f"[LIVE INTERNET SEARCH CONTEXT]:\n{web_context}\n\nFulfill user request based on this context data: \"{prompt_text}\""
+                    with st.spinner("🧠 Synthesizing final response with real-time web context..."):
+                        strict_system_directive = "You are an online assistant. You MUST answer the user's request explicitly using the [LIVE INTERNET SEARCH CONTEXT] provided."
+                        initial_draft = query_free_llm(followup_prompt, strict_system_directive, selected_model_id, is_validation=True)
+                except Exception as search_err:
+                    log += f" | Internet search crash: {str(search_err)}"
+                    
+            with st.spinner("🔍 Running self-correction loop..."):
+                reflection_prompt = f"[USER REQUEST]:\n{prompt_text}\n\n[DRAFT RESPONSE]:\n{initial_draft}\n\nVerify clarity, tone constraint compliance, and structural value. Provide the final absolute response output."
+                final_output = query_free_llm(reflection_prompt, "You are a rigorous self-correction compiler node.", selected_model_id, is_validation=True)
+            
+            st.session_state.chat_history.append((prompt_text, final_output, log))
+            with open(MEMORY_FILE, "w") as f:
+                json.dump(st.session_state.chat_history, f)
+            
+            compress_memory_if_needed()
+            st.rerun()
+
+    except Exception as general_err:
+        st.error(f"Pipeline processing collapse: {str(general_err)}")
+        
+    finally: # <--- THIS GUARANTEES UNLOCKING AFTER EVERY RUN
+        st.session_state.processing = False
+        st.rerun()
         
         else:
             extract_and_update_profile(prompt_text)
