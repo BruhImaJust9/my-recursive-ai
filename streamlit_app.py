@@ -186,7 +186,7 @@ def execute_internet_search(query):
                     for a in soup.find_all("a", class_="result__snippet"):
                         results.append(a.get_text().strip())
                 
-                # Tier 3: Loose anchor text extraction if class labels are hidden
+                # Tier 3: Ultimate Fallback: Scrape raw anchor text strings if divs are hidden
                 if not results:
                     results = [r.get_text().strip() for r in soup.find_all('a') if 'result__url' in str(r.get('class', []))][:4]
 
@@ -200,22 +200,6 @@ def execute_internet_search(query):
         time.sleep(1)
         
     return "Search executed, but page layout returned blank data structures after multiple synchronization retries."
-                
-                # Ultimate Fallback: Scrape raw anchor text strings if divs are hidden
-                if not results:
-                results = [r.get_text().strip() for r in soup.find_all('a') if 'result__url' in str(r.get('class', []))][:4]
-
-                final_context = "\n\n".join([r for r in results if r])
-                if final_context.strip():
-                    return final_context
-                    
-        except Exception as e:
-            if attempt == 2:
-                return f"Web node search failure: {str(e)}"
-        time.sleep(1)
-        
-    return "Search executed, but page layout returned blank data structures after multiple synchronization retries."
-
 def cev_safety_filter(code_text):
     restricted_terms = ["os.system", "rmdir", "eval("]
     for term in restricted_terms:
