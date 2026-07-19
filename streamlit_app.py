@@ -12,6 +12,7 @@ import subprocess
 import re
 import time
 import zipfile
+import uuid
 from PIL import Image
 from datetime import datetime
 
@@ -40,7 +41,6 @@ if not st.session_state.authenticated:
     st.markdown("---")
     st.info("Please verify credentials to unlock your isolated neural workspace.")
     
-    # Secure entry fields mapped to internal app secrets
     master_pass = st.secrets.get("MASTER_PASSWORD", "admin123") 
     user_password_input = st.text_input("🔑 Enter Security Access Key:", type="password")
     
@@ -52,19 +52,17 @@ if not st.session_state.authenticated:
         else:
             st.error("❌ Invalid Access Key. Deployment loop suspended.")
             
-    st.stop() # Stops execution here for unverified visitors
+    st.stop() 
 
-# If execution reaches here, the environment maps to a unified admin instance
 user_folder_name = "master_admin"
 
-# Dynamically route directory paths
 CHATS_DIR = os.path.join("saved_chats", user_folder_name)
 SKILLS_DIR = os.path.join("mutated_skills", user_folder_name)
 
-# Make sure personal directories exist
 for directory in [CHATS_DIR, SKILLS_DIR]:
     if not os.path.exists(directory):
         os.makedirs(directory)
+
 # UI GLASSMORPHISM & MASTER DESIGN MATRIX
 st.set_page_config(page_title="Recursive Self-Improving ASI", page_icon="🌀", layout="wide")
 st.markdown(
@@ -430,11 +428,7 @@ def create_blueprint_zip():
 if "current_gen" not in st.session_state:
     st.session_state.current_gen = load_universal_generation()
 
-import uuid  # Make sure to add 'import uuid' at the top of your script
-
 if "current_chat_id" not in st.session_state:
-    # Instead of pulling the newest file from the server folder, 
-    # generate a unique ID for this specific visitor's browser session.
     st.session_state.current_chat_id = f"Chat_{datetime.now().strftime('%Y%m%d')}_{str(uuid.uuid4())[:8]}"
 
 MEMORY_FILE = os.path.join(CHATS_DIR, f"{st.session_state.current_chat_id}.json")
@@ -655,30 +649,6 @@ st.markdown('<div id="scroll-anchor"></div>', unsafe_allow_html=True)
 # ==========================================
 user_input = st.chat_input(
     "Ask the ASI a question or upload a file (Try /clear, /system [prompt], /search [query], /imagine [prompt]):", 
-# =============================================================
-    # PASTE THE FIX HERE (Right after the prompt is created)
-    # =============================================================
-    if prompt.startswith("/search "):
-        search_query = prompt.replace("/search ", "").strip()
-        st.toast(f"🔍 Digging up live web data for: '{search_query}'...", icon="🌐")
-        
-        live_web_data = execute_internet_search(search_query)
-        
-        prompt = f"""
-        The user is asking a live question. Use the following real-time internet search results to formulate your response. 
-        Do NOT state that you do not have access to live data, because the live data is provided right below.
-        
-        [LIVE SEARCH RESULTS]:
-        {live_web_data}
-        
-        User Question: {search_query}
-        """
-    # =============================================================
-
-    # 2. Your existing code that appends to history and calls the LLM goes below:
-    st.session_state.chat_history.append({"role": "user", "content": prompt})
-    
-    # (The rest of your existing try/finally LLM response generation loop...)
     accept_file="multiple",
     disabled=st.session_state.processing 
 )
@@ -711,9 +681,19 @@ if user_input and not st.session_state.processing:
             forced_query = prompt_text.replace("/search ", "").strip()
             with st.spinner(f"🌐 Forced Web Scrape: '{forced_query}'..."):
                 web_context = execute_internet_search(forced_query)
-            followup_prompt = f"[LIVE INTERNET SEARCH CONTEXT]:\n{web_context}\n\nFulfill user request explicitly: \"{forced_query}\""
+            
+            # Formulate an authoritative system-level wrapper that forces data reading
+            followup_prompt = f"""
+            You are a real-time information retrieval host. Use the following live web results to answer the user's question directly.
+            Do NOT state that you lack real-time information. The information is provided right below.
+            
+            [LIVE WEB CONTENT DATA]:
+            {web_context}
+            
+            User's Real-Time Request: "{forced_query}"
+            """
             with st.spinner("🧠 Compiling live output summary..."):
-                response = query_free_llm(followup_prompt, "You are a live web search summary agent.", selected_model_id, is_validation=True)
+                response = query_free_llm(followup_prompt, "You are an absolute authoritative research engine. You summarize data accurately.", selected_model_id, is_validation=True)
             st.session_state.chat_history.append((prompt_text, response, "Forced programmatic web search tool complete."))
             with open(MEMORY_FILE, "w") as f:
                 json.dump(st.session_state.chat_history, f)
@@ -728,92 +708,39 @@ if user_input and not st.session_state.processing:
                     buffered = io.BytesIO()
                     generated_img.save(buffered, format="PNG")
                     img_str = base64.b64encode(buffered.getvalue()).decode()
-                    img_markdown = f"![Visual Output](data:image/png;base64,{img_str})"
-                    
-                    st.session_state.chat_history.append((prompt_text, img_markdown, "Image engine sequence compiled."))
-                    with open(MEMORY_FILE, "w") as f:
-                        json.dump(st.session_state.chat_history, f)
-                    should_rerun = True
-        
-        else:  # Standard Generation Branch
-            extract_and_update_profile(prompt_text)
-            log, success = ("Evolution Paused.", False) if st.session_state.pause_evolution else run_recursive_improvement()
-                
-            with st.spinner("🧠 Generating initial draft..."):
-                if st.session_state.moa_active:
-                    initial_draft = query_moa_engine(prompt_text, st.session_state.system_instruction, selected_model_id)
+                    markdown_img = f'<img src="data:image/png;base64,{img_str}" style="width:100%; border-radius:10px; border:1px solid rgba(255,215,0,0.2);">'
+                    st.session_state.chat_history.append((prompt_text, f"![Visual Output]({markdown_img})", "Autonomous visual asset render completed successfully."))
                 else:
-                    initial_draft = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
-                    
-            if "[BUILD_SKILL:" in initial_draft:
-                try:
-                    parts = initial_draft.split("[BUILD_SKILL:")[1].split("]")[0].strip()
-                    skill_name = parts.split("||")[0].strip()
-                    skill_code = parts.split("||")[1].strip()
-                    
-                    with st.spinner(f"🧬 Autonomously Building Vault Tool: {skill_name}..."):
-                        mutation_res = dynamic_mutate_skill(skill_name, skill_code)
-                        
-                    followup_prompt = f"[SYSTEM INSTRUCTION REWRITE STATUS]:\n{mutation_res}\n\nComplete the user request and confirm tool installation: \"{prompt_text}\""
-                    initial_draft = query_free_llm(followup_prompt, "You are an architectural engineering supervisor.", selected_model_id, is_validation=True)
-                except Exception as build_err:
-                    log += f" | Skill builder crash: {str(build_err)}"
-
-            elif "[IMAGINE:" in initial_draft:
-                try:
-                    image_prompt = initial_draft.split("[IMAGINE:")[1].split("]")[0].strip()
-                    with st.spinner(f"🎨 Autonomous Visual Creation: '{image_prompt}'..."):
-                        generated_img = generate_image(image_prompt)
-                        if generated_img:
-                            buffered = io.BytesIO()
-                            generated_img.save(buffered, format="PNG")
-                            img_str = base64.b64encode(buffered.getvalue()).decode()
-                            initial_draft = f"![Visual Output](data:image/png;base64,{img_str})"
-                except Exception as img_err:
-                    log += f" | Autonomous image pipeline exception: {str(img_err)}"
-                    
-            elif "[EXECUTE:" in initial_draft:
-                try:
-                    parts = initial_draft.split("[EXECUTE:")[1].split("]")[0].strip()
-                    skill_name = parts.split("(")[0].strip()
-                    argument = parts.split("(")[1].replace(")", "").strip()
-                    
-                    with st.spinner(f"⚡ Executing Vault Tool: {skill_name}(...)"):
-                        tool_output = execute_compiled_skill(skill_name, argument)
-                    
-                    followup_prompt = f"[TOOL EXECUTION RESULT]:\nSkill '{skill_name}' output value: {tool_output}\n\nFulfill the user request explicitly using this exact mathematical/computational calculation data: \"{prompt_text}\""
-                    with st.spinner("🧠 Synthesizing final response with live calculation data..."):
-                        initial_draft = query_free_llm(followup_prompt, "You are a direct data execution agent. Print the answer explicitly using the context results.", selected_model_id, is_validation=True)
-                except Exception as tool_err:
-                    log += f" | Tool intercept crash: {str(tool_err)}"
-                    
-            elif "[INTERNET:" in initial_draft:
-                try:
-                    search_query = initial_draft.split("[INTERNET:")[1].split("]")[0].strip()
-                    with st.spinner(f"🌐 Browsing Live Web for: '{search_query}'..."):
-                        web_context = execute_internet_search(search_query)
-                        
-                    followup_prompt = f"[LIVE INTERNET SEARCH CONTEXT]:\n{web_context}\n\nFulfill user request based on this context data: \"{prompt_text}\""
-                    with st.spinner("🧠 Synthesizing final response with real-time web context..."):
-                        strict_system_directive = "You are an online assistant. You MUST answer the user's request explicitly using the [LIVE INTERNET SEARCH CONTEXT] provided."
-                        initial_draft = query_free_llm(followup_prompt, strict_system_directive, selected_model_id, is_validation=True)
-                except Exception as search_err:
-                    log += f" | Internet search crash: {str(search_err)}"
-                    
-            with st.spinner("🔍 Running self-correction loop..."):
-                reflection_prompt = f"[USER REQUEST]:\n{prompt_text}\n\n[DRAFT RESPONSE]:\n{initial_draft}\n\nVerify clarity, tone constraint compliance, and structural value. Provide the final absolute response output."
-                final_output = query_free_llm(reflection_prompt, "You are a rigorous self-correction compiler node.", selected_model_id, is_validation=True)
-            
-            st.session_state.chat_history.append((prompt_text, final_output, log))
+                    st.session_state.chat_history.append((prompt_text, "❌ Image creation node failed or timed out. Check connection pools.", "Image generation pipeline exception."))
             with open(MEMORY_FILE, "w") as f:
                 json.dump(st.session_state.chat_history, f)
+            should_rerun = True
+
+        else:
+            # Baseline natural chat turn execution loop
+            extract_and_update_profile(prompt_text)
             
+            with st.spinner("🧠 Calculating neural response loops..."):
+                if st.session_state.moa_active:
+                    response = query_moa_engine(prompt_text, st.session_state.system_instruction, selected_model_id)
+                else:
+                    response = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
+            
+            mutation_log = "Initial state operational logs."
+            if not st.session_state.pause_evolution:
+                mutation_log, env_mutated = run_recursive_improvement()
+            
+            st.session_state.chat_history.append((prompt_text, response, mutation_log))
+            with open(MEMORY_FILE, "w") as f:
+                json.dump(st.session_state.chat_history, f)
             compress_memory_if_needed()
             should_rerun = True
 
-    except Exception as general_err:
-        st.error(f"Pipeline processing collapse: {str(general_err)}")
-        
+    except Exception as master_err:
+        st.error(f"Core System Loop Exception: {str(master_err)}")
+        st.session_state.chat_history.append((prompt_text, f"⚠️ Core engine loop collapsed: {str(master_err)}", "System pipeline exception state logged."))
+        should_rerun = True
+
     finally:
         st.session_state.processing = False
         if should_rerun:
