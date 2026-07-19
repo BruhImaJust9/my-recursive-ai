@@ -32,27 +32,36 @@ PROFILE_FILE = os.path.join(CHATS_DIR, "user_profile.json")
 # ==========================================
 # AUTHENTICATION & MULTI-USER ISOLATION WALL
 # ==========================================
-if not st.user.is_logged_in:  # <--- CHANGED FROM st.experimental_user
+# Safely check if authentication is active and logged in
+is_authenticated = False
+try:
+    if hasattr(st.user, "is_logged_in") and st.user.is_logged_in:
+        is_authenticated = True
+except AttributeError:
+    # Fallback for local testing environments where st.user is completely unconfigured
+    is_authenticated = False
+
+if not is_authenticated:
     st.title("🌀 Private ASI Platform Login")
     st.markdown("---")
     st.info("Please authenticate to access your isolated neural workspace and saved custom skills.")
     
-    # Updated callback notation to use the direct st.login function
+    # We pass the default native login tool as a callback
     if st.button("🔓 Log In with Auth Provider", use_container_width=True, on_click=st.login):
         st.stop()
         
-    st.stop() # Stops the script here so logged-out users see NOTHING below this line.
+    st.stop() # Stops execution here for unverified visitors
 
-# If the execution reaches here, the user is verified!
-user_email = st.user.email  # <--- CHANGED FROM st.experimental_user
-# Create a safe, custom folder name out of their email address
+# If execution reaches here, the user is verified!
+# Safely pull email, fallback to a "local_admin" folder if running locally without OIDC
+user_email = getattr(st.user, "email", "local_admin")
 user_folder_name = user_email.replace("@", "_at_").replace(".", "_")
 
 # Dynamically route directory paths based on the logged-in user
 CHATS_DIR = os.path.join("saved_chats", user_folder_name)
 SKILLS_DIR = os.path.join("mutated_skills", user_folder_name)
 
-# Make sure their personal directories exist
+# Make sure personal directories exist
 for directory in [CHATS_DIR, SKILLS_DIR]:
     if not os.path.exists(directory):
         os.makedirs(directory)
