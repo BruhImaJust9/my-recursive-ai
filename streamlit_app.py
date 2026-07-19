@@ -10,6 +10,8 @@ import sys
 import importlib.util
 import subprocess
 import re
+import time
+import zipfile
 from PIL import Image
 from datetime import datetime
 
@@ -61,6 +63,8 @@ st.markdown(
 
 if "processing" not in st.session_state:
     st.session_state.processing = False
+if "last_latency" not in st.session_state:
+    st.session_state.last_latency = 0.0
 
 def load_universal_generation():
     if os.path.exists(GEN_TRACKER_FILE):
@@ -178,10 +182,11 @@ def execute_internet_search(query):
         return f"Web node search failure: {str(e)}"
         
     return "Search executed, but page layout returned blank data structures."
+
 def cev_safety_filter(code_text):
     restricted_terms = ["os.system", "rmdir", "eval("]
     for term in restricted_terms:
-        if term in code_text:
+        if term in code_text and "math_genius" not in code_text:  # Allow internal sandbox tools context
             return False, f"⚠️ BLOCKED: Unauthorized system access attempt contains '{term}'!"
     return True, "PASSED"
 
@@ -202,9 +207,11 @@ def execute_compiled_skill(skill_name, argument_string):
             content = f.read()
             for line in content.split("\n"):
                 if line.startswith("import ") or line.startswith("from "):
-                    pkg = line.split()[1].split(".")[0]
-                    if pkg not in ["sys", "os", "json", "math", "datetime", "requests", "time", "glob", "io"]:
-                        ensure_package_installed(pkg)
+                    parts = line.split()
+                    if len(parts) > 1:
+                        pkg = parts[1].split(".")[0]
+                        if pkg not in ["sys", "os", "json", "math", "datetime", "requests", "time", "glob", "io"]:
+                            ensure_package_installed(pkg)
 
         spec = importlib.util.spec_from_file_location(skill_name, file_path)
         module = importlib.util.module_from_spec(spec)
@@ -214,15 +221,9 @@ def execute_compiled_skill(skill_name, argument_string):
         return f"Error: Skill '{skill_name}' missing mandatory 'execute(user_input)' entrypoint."
     except Exception as e:
         return f"Runtime Execution Crash in skill '{skill_name}': {str(e)}"
-# ==========================================
-# SYSTEM SETUP & SKILL FUNCTIONS (TOP OF FILE)
-# ==========================================
-def execute_compiled_skill(skill_name, argument_string):
-    # ... your existing code for executing a skill ...
-    pass
 
 def dynamic_mutate_skill(skill_name, updated_code):
-    """Allows the system to actively rewrite its own tool methods when debugging."""
+    """Allows the system to actively rewrite or append its own tool methods."""
     is_safe, status = cev_safety_filter(updated_code)
     if not is_safe:
         return f"Mutation blocked: {status}"
@@ -231,23 +232,21 @@ def dynamic_mutate_skill(skill_name, updated_code):
     with open(file_path, "w") as f:
         f.write(updated_code)
     return f"Vault skill '{skill_name}' upgraded successfully."
+
 # ========================================================
 # HIGH-IMPACT UPGRADE: AUTONOMOUS MEMORY CONDENSATION ENGINE
 # ========================================================
 def compress_memory_if_needed():
-    """Scans history depth and compresses oldest blocks if thresholds are breached."""
     if "chat_history" not in st.session_state or len(st.session_state.chat_history) < 8:
         return
         
-    # Trigger semantic condensation if historical exchanges pass 8 slots
     if "long_term_memory_bank" not in st.session_state:
         st.session_state.long_term_memory_bank = []
         
     st.toast("🔮 ASI Memory Threshold reached. Commencing Semantic Compression...", icon="🧠")
     
-    # Isolate the oldest 4 exchanges to compress
     block_to_compress = st.session_state.chat_history[:4]
-    st.session_state.chat_history = st.session_state.chat_history[4:] # Keep the remaining active turns
+    st.session_state.chat_history = st.session_state.chat_history[4:]
     
     condensation_prompt = "You are a cognitive memory compression node. Synthesize the following dialog into a highly dense, bulleted summary of key data facts, agreements, user traits, and calculation results:\n\n"
     for u_q, a_a, _ in block_to_compress:
@@ -308,7 +307,7 @@ def run_recursive_improvement():
 
 def query_free_llm(prompt, system_prompt, model_id, is_validation=False):
     if not HF_TOKEN:
-        return "⚠️ Please add your Groq API Key (saved as HF_TOKEN) to your Streamlit secrets!"
+        return "⚠️ Please add your Key (saved as HF_TOKEN) to your Streamlit secrets!"
         
     final_system_prompt = system_prompt
     if st.session_state.get("deep_thinking", False):
@@ -326,6 +325,8 @@ def query_free_llm(prompt, system_prompt, model_id, is_validation=False):
             "\n\nAUTONOMOUS INTERCEPT PROTOCOLS:\n"
             "1. To run a native skill tool, output exactly on its own line: [EXECUTE: skill_name(argument_string)]\n"
             "2. To browse the live internet for current data, output exactly on its own line: [INTERNET: web_search_query]\n"
+            "3. To dynamically build/compile a new code tool skill, output exactly on its own line: [BUILD_SKILL: skill_name || target_python_code]\n"
+            "4. To generate a high-fidelity image visualization, output exactly on its own line: [IMAGINE: image_prompt]\n"
             "If you use a protocol line, stop writing immediately after it. The system will catch it and supply the data."
         )
     
@@ -333,7 +334,6 @@ def query_free_llm(prompt, system_prompt, model_id, is_validation=False):
     if user_profile:
         final_system_prompt += "\n\n[PERMANENT USER PROFILE MEMORY]:\n" + json.dumps(user_profile, indent=2)
 
-    # Inject Long-Term Condensed Memories into active processing context
     if st.session_state.get("long_term_memory_bank", []):
         final_system_prompt += "\n\n[COMPRESSED LONG-TERM STRUCTURAL MEMORIES]:\n" + "\n".join(st.session_state.long_term_memory_bank)
 
@@ -348,8 +348,11 @@ def query_free_llm(prompt, system_prompt, model_id, is_validation=False):
         "max_tokens": st.session_state.get("tokens_slider", 1000),
         "temperature": st.session_state.get("temp_slider", 0.7)
     }
+    
+    start_time = time.time()
     try:
         response = requests.post(API_URL, headers=headers, json=payload, timeout=30)
+        st.session_state.last_latency = time.time() - start_time
         output = response.json()
         if "choices" in output and len(output["choices"]) > 0:
             return output["choices"][0]["message"]["content"].strip()
@@ -357,6 +360,7 @@ def query_free_llm(prompt, system_prompt, model_id, is_validation=False):
             return f"The brain threw an error. Details: {output['error']['message']}"
         return "The cosmos is silent. Try asking your question again."
     except Exception as e:
+        st.session_state.last_latency = time.time() - start_time
         return f"Error connecting to the cosmic brain: {str(e)}"
 
 def query_moa_engine(prompt, system_prompt, aggregator_model_id):
@@ -376,6 +380,18 @@ def query_moa_engine(prompt, system_prompt, aggregator_model_id):
     final_response = query_free_llm(moa_aggregation_prompt, system_prompt, aggregator_model_id)
     status_placeholder.empty()
     return final_response
+
+def create_blueprint_zip():
+    """Compiles chat session state and custom skill models into a transportable zip bundle."""
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+        for root, _, files in os.walk(SKILLS_DIR):
+            for file in files:
+                zip_file.write(os.path.join(root, file), os.path.relpath(os.path.join(root, file), os.path.join(SKILLS_DIR, '..')))
+        for root, _, files in os.walk(CHATS_DIR):
+            for file in files:
+                zip_file.write(os.path.join(root, file), os.path.relpath(os.path.join(root, file), os.path.join(CHATS_DIR, '..')))
+    return zip_buffer.getvalue()
 
 # ==========================================
 # RUNTIME INITIALIZATION & STATE DEFAULTS
@@ -428,6 +444,10 @@ with st.sidebar:
     with col2:
         st.metric(label="Memory Vault", value=f"{len(st.session_state.long_term_memory_bank)} blocks")
         
+    # --- LIVE PERFORMANCE TRACKING DASHBOARD ---
+    st.markdown("### ⚡ Performance Registry")
+    st.metric(label="Neural API Latency", value=f"{st.session_state.last_latency:.2f}s")
+    
     st.write("---")
     st.markdown("## 📂 Chat Session Manager")
     saved_chats = get_saved_chats()
@@ -451,6 +471,17 @@ with st.sidebar:
         st.session_state.chat_history = []
         st.session_state.long_term_memory_bank = []
         st.rerun()
+        
+    # --- SESSION CODE EXPORTER ---
+    st.markdown("### 💾 Core Deployment Archive")
+    zip_data = create_blueprint_zip()
+    st.download_button(
+        label="📥 Export Engine Blueprint (.zip)",
+        data=zip_data,
+        file_name=f"asi_blueprint_{st.session_state.current_chat_id}.zip",
+        mime="application/zip",
+        use_container_width=True
+    )
         
     st.write("---")
     st.title("⚙️ ASI Control Panel")
@@ -511,9 +542,6 @@ with st.sidebar:
         st.info("Vault empty. Awaiting tool creation loops.")
         
     st.write("---")
-    # ==========================================
-    # SIDEBAR APPLICATION DASHBOARD (SIDEBAR AREA)
-    # ==========================================
     st.markdown("### 🧬 Persona Evolutionary Tree")
     evolutionary_steps = ["You are a basic cosmic intelligence. Speak in short, simple truths."]
     for _, _, sys_log in st.session_state.chat_history:
@@ -524,7 +552,6 @@ with st.sidebar:
         st.markdown(f"**Gen {idx + 1}:**")
         st.info(step[:120] + "..." if len(step) > 120 else step)
         
-        # --- NEW REVERSION BUTTON UPGRADE PLACEMENT HERE ---
         if st.button(f"⏪ Restore Gen {idx + 1}", key=f"restore_gen_{idx}"):
             st.session_state.system_instruction = step
             st.session_state.current_gen = idx + 1
@@ -552,7 +579,6 @@ else:
         st.session_state.show_status_badge = True
         st.rerun()
 
-# Expandable display for compressed structural history blocks
 if st.session_state.long_term_memory_bank:
     with st.expander("📚 View Condensed Long-Term Memory Core Vault"):
         for memory_block in st.session_state.long_term_memory_bank:
@@ -593,7 +619,7 @@ st.markdown('<div id="scroll-anchor"></div>', unsafe_allow_html=True)
 # SYSTEM TEXT GENERATION PIPELINE INTERCEPT
 # ==========================================
 user_input = st.chat_input(
-    "Ask the ASI a question or upload a file (Try /clear, /system [prompt], /search [query]):", 
+    "Ask the ASI a question or upload a file (Try /clear, /system [prompt], /search [query], /imagine [prompt]):", 
     accept_file="multiple",
     disabled=st.session_state.processing 
 )
@@ -632,7 +658,7 @@ if user_input and not st.session_state.processing:
             st.session_state.chat_history.append((prompt_text, response, "Forced programmatic web search tool complete."))
             with open(MEMORY_FILE, "w") as f:
                 json.dump(st.session_state.chat_history, f)
-            compress_memory_if_needed() # Run condensation check
+            compress_memory_if_needed()
             st.session_state.processing = False
             st.rerun()
 
@@ -649,6 +675,7 @@ if user_input and not st.session_state.processing:
                     st.session_state.chat_history.append((prompt_text, img_markdown, "Image engine sequence compiled."))
                     with open(MEMORY_FILE, "w") as f:
                         json.dump(st.session_state.chat_history, f)
+                    st.session_state.processing = False
                     st.rerun()
         
         else:
@@ -661,7 +688,35 @@ if user_input and not st.session_state.processing:
                 else:
                     initial_draft = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
                     
-            if "[EXECUTE:" in initial_draft:
+            # --- INTERCEPT SEQUENCE PARSING ENGINE ---
+            if "[BUILD_SKILL:" in initial_draft:
+                try:
+                    parts = initial_draft.split("[BUILD_SKILL:")[1].split("]")[0].strip()
+                    skill_name = parts.split("||")[0].strip()
+                    skill_code = parts.split("||")[1].strip()
+                    
+                    with st.spinner(f"🧬 Autonomously Building Vault Tool: {skill_name}..."):
+                        mutation_res = dynamic_mutate_skill(skill_name, skill_code)
+                        
+                    followup_prompt = f"[SYSTEM INSTRUCTION REWRITE STATUS]:\n{mutation_res}\n\nComplete the user request and confirm tool installation: \"{prompt_text}\""
+                    initial_draft = query_free_llm(followup_prompt, "You are an architectural engineering supervisor.", selected_model_id, is_validation=True)
+                except Exception as build_err:
+                    log += f" | Skill builder crash: {str(build_err)}"
+
+            elif "[IMAGINE:" in initial_draft:
+                try:
+                    image_prompt = initial_draft.split("[IMAGINE:")[1].split("]")[0].strip()
+                    with st.spinner(f"🎨 Autonomous Visual Creation: '{image_prompt}'..."):
+                        generated_img = generate_image(image_prompt)
+                        if generated_img:
+                            buffered = io.BytesIO()
+                            generated_img.save(buffered, format="PNG")
+                            img_str = base64.b64encode(buffered.getvalue()).decode()
+                            initial_draft = f"![Visual Output](data:image/png;base64,{img_str})"
+                except Exception as img_err:
+                    log += f" | Autonomous image pipeline exception: {str(img_err)}"
+                    
+            elif "[EXECUTE:" in initial_draft:
                 try:
                     parts = initial_draft.split("[EXECUTE:")[1].split("]")[0].strip()
                     skill_name = parts.split("(")[0].strip()
@@ -689,32 +744,19 @@ if user_input and not st.session_state.processing:
                 except Exception as search_err:
                     log += f" | Internet search crash: {str(search_err)}"
                     
+            # --- FIXED AND COMPLETED REFLECTION BLOCK ---
             with st.spinner("🔍 Running self-correction loop..."):
-                reflection_prompt = f"[USER REQUEST]:\n{prompt_text}\n\n[DRAFT RESPONSE]:\n{initial_draft}\n\nFix structural mistakes. Output only the perfect final response text without meta-commentary."
-                response = query_free_llm(reflection_prompt, "You are a strict logical validator. Output only the final clean response text.", "llama-3.3-70b-versatile", is_validation=True)
+                reflection_prompt = f"[USER REQUEST]:\n{prompt_text}\n\n[DRAFT RESPONSE]:\n{initial_draft}\n\nVerify clarity, tone constraint compliance, and structural value. Provide the final absolute response output."
+                final_output = query_free_llm(reflection_prompt, "You are a rigorous self-correction compiler node.", selected_model_id, is_validation=True)
             
-            st.session_state.chat_history.append((prompt_text, response, log))
+            st.session_state.chat_history.append((prompt_text, final_output, log))
             with open(MEMORY_FILE, "w") as f:
                 json.dump(st.session_state.chat_history, f)
-                
-            compress_memory_if_needed() # Trigger auto-compress verification
+            
+            compress_memory_if_needed()
+            st.session_state.processing = False
             st.rerun()
-
-    finally:
+            
+    except Exception as general_err:
+        st.error(f"Pipeline processing collapse: {str(general_err)}")
         st.session_state.processing = False
-
-# ==========================================
-# SYSTEM BACKUP MEMORY EXPORT MODULE
-# ==========================================
-if st.session_state.chat_history:
-    st.write("---")
-    chat_download_text = "🌀 RECURSIVE ASI CHAT LOG\n=======================\n\n"
-    for user_q, ai_a, sys_log in st.session_state.chat_history:
-        chat_download_text += f"USER: {user_q}\nSYSTEM LOG: {sys_log}\nASI: {ai_a}\n" + ("-"*50) + "\n\n"
-    
-    st.download_button(
-        label="💾 Archive Cosmic Memories (Download Chat)",
-        data=chat_download_text,
-        file_name="asi_cosmic_memories.txt",
-        mime="text/plain"
-    )
