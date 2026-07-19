@@ -431,6 +431,12 @@ if "show_status_badge" not in st.session_state:
 # SIDEBAR APPLICATION DASHBOARD
 # ==========================================
 with st.sidebar:
+    st.markdown("### 🚨 Emergency Controls")
+    if st.button("🔓 Force Unlock Chat Box", type="primary", use_container_width=True):
+        st.session_state.processing = False
+        st.rerun()
+    st.write("---")
+with st.sidebar:
     st.markdown("### 📊 ASI Core Status")
     msg_count = len(st.session_state.chat_history)
     col1, col2 = st.columns(2)
