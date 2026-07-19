@@ -623,7 +623,7 @@ if user_input and not st.session_state.processing:
 
         try:  # Master Try Block
             if prompt_text.startswith("/clear"):
-            st.session_state.chat_history = []
+                st.session_state.chat_history = []
             st.session_state.long_term_memory_bank = []
             if os.path.exists(MEMORY_FILE):
                 os.remove(MEMORY_FILE)
