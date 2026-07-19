@@ -621,7 +621,7 @@ if user_input and not st.session_state.processing:
     if user_input["files"]:
         prompt_text += f"\n\n📎 [Attached Files]: " + ", ".join([f.name for f in user_input["files"]])
 
-   try:  # Master Try Block
+        try:  # Master Try Block
         if prompt_text.startswith("/clear"):
             st.session_state.chat_history = []
             st.session_state.long_term_memory_bank = []
