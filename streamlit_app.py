@@ -236,7 +236,23 @@ def execute_compiled_skill(skill_name, argument_string):
         return f"Error: Skill '{skill_name}' missing mandatory 'execute(user_input)' entrypoint."
     except Exception as e:
         return f"Runtime Execution Crash in skill '{skill_name}': {str(e)}"
+# ==========================================
+# SYSTEM SETUP & SKILL FUNCTIONS (TOP OF FILE)
+# ==========================================
+def execute_compiled_skill(skill_name, argument_string):
+    # ... your existing code for executing a skill ...
+    pass
 
+def dynamic_mutate_skill(skill_name, updated_code):
+    """Allows the system to actively rewrite its own tool methods when debugging."""
+    is_safe, status = cev_safety_filter(updated_code)
+    if not is_safe:
+        return f"Mutation blocked: {status}"
+        
+    file_path = os.path.join(SKILLS_DIR, f"{skill_name}.py")
+    with open(file_path, "w") as f:
+        f.write(updated_code)
+    return f"Vault skill '{skill_name}' upgraded successfully."
 # ========================================================
 # HIGH-IMPACT UPGRADE: AUTONOMOUS MEMORY CONDENSATION ENGINE
 # ========================================================
@@ -517,6 +533,9 @@ with st.sidebar:
         st.info("Vault empty. Awaiting tool creation loops.")
         
     st.write("---")
+    # ==========================================
+    # SIDEBAR APPLICATION DASHBOARD (SIDEBAR AREA)
+    # ==========================================
     st.markdown("### 🧬 Persona Evolutionary Tree")
     evolutionary_steps = ["You are a basic cosmic intelligence. Speak in short, simple truths."]
     for _, _, sys_log in st.session_state.chat_history:
@@ -526,6 +545,13 @@ with st.sidebar:
     for idx, step in enumerate(evolutionary_steps):
         st.markdown(f"**Gen {idx + 1}:**")
         st.info(step[:120] + "..." if len(step) > 120 else step)
+        
+        # --- NEW REVERSION BUTTON UPGRADE PLACEMENT HERE ---
+        if st.button(f"⏪ Restore Gen {idx + 1}", key=f"restore_gen_{idx}"):
+            st.session_state.system_instruction = step
+            st.session_state.current_gen = idx + 1
+            st.rerun()
+            
         if idx < len(evolutionary_steps) - 1:
             st.markdown("<p style='text-align: center; margin:0;'>👇 <i>Mutation</i> 👇</p>", unsafe_allow_html=True)
 
