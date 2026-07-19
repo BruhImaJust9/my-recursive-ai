@@ -152,9 +152,6 @@ def ensure_package_installed(package_name):
             return f"❌ Failed to install package '{package_name}': {str(e)}"
 
 def execute_internet_search(query):
-    """
-    Searches the live web using the DuckDuckGo Search library instead of raw HTML scraping.
-    """
     try:
         ensure_package_installed("duckduckgo_search")
         from duckduckgo_search import DDGS
@@ -180,7 +177,7 @@ def execute_internet_search(query):
     except Exception as e:
         return f"Web node search failure: {str(e)}"
         
-    return "Search executed, but page layout returned blank data structures after multiple synchronization retries."
+    return "Search executed, but page layout returned blank data structures."
 def cev_safety_filter(code_text):
     restricted_terms = ["os.system", "rmdir", "eval("]
     for term in restricted_terms:
