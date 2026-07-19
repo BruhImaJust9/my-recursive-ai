@@ -621,7 +621,7 @@ if user_input and not st.session_state.processing:
     if user_input["files"]:
         prompt_text += f"\n\n📎 [Attached Files]: " + ", ".join([f.name for f in user_input["files"]])
 
-    try:  # Master Try Block
+   try:  # Master Try Block
         if prompt_text.startswith("/clear"):
             st.session_state.chat_history = []
             st.session_state.long_term_memory_bank = []
@@ -665,7 +665,7 @@ if user_input and not st.session_state.processing:
                         json.dump(st.session_state.chat_history, f)
                     st.rerun()
         
-        else:
+        else:  # <--- The 'else' stays inside the try block, matching the if/elif alignment!
             extract_and_update_profile(prompt_text)
             log, success = ("Evolution Paused.", False) if st.session_state.pause_evolution else run_recursive_improvement()
                 
@@ -744,7 +744,7 @@ if user_input and not st.session_state.processing:
     except Exception as general_err:
         st.error(f"Pipeline processing collapse: {str(general_err)}")
         
-    finally: # <--- THIS GUARANTEES UNLOCKING AFTER EVERY RUN
+    finally:  # <--- Finally block sits at the very bottom of the entire try/except sequence
         st.session_state.processing = False
         st.rerun()
         
