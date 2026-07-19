@@ -32,32 +32,32 @@ PROFILE_FILE = os.path.join(CHATS_DIR, "user_profile.json")
 # ==========================================
 # AUTHENTICATION & MULTI-USER ISOLATION WALL
 # ==========================================
-# Safely check if authentication is active and logged in
-is_authenticated = False
-try:
-    if hasattr(st.user, "is_logged_in") and st.user.is_logged_in:
-        is_authenticated = True
-except AttributeError:
-    # Fallback for local testing environments where st.user is completely unconfigured
-    is_authenticated = False
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
 
-if not is_authenticated:
+if not st.session_state.authenticated:
     st.title("🌀 Private ASI Platform Login")
     st.markdown("---")
-    st.info("Please authenticate to access your isolated neural workspace and saved custom skills.")
+    st.info("Please verify credentials to unlock your isolated neural workspace.")
     
-    # We pass the default native login tool as a callback
-    if st.button("🔓 Log In with Auth Provider", use_container_width=True, on_click=st.login):
-        st.stop()
-        
+    # Secure entry fields mapped to internal app secrets
+    master_pass = st.secrets.get("MASTER_PASSWORD", "admin123") 
+    user_password_input = st.text_input("🔑 Enter Security Access Key:", type="password")
+    
+    if st.button("🔓 Authenticate and Mount Engine", use_container_width=True):
+        if user_password_input == master_pass:
+            st.session_state.authenticated = True
+            st.toast("⚡ Access granted! Initializing secure environments...", icon="🔓")
+            st.rerun()
+        else:
+            st.error("❌ Invalid Access Key. Deployment loop suspended.")
+            
     st.stop() # Stops execution here for unverified visitors
 
-# If execution reaches here, the user is verified!
-# Safely pull email, fallback to a "local_admin" folder if running locally without OIDC
-user_email = getattr(st.user, "email", "local_admin")
-user_folder_name = user_email.replace("@", "_at_").replace(".", "_")
+# If execution reaches here, the environment maps to a unified admin instance
+user_folder_name = "master_admin"
 
-# Dynamically route directory paths based on the logged-in user
+# Dynamically route directory paths
 CHATS_DIR = os.path.join("saved_chats", user_folder_name)
 SKILLS_DIR = os.path.join("mutated_skills", user_folder_name)
 
