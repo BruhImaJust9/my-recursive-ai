@@ -1,4 +1,6 @@
 streamlit
+authlib
 requests
 duckduckgo-search
+pillow
 python-dotenv
