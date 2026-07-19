@@ -32,7 +32,7 @@ PROFILE_FILE = os.path.join(CHATS_DIR, "user_profile.json")
 # ==========================================
 # AUTHENTICATION & MULTI-USER ISOLATION WALL
 # ==========================================
-    if not st.experimental_user.is_logged_in:
+if not st.experimental_user.is_logged_in:
     st.title("🌀 Private ASI Platform Login")
     st.markdown("---")
     st.info("Please authenticate to access your isolated neural workspace and saved custom skills.")
