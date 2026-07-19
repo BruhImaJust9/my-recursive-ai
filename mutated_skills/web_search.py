@@ -20,3 +20,18 @@ def execute(query: str) -> str:
         return "\n---\n".join(formatted_results)
     except Exception as e:
         return f"Error executing web search: {str(e)}"
+# ... inside your search function where the response is processed ...
+if response.status_code == 200:
+    data = response.json()
+    
+    # Safely look for common search engine labels
+    if "organic" in data:
+        results = [item.get("snippet", "") for item in data["organic"]]
+    elif "results" in data:
+        results = [item.get("snippet", "") for item in data["results"]]
+    else:
+        results = ["Layout shift detected in search response data."]
+        
+    return "\n\n".join(results[:4])
+else:
+    return f"Connection error: {response.status_code}"
