@@ -32,18 +32,19 @@ PROFILE_FILE = os.path.join(CHATS_DIR, "user_profile.json")
 # ==========================================
 # AUTHENTICATION & MULTI-USER ISOLATION WALL
 # ==========================================
-if not st.experimental_user.is_logged_in:
+if not st.user.is_logged_in:  # <--- CHANGED FROM st.experimental_user
     st.title("🌀 Private ASI Platform Login")
     st.markdown("---")
     st.info("Please authenticate to access your isolated neural workspace and saved custom skills.")
     
-    if st.button("🔓 Log In with Streamlit Provider", use_container_width=True):
-        st.experimental_user.login()
+    # Updated callback notation to use the direct st.login function
+    if st.button("🔓 Log In with Auth Provider", use_container_width=True, on_click=st.login):
+        st.stop()
         
-    st.stop() # <--- CRITICAL: Stops the script here so logged-out users see NOTHING below this line.
+    st.stop() # Stops the script here so logged-out users see NOTHING below this line.
 
 # If the execution reaches here, the user is verified!
-user_email = st.experimental_user.email
+user_email = st.user.email  # <--- CHANGED FROM st.experimental_user
 # Create a safe, custom folder name out of their email address
 user_folder_name = user_email.replace("@", "_at_").replace(".", "_")
 
