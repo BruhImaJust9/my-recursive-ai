@@ -203,7 +203,7 @@ def execute_internet_search(query):
                 
                 # Ultimate Fallback: Scrape raw anchor text strings if divs are hidden
                 if not results:
-                    results = [r.get_text().strip() for r in soup.find_all('a') if 'result__url' in str(r.get('class', []))][:4]
+                results = [r.get_text().strip() for r in soup.find_all('a') if 'result__url' in str(r.get('class', []))][:4]
 
                 final_context = "\n\n".join([r for r in results if r])
                 if final_context.strip():
