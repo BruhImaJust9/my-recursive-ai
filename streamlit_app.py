@@ -655,6 +655,30 @@ st.markdown('<div id="scroll-anchor"></div>', unsafe_allow_html=True)
 # ==========================================
 user_input = st.chat_input(
     "Ask the ASI a question or upload a file (Try /clear, /system [prompt], /search [query], /imagine [prompt]):", 
+# =============================================================
+    # PASTE THE FIX HERE (Right after the prompt is created)
+    # =============================================================
+    if prompt.startswith("/search "):
+        search_query = prompt.replace("/search ", "").strip()
+        st.toast(f"🔍 Digging up live web data for: '{search_query}'...", icon="🌐")
+        
+        live_web_data = execute_internet_search(search_query)
+        
+        prompt = f"""
+        The user is asking a live question. Use the following real-time internet search results to formulate your response. 
+        Do NOT state that you do not have access to live data, because the live data is provided right below.
+        
+        [LIVE SEARCH RESULTS]:
+        {live_web_data}
+        
+        User Question: {search_query}
+        """
+    # =============================================================
+
+    # 2. Your existing code that appends to history and calls the LLM goes below:
+    st.session_state.chat_history.append({"role": "user", "content": prompt})
+    
+    # (The rest of your existing try/finally LLM response generation loop...)
     accept_file="multiple",
     disabled=st.session_state.processing 
 )
