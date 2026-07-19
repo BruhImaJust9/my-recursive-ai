@@ -29,6 +29,32 @@ for directory in [CHATS_DIR, SKILLS_DIR]:
 GEN_TRACKER_FILE = os.path.join(CHATS_DIR, "universal_generation_counter.json")
 PROFILE_FILE = os.path.join(CHATS_DIR, "user_profile.json")
 
+# ==========================================
+# AUTHENTICATION & MULTI-USER ISOLATION WALL
+# ==========================================
+if not st.experimental_user.is_logged_in:
+    st.title("🌀 Private ASI Platform Login")
+    st.markdown("---")
+    st.info("Please authenticate to access your isolated neural workspace and saved custom skills.")
+    
+    if st.button("🔓 Log In with Streamlit Provider", use_container_width=True):
+        st.experimental_user.login()
+        
+    st.stop() # <--- CRITICAL: Stops the script here so logged-out users see NOTHING below this line.
+
+# If the execution reaches here, the user is verified!
+user_email = st.experimental_user.email
+# Create a safe, custom folder name out of their email address
+user_folder_name = user_email.replace("@", "_at_").replace(".", "_")
+
+# Dynamically route directory paths based on the logged-in user
+CHATS_DIR = os.path.join("saved_chats", user_folder_name)
+SKILLS_DIR = os.path.join("mutated_skills", user_folder_name)
+
+# Make sure their personal directories exist
+for directory in [CHATS_DIR, SKILLS_DIR]:
+    if not os.path.exists(directory):
+        os.makedirs(directory)
 # UI GLASSMORPHISM & MASTER DESIGN MATRIX
 st.set_page_config(page_title="Recursive Self-Improving ASI", page_icon="🌀", layout="wide")
 st.markdown(
@@ -394,12 +420,12 @@ def create_blueprint_zip():
 if "current_gen" not in st.session_state:
     st.session_state.current_gen = load_universal_generation()
 
+import uuid  # Make sure to add 'import uuid' at the top of your script
+
 if "current_chat_id" not in st.session_state:
-    saved_sessions = sorted(get_saved_chats(), reverse=True)
-    if saved_sessions:
-        st.session_state.current_chat_id = saved_sessions[0]
-    else:
-        st.session_state.current_chat_id = f"Chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    # Instead of pulling the newest file from the server folder, 
+    # generate a unique ID for this specific visitor's browser session.
+    st.session_state.current_chat_id = f"Chat_{datetime.now().strftime('%Y%m%d')}_{str(uuid.uuid4())[:8]}"
 
 MEMORY_FILE = os.path.join(CHATS_DIR, f"{st.session_state.current_chat_id}.json")
 
