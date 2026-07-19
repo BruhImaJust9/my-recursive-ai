@@ -658,7 +658,7 @@ user_input = st.chat_input(
 # =============================================================
     # PASTE THE FIX HERE (Right after the prompt is created)
     # =============================================================
-    if prompt.startswith("/search "):
+        if prompt.startswith("/search "):
         search_query = prompt.replace("/search ", "").strip()
         st.toast(f"🔍 Digging up live web data for: '{search_query}'...", icon="🌐")
         
