@@ -193,53 +193,39 @@ def execute_internet_search(query):
     try:
         ensure_package_installed("duckduckgo_search")
         from duckduckgo_search import DDGS
-        
+
+def execute(query: str) -> str:
+    """
+    Searches the live web using DuckDuckGo and returns a summary of the top results.
+    Bypasses cloud restrictions using the lightweight HTML backend and safely parses data structures.
+    """
+    try:
         results = []
         with DDGS() as ddgs:
+            # Shifted to the 'lite' HTML backend to bypass cloud blocking rules
             ddgs_generator = ddgs.text(keywords=query, backend="lite", max_results=4)
-            # Replace those lines with this safe check:
-if ddgs_generator:
-    if isinstance(ddgs_generator, list):
-        results = ddgs_generator
-    else:
-        results = list(ddgs_generator)
-                
+            
+            # Safe parsing check to handle both list returns and generator objects
+            if ddgs_generator:
+                if isinstance(ddgs_generator, list):
+                    results = ddgs_generator
+                else:
+                    results = list(ddgs_generator)
+            
         if not results:
             return "No live search results found for this query."
             
         formatted_results = []
         for i, r in enumerate(results):
             snippet = r.get('body', r.get('snippet', ''))
-            formatted_results.append(snippet)
+            formatted_results.append(
+                f"Result {i+1}:\nTitle: {r.get('title')}\nSource: {r.get('href')}\nSnippet: {snippet}\n"
+            )
             
-        final_context = "\n\n".join([r for r in formatted_results if r])
-        if final_context.strip():
-            return final_context
-            
+        return "\n---\n".join(formatted_results)
+
     except Exception as e:
-        return f"Web node search failure: {str(e)}"
-        
-    return "Search executed, but page layout returned blank data structures."
-
-def cev_safety_filter(code_text):
-    restricted_terms = ["os.system", "rmdir", "eval("]
-    for term in restricted_terms:
-        if term in code_text and "math_genius" not in code_text:
-            return False, f" BLOCKED: Unauthorized system access attempt contains '{term}'!"
-    return True, "PASSED"
-
-def get_compiled_skills():
-    skills = glob.glob(os.path.join(SKILLS_DIR, "*.py"))
-    skill_descriptions = []
-    for s in skills:
-        name = os.path.basename(s).replace(".py", "")
-        skill_descriptions.append(f"- Native Skill '{name}': Coded and compiled successfully.")
-    return "\n".join(skill_descriptions) if skill_descriptions else "No custom tools compiled yet."
-
-def execute_compiled_skill(skill_name, argument_string):
-    file_path = os.path.join(SKILLS_DIR, f"{skill_name}.py")
-    if not os.path.exists(file_path):
-        return f"Error: Skill '{skill_name}' does not exist in the vault."
+        return f"Error executing web search: {str(e)}"
     try:
         with open(file_path, "r") as f:
             content = f.read()
