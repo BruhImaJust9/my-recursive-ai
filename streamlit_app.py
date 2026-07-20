@@ -737,91 +737,59 @@ if user_input and not st.session_state.processing:
                 else:
                     response = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
             
-            # --- LOOP RESOLVER (Up to 3 iterations for nested tools) ---
+           # --- LOOP RESOLVER (Up to 3 iterations for nested tools) ---
             loop_count = 0
             mutation_log_msg = "Cognitive optimization successful: Rules upgraded based on contextual performance analysis."
             
             while loop_count < 3:
-                # 1. Look for Explicit Vault Skill tag: [EXECUTE: skill_name(arg)]
+                # 1. Look for Explicit Vault Skill tag
                 execute_match = re.search(r'\[EXECUTE:\s*(\w+)\((.*?)\)\]', response)
                 
-                # --- UPGRADE 1: FALLBACK KEYWORD SCAVENGER ---
-                if not execute_match and any(w in prompt_text.lower() for w in ["what day", "what time", "current date", "server clock"]):
+                # --- FALLBACK KEYWORD SCAVENGER ---
+                if not execute_match and any(w in prompt_text.lower() for w in ["time", "date", "clock", "day"]):
                     if os.path.exists(os.path.join(SKILLS_DIR, "time_zone_master.py")):
-                        response = '[EXECUTE: time_zone_master("server_clock")]'
+                        response = "[EXECUTE: time_zone_master(current_time)]"
                         execute_match = re.search(r'\[EXECUTE:\s*(\w+)\((.*?)\)\]', response)
 
-                # 2. Look for explicit automated system macro overrides generated inline
-                internet_match = re.search(r'\[INTERNET:\s*(.*?)\]', response)
-                imagine_match = re.search(r'\[IMAGINE:\s*(.*?)\]', response)
-                build_match = re.search(r'\[BUILD_SKILL:\s*(\w+)\s*\|\|\s*(.*)\]', response, re.DOTALL)
-
-                # Run Vault Skill
                 if execute_match:
-                    s_name = execute_match.group(1)
-                    s_arg = execute_match.group(2).strip('"\'')
-                    st.toast(f" Mounting Engine Node: {s_name}.py", icon="⚙️")
-                    tool_res = execute_compiled_skill(s_name, s_arg)
+                    skill_name = execute_match.group(1)
+                    argument_string = execute_match.group(2)
                     
-                    # Feed execution feedback block back to LLM context
-                    followup_context = f"🔧 [SKILL VAULT RUNNER SYSTEM NOTICE]: Skill '{s_name}' executed. Result: {tool_res}\nNow continue your conversation naturally without tags."
-                    response = query_free_llm(followup_context, st.session_state.system_instruction, selected_model_id, is_validation=True)
-                    mutation_log_msg = f"Executed native tool node successfully: {s_name}.py"
-                    loop_count += 1
-                
-                # Run Internet Scraper natively
-                elif internet_match:
-                    search_query = internet_match.group(1)
-                    st.toast(f" Scraping web index for: {search_query}", icon="🌐")
-                    web_res = execute_internet_search(search_query)
-                    followup_context = f"🌐 [WEB SCRAPER NOTICE]: Results for '{search_query}':\n{web_res}\nSummarize this data for the user."
-                    response = query_free_llm(followup_context, st.session_state.system_instruction, selected_model_id, is_validation=True)
-                    mutation_log_msg = "Browsed external data environments dynamically."
-                    loop_count += 1
-
-                # Run Image Node natively
-                elif imagine_match:
-                    img_prompt = imagine_match.group(1)
-                    st.toast(f" Rendering high-fidelity asset: {img_prompt}", icon="🎨")
-                    gen_img = generate_image(img_prompt)
-                    if gen_img:
-                        buffered = io.BytesIO()
-                        gen_img.save(buffered, format="PNG")
-                        img_str = base64.b64encode(buffered.getvalue()).decode()
-                        response = f'<img src="data:image/png;base64,{img_str}" style="width:100%; border-radius:10px;">'
+                    # Search specifically within the user's isolated subfolder
+                    skill_file_path = os.path.join(SKILLS_DIR, f"{skill_name}.py")
+                    
+                    if os.path.exists(skill_file_path):
+                        st.toast(f"⚡ Intercepted Pipeline: Triggering {skill_name}.py...", icon="🛠️")
+                        tool_output = execute_compiled_skill(skill_name, argument_string)
+                        mutation_log_msg = f"Executed native tool node successfully: {skill_name}.py"
                     else:
-                        response = "❌ Visual engine pipeline failure."
-                    mutation_log_msg = "Injected synthesized visual payload matrix."
-                    break
-
-                # Run Skill Generation Compiler natively
-                elif build_match:
-                    new_skill_name = build_match.group(1)
-                    new_skill_code = build_match.group(2)
-                    st.toast(f" Compiling source code tool: {new_skill_name}", icon="🛠️")
-                    compile_status = dynamic_mutate_skill(new_skill_name, new_skill_code)
-                    followup_context = f"🛠️ [COMPILER LOG]: {compile_status}\nNotify user tool is locked into vault."
-                    response = query_free_llm(followup_context, st.session_state.system_instruction, selected_model_id, is_validation=True)
-                    mutation_log_msg = f"Mutated logic architecture: added tool {new_skill_name}.py"
+                        tool_output = f"Error: Skill module '{skill_name}' was requested but does not exist in the isolated vault path: {SKILLS_DIR}"
+                        mutation_log_msg = f"Failed tool execution attempt: {skill_name}.py missing."
+                    
+                    # Feed tool results back to LLM for final synthesis
+                    followup_prompt = f"The tool '{skill_name}' was executed with arguments ({argument_string}).\n[TOOL RESULT OUTPUT]:\n{tool_output}\n\nSynthesize this data into a final comprehensive response for the user."
+                    response = query_free_llm(followup_prompt, st.session_state.system_instruction, selected_model_id, is_validation=True)
                     loop_count += 1
-                
                 else:
-                    break
-
-            # Append finalized transaction record to disk structures
-            if not st.session_state.pause_evolution:
-                opt_msg, _ = run_recursive_improvement()
-                if "successful" in opt_msg.lower():
-                    mutation_log_msg = opt_msg
-
+                    break # No more tool execution matches found, break loop
+            
+            # Save the final text exchange to memory structures
             st.session_state.chat_history.append((prompt_text, response, mutation_log_msg))
             with open(MEMORY_FILE, "w") as f:
                 json.dump(st.session_state.chat_history, f)
+            
+            # Evaluate automatic cognitive restructuring unless paused
+            if not st.session_state.pause_evolution:
+                run_recursive_improvement()
+                
             compress_memory_if_needed()
             should_rerun = True
 
     except Exception as master_err:
-        st.error(f"Platform pipeline execution halted: {master_err}")
+        st.error(f"Platform pipeline execution halted: {str(master_err)}")
+        st.session_state.chat_history.append((prompt_text, f"Pipeline Error Exception: {str(master_err)}", "Core engine execution failure."))
+        should_rerun = True
+
     finally:
         st.session_state.processing = False
         if should_rerun:
