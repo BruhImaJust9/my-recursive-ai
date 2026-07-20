@@ -737,6 +737,35 @@ if user_input and not st.session_state.processing:
                 else:
                     response = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
             
+            # ==========================================
+            # NEW: AUTONOMOUS PROTOCOL INTERCEPT PARSER
+            # ==========================================
+            if "[INTERNET:" in response:
+                try:
+                    # Extract the query inside the brackets
+                    extracted_query = response.split("[INTERNET:")[1].split("]")[0].strip()
+                    
+                    with st.spinner(f"🤖 Autonomous intercept engaged. Searching live web for: '{extracted_query}'..."):
+                        web_context = execute_internet_search(extracted_query)
+                    
+                    followup_prompt = f"""
+                    You initiated an autonomous web search tool protocol. Here is the live context data retrieved:
+                    
+                    [LIVE WEB CONTENT DATA]:
+                    {web_context}
+                    
+                    Use this data to fully answer the user's original request. Do not repeat your protocol tag.
+                    Original Request: "{prompt_text}"
+                    """
+                    
+                    with st.spinner("🧠 Synthesizing live data into final answer..."):
+                        response = query_free_llm(followup_prompt, st.session_state.system_instruction, selected_model_id, is_validation=True)
+                except Exception as search_err:
+                    response += f"\n\n*(Autonomous search intercept failed: {str(search_err)})*"
+
+            # ==========================================
+            # CONTINUE STANDARD COMPILATION
+            # ==========================================
             eval_log = "Base iteration loop complete."
             if not st.session_state.pause_evolution:
                 eval_log, _ = run_recursive_improvement()
