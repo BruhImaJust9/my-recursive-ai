@@ -214,7 +214,7 @@ def execute_internet_search(query):
         return blob
         
     except Exception as e:
-        # If the default backend blocks us, try a structural fallback or return the exact error
+        # This closes the try block safely!
         return f"Scraper error encountered: {str(e)}. Please check library updates."
 def execute_compiled_skill(skill_name, argument_string):
     """
