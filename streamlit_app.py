@@ -724,42 +724,28 @@ if user_input and not st.session_state.processing:
                         json.dump(st.session_state.chat_history, f)
                     should_rerun = True
         else:
-            # Handle normal text submission
+            # 1. Handle normal text submission (Indented 12 spaces)
             with st.spinner("Thinking..."):
                 if st.session_state.moa_active:
                     response = query_moa_engine(prompt_text, st.session_state.system_instruction, selected_model_id)
                 else:
                     response = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
             
-            # ==========================================
-            # NEW: AUTONOMOUS PROTOCOL INTERCEPT PARSER
-            # ==========================================
+            # 2. Autonomous Intercept (Indented 12 spaces)
             if "[INTERNET:" in response:
                 try:
-                    # Extract the query inside the brackets
+                    # Inside the inner try (Indented 20 spaces)
                     extracted_query = response.split("[INTERNET:")[1].split("]")[0].strip()
-                    
-                    with st.spinner(f"🤖 Autonomous intercept engaged. Searching live web for: '{extracted_query}'..."):
+                    with st.spinner(f"🤖 Searching live web for: '{extracted_query}'..."):
                         web_context = execute_internet_search(extracted_query)
                     
-                    followup_prompt = f"""
-                    You initiated an autonomous web search tool protocol. Here is the live context data retrieved:
-                    
-                    [LIVE WEB CONTENT DATA]:
-                    {web_context}
-                    
-                    Use this data to fully answer the user's original request. Do not repeat your protocol tag.
-                    Original Request: "{prompt_text}"
-                    """
-                    
-                    with st.spinner("🧠 Synthesizing live data into final answer..."):
-                        response = query_free_llm(followup_prompt, st.session_state.system_instruction, selected_model_id, is_validation=True)
+                    followup_prompt = f"Live Context:\n{web_context}\n\nOriginal Request: {prompt_text}"
+                    response = query_free_llm(followup_prompt, st.session_state.system_instruction, selected_model_id, is_validation=True)
                 except Exception as search_err:
-                    response += f"\n\n*(Autonomous search intercept failed: {str(search_err)})*"
+                    # Back to matching the inner try (Indented 16 spaces)
+                    response += f"\n\n*(Search failed: {str(search_err)})*"
 
-            # ==========================================
-            # CONTINUE STANDARD COMPILATION
-            # ==========================================
+            # 3. Save history blocks (Indented 12 spaces)
             eval_log = "Base iteration loop complete."
             if not st.session_state.pause_evolution:
                 eval_log, _ = run_recursive_improvement()
@@ -770,6 +756,9 @@ if user_input and not st.session_state.processing:
             compress_memory_if_needed()
             should_rerun = True
             
+    # ============================================================
+    # 🌟 THE MASTER EXCEPT BLOCK (Indented 4 or 8 spaces to match Master Try)
+    # ============================================================
     except Exception as e:
         st.error(f"Execution Error: {str(e)}")
     finally:
