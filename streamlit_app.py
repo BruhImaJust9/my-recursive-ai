@@ -320,6 +320,32 @@ def run_recursive_improvement():
     except Exception as e:
         return f"Evolution suspended due to core node error: {str(e)}", False
 
+        def get_compiled_skills() -> str:
+    """
+    Scans the local mutated_skills folder and compiles a manifest 
+    of all active custom tool names and documentation for the LLM context window.
+    """
+    try:
+        skills = glob.glob(os.path.join(SKILLS_DIR, "*.py"))
+        if not skills:
+            return "No custom tool skills are currently unlocked in the vault."
+        
+        manifest = []
+        for s in skills:
+            s_name = os.path.basename(s).replace(".py", "")
+            try:
+                with open(s, "r") as f:
+                    content = f.read()
+                # Extract docstrings or description headers if available
+                docstring_match = re.search(r'"""(.*?)"""', content, re.DOTALL)
+                desc = docstring_match.group(1).strip() if docstring_match else "No description provided."
+                manifest.append(f"- Skill Name: '{s_name}'\n  Usage Directive: [EXECUTE: {s_name}(argument_string)]\n  Capability: {desc}")
+            except Exception:
+                continue
+        return "\n\n".join(manifest)
+    except Exception as e:
+        return f"Error assembling skill manifest: {str(e)}"
+
 def query_free_llm(prompt, system_prompt, model_id, is_validation=False):
     if not HF_TOKEN:
         return " Please add your Key (saved as HF_TOKEN) to your Streamlit secrets!"
