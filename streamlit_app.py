@@ -197,8 +197,12 @@ def execute_internet_search(query):
         results = []
         with DDGS() as ddgs:
             ddgs_generator = ddgs.text(keywords=query, backend="lite", max_results=4)
-            if ddgs_generator:
-                results = list(ddgs_generator)
+            # Replace those lines with this safe check:
+if ddgs_generator:
+    if isinstance(ddgs_generator, list):
+        results = ddgs_generator
+    else:
+        results = list(ddgs_generator)
                 
         if not results:
             return "No live search results found for this query."
