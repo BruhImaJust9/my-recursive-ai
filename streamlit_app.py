@@ -189,11 +189,6 @@ def ensure_package_installed(package_name):
         except Exception as e:
             return f" Failed to install package '{package_name}': {str(e)}"
 
-def execute_internet_search(query):
-    try:
-        ensure_package_installed("duckduckgo_search")
-        from duckduckgo_search import DDGS
-
 # --- Internet Search Tool Integration ---
 def execute_internet_search(query: str) -> str:
     """
