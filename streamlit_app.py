@@ -321,11 +321,11 @@ def run_recursive_improvement():
         return f"Evolution suspended due to core node error: {str(e)}", False
 
         def get_compiled_skills() -> str:
-    """
-    Scans the local mutated_skills folder and compiles a manifest 
-    of all active custom tool names and documentation for the LLM context window.
-    """
-    try:
+        """
+        Scans the local mutated_skills folder and compiles a manifest 
+        of all active custom tool names and documentation for the LLM context window.
+        """
+        try:
         skills = glob.glob(os.path.join(SKILLS_DIR, "*.py"))
         if not skills:
             return "No custom tool skills are currently unlocked in the vault."
