@@ -194,10 +194,11 @@ def execute_internet_search(query):
         ensure_package_installed("duckduckgo_search")
         from duckduckgo_search import DDGS
 
-def execute(query: str) -> str:
+# --- Internet Search Tool Integration ---
+def execute_internet_search(query: str) -> str:
     """
     Searches the live web using DuckDuckGo and returns a summary of the top results.
-    Bypasses cloud restrictions using the lightweight HTML backend and safely parses data structures.
+    Bypasses cloud restrictions using the lightweight HTML backend.
     """
     try:
         results = []
@@ -205,7 +206,6 @@ def execute(query: str) -> str:
             # Shifted to the 'lite' HTML backend to bypass cloud blocking rules
             ddgs_generator = ddgs.text(keywords=query, backend="lite", max_results=4)
             
-            # Safe parsing check to handle both list returns and generator objects
             if ddgs_generator:
                 if isinstance(ddgs_generator, list):
                     results = ddgs_generator
