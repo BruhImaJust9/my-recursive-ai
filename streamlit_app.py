@@ -197,31 +197,25 @@ def execute_internet_search(query: str) -> str:
     """
     try:
         from duckduckgo_search import DDGS
-        results = []
+
+def execute_internet_search(query):
+    try:
+        # 1. Try passing an explicit region and increasing max_results
         with DDGS() as ddgs:
-            ddgs_generator = ddgs.text(keywords=query, backend="lite", max_results=4)
-            
-            if ddgs_generator:
-                if isinstance(ddgs_generator, list):
-                    results = ddgs_generator
-                else:
-                    results = list(ddgs_generator)
-            
+            results = [r for r in ddgs.text(query, region="wt-wt", max_results=5)]
+        
         if not results:
-            return "No live search results found for this query."
+            return "Search executed, but no matching snippets were returned."
             
-        formatted_results = []
-        for i, r in enumerate(results):
-            snippet = r.get('body', r.get('snippet', ''))
-            formatted_results.append(
-                f"Result {i+1}:\nTitle: {r.get('title')}\nSource: {r.get('href')}\nSnippet: {snippet}\n"
-            )
-            
-        return "\n---\n".join(formatted_results)
-
+        # 2. Format the output cleanly for the LLM brain
+        blob = ""
+        for i, r in enumerate(results, 1):
+            blob += f"Result {i}: {r['title']}\nURL: {r['href']}\nSnippet: {r['body']}\n\n"
+        return blob
+        
     except Exception as e:
-        return f"Error executing web search: {str(e)}"
-
+        # If the default backend blocks us, try a structural fallback or return the exact error
+        return f"Scraper error encountered: {str(e)}. Please check library updates."
 def execute_compiled_skill(skill_name, argument_string):
     """
     Executes a dynamically compiled skill from the isolated vault.
