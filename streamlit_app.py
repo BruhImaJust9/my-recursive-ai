@@ -193,29 +193,23 @@ def ensure_package_installed(package_name):
 def execute_internet_search(query: str) -> str:
     """
     Searches the live web using DuckDuckGo and returns a summary of the top results.
-    Bypasses cloud restrictions using the lightweight HTML backend.
     """
     try:
         from duckduckgo_search import DDGS
-
-def execute_internet_search(query):
-    try:
-        # 1. Try passing an explicit region and increasing max_results
         with DDGS() as ddgs:
             results = [r for r in ddgs.text(query, region="wt-wt", max_results=5)]
         
         if not results:
             return "Search executed, but no matching snippets were returned."
             
-        # 2. Format the output cleanly for the LLM brain
         blob = ""
         for i, r in enumerate(results, 1):
             blob += f"Result {i}: {r['title']}\nURL: {r['href']}\nSnippet: {r['body']}\n\n"
         return blob
         
     except Exception as e:
-        # This closes the try block safely!
         return f"Scraper error encountered: {str(e)}. Please check library updates."
+
 def execute_compiled_skill(skill_name, argument_string):
     """
     Executes a dynamically compiled skill from the isolated vault.
@@ -242,7 +236,6 @@ def execute_compiled_skill(skill_name, argument_string):
         return f"Runtime Execution Crash in skill '{skill_name}': {str(e)}"
 
 def cev_safety_filter(code):
-    # Dummy placeholder function to prevent syntax errors
     return True, "Safe"
 
 def dynamic_mutate_skill(skill_name, updated_code):
@@ -284,10 +277,6 @@ def compress_memory_if_needed():
         st.toast(f"Memory condensation warning: {e}", icon="⚠️")
 
 def get_compiled_skills() -> str:
-    """
-    Scans the local mutated_skills folder and compiles a manifest 
-    of all active custom tool names and documentation for the LLM context window.
-    """
     try:
         skills = glob.glob(os.path.join(SKILLS_DIR, "*.py"))
         if not skills:
@@ -647,7 +636,7 @@ for user_q, ai_a, sys_log in st.session_state.chat_history:
             unsafe_allow_html=True
         )
         
-        if ai_a.startswith("![Visual Output]"):
+        if ai_a.startswith("<img src="):
             st.markdown(ai_a, unsafe_allow_html=True)
         elif "<thinking>" in ai_a and "</thinking>" in ai_a:
             parts = ai_a.split("</thinking>")
@@ -724,17 +713,15 @@ if user_input and not st.session_state.processing:
                         json.dump(st.session_state.chat_history, f)
                     should_rerun = True
         else:
-            # 1. Handle normal text submission (Indented 12 spaces)
             with st.spinner("Thinking..."):
                 if st.session_state.moa_active:
                     response = query_moa_engine(prompt_text, st.session_state.system_instruction, selected_model_id)
                 else:
                     response = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
             
-            # 2. Autonomous Intercept (Indented 12 spaces)
+            # --- Autonomous Protocol Intercept ---
             if "[INTERNET:" in response:
                 try:
-                    # Inside the inner try (Indented 20 spaces)
                     extracted_query = response.split("[INTERNET:")[1].split("]")[0].strip()
                     with st.spinner(f"🤖 Searching live web for: '{extracted_query}'..."):
                         web_context = execute_internet_search(extracted_query)
@@ -742,10 +729,8 @@ if user_input and not st.session_state.processing:
                     followup_prompt = f"Live Context:\n{web_context}\n\nOriginal Request: {prompt_text}"
                     response = query_free_llm(followup_prompt, st.session_state.system_instruction, selected_model_id, is_validation=True)
                 except Exception as search_err:
-                    # Back to matching the inner try (Indented 16 spaces)
                     response += f"\n\n*(Search failed: {str(search_err)})*"
 
-            # 3. Save history blocks (Indented 12 spaces)
             eval_log = "Base iteration loop complete."
             if not st.session_state.pause_evolution:
                 eval_log, _ = run_recursive_improvement()
@@ -755,10 +740,7 @@ if user_input and not st.session_state.processing:
                 json.dump(st.session_state.chat_history, f)
             compress_memory_if_needed()
             should_rerun = True
-            
-    # ============================================================
-    # 🌟 THE MASTER EXCEPT BLOCK (Indented 4 or 8 spaces to match Master Try)
-    # ============================================================
+
     except Exception as e:
         st.error(f"Execution Error: {str(e)}")
     finally:
