@@ -190,6 +190,7 @@ def ensure_package_installed(package_name):
             return f" Failed to install package '{package_name}': {str(e)}"
 
 # --- Internet Search Tool Integration ---
+# --- Internet Search Tool Integration ---
 def execute_internet_search(query: str) -> str:
     """
     Searches the live web using DuckDuckGo and returns a summary of the top results.
@@ -221,6 +222,13 @@ def execute_internet_search(query: str) -> str:
 
     except Exception as e:
         return f"Error executing web search: {str(e)}"
+
+
+def execute_compiled_skill(skill_name, argument_string):
+    """
+    Executes a dynamically compiled skill from the isolated vault.
+    """
+    file_path = os.path.join(SKILLS_DIR, f"{skill_name}.py")
     try:
         with open(file_path, "r") as f:
             content = f.read()
@@ -240,7 +248,6 @@ def execute_internet_search(query: str) -> str:
         return f"Error: Skill '{skill_name}' missing mandatory 'execute(user_input)' entrypoint."
     except Exception as e:
         return f"Runtime Execution Crash in skill '{skill_name}': {str(e)}"
-
 def dynamic_mutate_skill(skill_name, updated_code):
     is_safe, status = cev_safety_filter(updated_code)
     if not is_safe:
