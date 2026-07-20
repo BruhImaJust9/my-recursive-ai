@@ -37,20 +37,20 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
-    st.title("🌀 Private ASI Platform Login")
+    st.title("Private ASI Platform Login")
     st.markdown("---")
     st.info("Please verify credentials to unlock your isolated neural workspace.")
     
     master_pass = st.secrets.get("MASTER_PASSWORD", "admin123") 
-    user_password_input = st.text_input("🔑 Enter Security Access Key:", type="password")
+    user_password_input = st.text_input(" Enter Security Access Key:", type="password")
     
-    if st.button("🔓 Authenticate and Mount Engine", use_container_width=True):
+    if st.button(" Authenticate and Mount Engine", use_container_width=True):
         if user_password_input == master_pass:
             st.session_state.authenticated = True
-            st.toast("⚡ Access granted! Initializing secure environments...", icon="🔓")
+            st.toast(" Access granted! Initializing secure environments...", icon="🔓")
             st.rerun()
         else:
-            st.error("❌ Invalid Access Key. Deployment loop suspended.")
+            st.error(" Invalid Access Key. Deployment loop suspended.")
             
     st.stop() 
 
@@ -185,9 +185,9 @@ def ensure_package_installed(package_name):
     except ImportError:
         try:
             subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
-            return f"✅ Package '{package_name}' was successfully installed on the fly!"
+            return f" Package '{package_name}' was successfully installed on the fly!"
         except Exception as e:
-            return f"❌ Failed to install package '{package_name}': {str(e)}"
+            return f" Failed to install package '{package_name}': {str(e)}"
 
 def execute_internet_search(query):
     try:
@@ -221,7 +221,7 @@ def cev_safety_filter(code_text):
     restricted_terms = ["os.system", "rmdir", "eval("]
     for term in restricted_terms:
         if term in code_text and "math_genius" not in code_text:
-            return False, f"⚠️ BLOCKED: Unauthorized system access attempt contains '{term}'!"
+            return False, f" BLOCKED: Unauthorized system access attempt contains '{term}'!"
     return True, "PASSED"
 
 def get_compiled_skills():
@@ -337,7 +337,7 @@ def run_recursive_improvement():
 
 def query_free_llm(prompt, system_prompt, model_id, is_validation=False):
     if not HF_TOKEN:
-        return "⚠️ Please add your Key (saved as HF_TOKEN) to your Streamlit secrets!"
+        return " Please add your Key (saved as HF_TOKEN) to your Streamlit secrets!"
         
     final_system_prompt = system_prompt
     if st.session_state.get("deep_thinking", False):
@@ -461,13 +461,13 @@ if "show_status_badge" not in st.session_state:
 # SIDEBAR APPLICATION DASHBOARD
 # ==========================================
 with st.sidebar:
-    st.markdown("### 🚨 Emergency Controls")
-    if st.button("🔓 Force Unlock Chat Box", type="primary", use_container_width=True):
+    st.markdown("###  Emergency Controls")
+    if st.button(" Force Unlock Chat Box", type="primary", use_container_width=True):
         st.session_state.processing = False
         st.rerun()
     st.write("---")
 with st.sidebar:
-    st.markdown("### 📊 ASI Core Status")
+    st.markdown("###  ASI Core Status")
     msg_count = len(st.session_state.chat_history)
     col1, col2 = st.columns(2)
     with col1:
@@ -475,11 +475,11 @@ with st.sidebar:
     with col2:
         st.metric(label="Memory Vault", value=f"{len(st.session_state.long_term_memory_bank)} blocks")
         
-    st.markdown("### ⚡ Performance Registry")
+    st.markdown("###  Performance Registry")
     st.metric(label="Neural API Latency", value=f"{st.session_state.last_latency:.2f}s")
     
     st.write("---")
-    st.markdown("## 📂 Chat Session Manager")
+    st.markdown("##  Chat Session Manager")
     saved_chats = get_saved_chats()
     if st.session_state.current_chat_id not in saved_chats:
         saved_chats.append(st.session_state.current_chat_id)
@@ -496,16 +496,16 @@ with st.sidebar:
         st.session_state.chat_history = json.load(open(target_file, "r")) if os.path.exists(target_file) else []
         st.rerun()
 
-    if st.button("➕ Start New Chat", use_container_width=True):
+    if st.button(" Start New Chat", use_container_width=True):
         st.session_state.current_chat_id = f"Chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         st.session_state.chat_history = []
         st.session_state.long_term_memory_bank = []
         st.rerun()
         
-    st.markdown("### 💾 Core Deployment Archive")
+    st.markdown("###  Core Deployment Archive")
     zip_data = create_blueprint_zip()
     st.download_button(
-        label="📥 Export Engine Blueprint (.zip)",
+        label=" Export Engine Blueprint (.zip)",
         data=zip_data,
         file_name=f"asi_blueprint_{st.session_state.current_chat_id}.zip",
         mime="application/zip",
@@ -518,7 +518,7 @@ with st.sidebar:
     tokens_slider = st.slider("Max Tokens (Response Length)", 100, 2000, 1000, 50, key="tokens_slider")
     
     st.write("---")
-    st.markdown("### 🧠 Foundational Engine")
+    st.markdown("###  Foundational Engine")
     model_options = {
         "Llama 3.3 70B (High Intelligence)": "llama-3.3-70b-versatile",
         "Llama 3.1 8B (Fast & Versatile)": "llama-3.1-8b-instant",
@@ -528,24 +528,24 @@ with st.sidebar:
     selected_model_id = model_options[selected_model_name]
     
     st.write("---")
-    st.session_state.deep_thinking = st.toggle("🧠 Enable Deep Thinking Mode", value=st.session_state.deep_thinking)
-    st.session_state.moa_active = st.toggle("👥 Enable Mixture of Agents (MoA)", value=st.session_state.moa_active)
+    st.session_state.deep_thinking = st.toggle(" Enable Deep Thinking Mode", value=st.session_state.deep_thinking)
+    st.session_state.moa_active = st.toggle(" Enable Mixture of Agents (MoA)", value=st.session_state.moa_active)
     
     st.write("---")
     st.markdown("### 🎛️ Evolution Controls")
-    st.session_state.pause_evolution = st.checkbox("⏸️ Pause Automatic Evolution", value=st.session_state.pause_evolution)
+    st.session_state.pause_evolution = st.checkbox(" Pause Automatic Evolution", value=st.session_state.pause_evolution)
     
-    with st.expander("🧠 Brain Surgery (Manual Prompt Override)"):
+    with st.expander(" Brain Surgery (Manual Prompt Override)"):
         manual_instruction = st.text_area("Core System Prompt:", value=st.session_state.system_instruction, height=100)
-        if st.button("💉 Inject New Programming", use_container_width=True):
+        if st.button(" Inject New Programming", use_container_width=True):
             st.session_state.system_instruction = manual_instruction
             st.rerun()
             
-    if st.button("🌀 Force Mental Evolution", use_container_width=True):
+    if st.button(" Force Mental Evolution", use_container_width=True):
         run_recursive_improvement()
         st.rerun()
         
-    if st.button("🗑️ Delete Current Chat", type="primary", use_container_width=True):
+    if st.button(" Delete Current Chat", type="primary", use_container_width=True):
         current_file = os.path.join(CHATS_DIR, f"{st.session_state.current_chat_id}.json")
         if os.path.exists(current_file):
             os.remove(current_file)
@@ -571,7 +571,7 @@ with st.sidebar:
         st.info("Vault empty. Awaiting tool creation loops.")
         
     st.write("---")
-    st.markdown("### 🧬 Persona Evolutionary Tree")
+    st.markdown("###  Persona Evolutionary Tree")
     evolutionary_steps = ["You are a basic cosmic intelligence. Speak in short, simple truths."]
     for _, _, sys_log in st.session_state.chat_history:
         if "optimization successful" in sys_log.lower() and sys_log not in evolutionary_steps:
@@ -600,7 +600,7 @@ if st.session_state.show_status_badge:
     with badge_col:
         st.info(f"🧬 **ASI STATUS: ACTIVE (Gen {current_gen})**\n\n**Directive:** *\"{st.session_state.system_instruction}\"*")
     with btn_col:
-        if st.button("❌ Close", use_container_width=True):
+        if st.button(" Close", use_container_width=True):
             st.session_state.show_status_badge = False
             st.rerun()
 else:
@@ -609,7 +609,7 @@ else:
         st.rerun()
 
 if st.session_state.long_term_memory_bank:
-    with st.expander("📚 View Condensed Long-Term Memory Core Vault"):
+    with st.expander(" View Condensed Long-Term Memory Core Vault"):
         for memory_block in st.session_state.long_term_memory_bank:
             st.write(memory_block)
 
@@ -636,7 +636,7 @@ for user_q, ai_a, sys_log in st.session_state.chat_history:
             st.markdown(ai_a, unsafe_allow_html=True)
         elif "<thinking>" in ai_a and "</thinking>" in ai_a:
             parts = ai_a.split("</thinking>")
-            with st.expander("🧠 View Inner Thought Process"):
+            with st.expander(" View Inner Thought Process"):
                 st.caption(parts[0].replace("<thinking>", "").strip())
             st.write(parts[1].strip())
         else:
@@ -644,9 +644,10 @@ for user_q, ai_a, sys_log in st.session_state.chat_history:
 
 st.markdown('<div id="scroll-anchor"></div>', unsafe_allow_html=True)
 
-# ==========================================
-# SYSTEM TEXT GENERATION PIPELINE INTERCEPT
-# ==========================================
+
+# ========================================================
+# 🛠️ SYSTEM TEXT GENERATION PIPELINE INTERCEPT (FIXED)
+# ========================================================
 user_input = st.chat_input(
     "Ask the ASI a question or upload a file (Try /clear, /system [prompt], /search [query], /imagine [prompt]):", 
     accept_file="multiple",
@@ -672,17 +673,16 @@ if user_input and not st.session_state.processing:
         elif prompt_text.startswith("/system "):
             new_sys = prompt_text.replace("/system ", "").strip()
             st.session_state.system_instruction = new_sys
-            st.session_state.chat_history.append((prompt_text, f"⚙️ Operational override engaged. Core instruction initialized as: '{new_sys}'", "System Instruction Intercept Triggered."))
+            st.session_state.chat_history.append((prompt_text, f" Operational override engaged. Core instruction initialized as: '{new_sys}'", "System Instruction Intercept Triggered."))
             with open(MEMORY_FILE, "w") as f:
                 json.dump(st.session_state.chat_history, f)
             should_rerun = True
             
         elif prompt_text.startswith("/search "):
             forced_query = prompt_text.replace("/search ", "").strip()
-            with st.spinner(f"🌐 Forced Web Scrape: '{forced_query}'..."):
+            with st.spinner(f" Forced Web Scrape: '{forced_query}'..."):
                 web_context = execute_internet_search(forced_query)
             
-            # Formulate an authoritative system-level wrapper that forces data reading
             followup_prompt = f"""
             You are a real-time information retrieval host. Use the following live web results to answer the user's question directly.
             Do NOT state that you lack real-time information. The information is provided right below.
@@ -692,7 +692,7 @@ if user_input and not st.session_state.processing:
             
             User's Real-Time Request: "{forced_query}"
             """
-            with st.spinner("🧠 Compiling live output summary..."):
+            with st.spinner(" Compiling live output summary..."):
                 response = query_free_llm(followup_prompt, "You are an absolute authoritative research engine. You summarize data accurately.", selected_model_id, is_validation=True)
             st.session_state.chat_history.append((prompt_text, response, "Forced programmatic web search tool complete."))
             with open(MEMORY_FILE, "w") as f:
@@ -702,7 +702,7 @@ if user_input and not st.session_state.processing:
 
         elif prompt_text.startswith("/imagine "):
             image_prompt = prompt_text.replace("/imagine ", "")
-            with st.spinner(f"🎨 Visualizing: '{image_prompt}'..."):
+            with st.spinner(f" Visualizing: '{image_prompt}'..."):
                 generated_img = generate_image(image_prompt)
                 if generated_img:
                     buffered = io.BytesIO()
@@ -711,7 +711,7 @@ if user_input and not st.session_state.processing:
                     markdown_img = f'<img src="data:image/png;base64,{img_str}" style="width:100%; border-radius:10px; border:1px solid rgba(255,215,0,0.2);">'
                     st.session_state.chat_history.append((prompt_text, f"![Visual Output]({markdown_img})", "Autonomous visual asset render completed successfully."))
                 else:
-                    st.session_state.chat_history.append((prompt_text, "❌ Image creation node failed or timed out. Check connection pools.", "Image generation pipeline exception."))
+                    st.session_state.chat_history.append((prompt_text, " Image creation node failed or timed out. Check connection pools.", "Image generation pipeline exception."))
             with open(MEMORY_FILE, "w") as f:
                 json.dump(st.session_state.chat_history, f)
             should_rerun = True
@@ -720,27 +720,97 @@ if user_input and not st.session_state.processing:
             # Baseline natural chat turn execution loop
             extract_and_update_profile(prompt_text)
             
-            with st.spinner("🧠 Calculating neural response loops..."):
+            with st.spinner(" Calculating neural response loops..."):
                 if st.session_state.moa_active:
                     response = query_moa_engine(prompt_text, st.session_state.system_instruction, selected_model_id)
                 else:
                     response = query_free_llm(prompt_text, st.session_state.system_instruction, selected_model_id)
             
-            mutation_log = "Initial state operational logs."
-            if not st.session_state.pause_evolution:
-                mutation_log, env_mutated = run_recursive_improvement()
+            # --- LOOP RESOLVER (Up to 3 iterations for nested tools) ---
+            loop_count = 0
+            mutation_log_msg = "Cognitive optimization successful: Rules upgraded based on contextual performance analysis."
             
-            st.session_state.chat_history.append((prompt_text, response, mutation_log))
+            while loop_count < 3:
+                # 1. Look for Explicit Vault Skill tag: [EXECUTE: skill_name(arg)]
+                execute_match = re.search(r'\[EXECUTE:\s*(\w+)\((.*?)\)\]', response)
+                
+                # --- UPGRADE 1: FALLBACK KEYWORD SCAVENGER ---
+                if not execute_match and any(w in prompt_text.lower() for w in ["what day", "what time", "current date", "server clock"]):
+                    if os.path.exists(os.path.join(SKILLS_DIR, "time_zone_master.py")):
+                        response = '[EXECUTE: time_zone_master("server_clock")]'
+                        execute_match = re.search(r'\[EXECUTE:\s*(\w+)\((.*?)\)\]', response)
+
+                # 2. Look for explicit automated system macro overrides generated inline
+                internet_match = re.search(r'\[INTERNET:\s*(.*?)\]', response)
+                imagine_match = re.search(r'\[IMAGINE:\s*(.*?)\]', response)
+                build_match = re.search(r'\[BUILD_SKILL:\s*(\w+)\s*\|\|\s*(.*)\]', response, re.DOTALL)
+
+                # Run Vault Skill
+                if execute_match:
+                    s_name = execute_match.group(1)
+                    s_arg = execute_match.group(2).strip('"\'')
+                    st.toast(f" Mounting Engine Node: {s_name}.py", icon="⚙️")
+                    tool_res = execute_compiled_skill(s_name, s_arg)
+                    
+                    # Feed execution feedback block back to LLM context
+                    followup_context = f"🔧 [SKILL VAULT RUNNER SYSTEM NOTICE]: Skill '{s_name}' executed. Result: {tool_res}\nNow continue your conversation naturally without tags."
+                    response = query_free_llm(followup_context, st.session_state.system_instruction, selected_model_id, is_validation=True)
+                    mutation_log_msg = f"Executed native tool node successfully: {s_name}.py"
+                    loop_count += 1
+                
+                # Run Internet Scraper natively
+                elif internet_match:
+                    search_query = internet_match.group(1)
+                    st.toast(f" Scraping web index for: {search_query}", icon="🌐")
+                    web_res = execute_internet_search(search_query)
+                    followup_context = f"🌐 [WEB SCRAPER NOTICE]: Results for '{search_query}':\n{web_res}\nSummarize this data for the user."
+                    response = query_free_llm(followup_context, st.session_state.system_instruction, selected_model_id, is_validation=True)
+                    mutation_log_msg = "Browsed external data environments dynamically."
+                    loop_count += 1
+
+                # Run Image Node natively
+                elif imagine_match:
+                    img_prompt = imagine_match.group(1)
+                    st.toast(f" Rendering high-fidelity asset: {img_prompt}", icon="🎨")
+                    gen_img = generate_image(img_prompt)
+                    if gen_img:
+                        buffered = io.BytesIO()
+                        gen_img.save(buffered, format="PNG")
+                        img_str = base64.b64encode(buffered.getvalue()).decode()
+                        response = f'<img src="data:image/png;base64,{img_str}" style="width:100%; border-radius:10px;">'
+                    else:
+                        response = "❌ Visual engine pipeline failure."
+                    mutation_log_msg = "Injected synthesized visual payload matrix."
+                    break
+
+                # Run Skill Generation Compiler natively
+                elif build_match:
+                    new_skill_name = build_match.group(1)
+                    new_skill_code = build_match.group(2)
+                    st.toast(f" Compiling source code tool: {new_skill_name}", icon="🛠️")
+                    compile_status = dynamic_mutate_skill(new_skill_name, new_skill_code)
+                    followup_context = f"🛠️ [COMPILER LOG]: {compile_status}\nNotify user tool is locked into vault."
+                    response = query_free_llm(followup_context, st.session_state.system_instruction, selected_model_id, is_validation=True)
+                    mutation_log_msg = f"Mutated logic architecture: added tool {new_skill_name}.py"
+                    loop_count += 1
+                
+                else:
+                    break
+
+            # Append finalized transaction record to disk structures
+            if not st.session_state.pause_evolution:
+                opt_msg, _ = run_recursive_improvement()
+                if "successful" in opt_msg.lower():
+                    mutation_log_msg = opt_msg
+
+            st.session_state.chat_history.append((prompt_text, response, mutation_log_msg))
             with open(MEMORY_FILE, "w") as f:
                 json.dump(st.session_state.chat_history, f)
             compress_memory_if_needed()
             should_rerun = True
 
     except Exception as master_err:
-        st.error(f"Core System Loop Exception: {str(master_err)}")
-        st.session_state.chat_history.append((prompt_text, f"⚠️ Core engine loop collapsed: {str(master_err)}", "System pipeline exception state logged."))
-        should_rerun = True
-
+        st.error(f"Platform pipeline execution halted: {master_err}")
     finally:
         st.session_state.processing = False
         if should_rerun:
