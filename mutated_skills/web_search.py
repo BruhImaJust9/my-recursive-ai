@@ -3,12 +3,13 @@ from duckduckgo_search import DDGS
 def execute(query: str) -> str:
     """
     Searches the live web using DuckDuckGo and returns a summary of the top results.
+    Bypasses cloud restrictions using the lightweight HTML backend.
     """
     try:
         results = []
         with DDGS() as ddgs:
-            # Fetch text results from DuckDuckGo
-            ddgs_generator = ddgs.text(query, max_results=4)
+            # Shifted to the 'lite' HTML backend to bypass cloud blocking rules
+            ddgs_generator = ddgs.text(keywords=query, backend="lite", max_results=4)
             if ddgs_generator:
                 results = list(ddgs_generator)
             
@@ -17,7 +18,6 @@ def execute(query: str) -> str:
             
         formatted_results = []
         for i, r in enumerate(results):
-            # DuckDuckGo uses 'body' for the text snippet
             snippet = r.get('body', r.get('snippet', ''))
             formatted_results.append(
                 f"Result {i+1}:\nTitle: {r.get('title')}\nSource: {r.get('href')}\nSnippet: {snippet}\n"
