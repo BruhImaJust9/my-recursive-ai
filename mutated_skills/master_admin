@@ -1,0 +1,8 @@
+# mutated_skills/master_admin/any_name_you_want.py
+
+def execute(user_input):
+    # 1. Do your calculations or logic here using the 'user_input' string
+    processed_data = f"Hello! You sent: {user_input}"
+    
+    # 2. You MUST return a string at the very end
+    return processed_data
