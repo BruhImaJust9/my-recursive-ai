@@ -196,7 +196,7 @@ def execute_internet_search(query):
         
         results = []
         with DDGS() as ddgs:
-            ddgs_generator = ddgs.text(query, max_results=4)
+            ddgs_generator = ddgs.text(keywords=query, backend="lite", max_results=4)
             if ddgs_generator:
                 results = list(ddgs_generator)
                 
