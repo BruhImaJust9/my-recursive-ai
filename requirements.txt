@@ -4,3 +4,4 @@ requests
 duckduckgo-search
 pillow
 python-dotenv
+google-generativeai
