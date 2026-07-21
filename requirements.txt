@@ -1,7 +1,7 @@
 streamlit
-requests
+groq
 duckduckgo-search
 pillow
+requests
 python-dotenv
-google-generativeai
 authlib
