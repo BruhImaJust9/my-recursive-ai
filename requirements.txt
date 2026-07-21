@@ -3,5 +3,5 @@ requests
 duckduckgo-search
 pillow
 python-dotenv
-google-genai
+google-generativeai
 authlib
