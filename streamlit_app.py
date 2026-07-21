@@ -1,7 +1,7 @@
 import streamlit as st
 import urllib.parse
 from PIL import Image
-from google import genai
+import google.generativeai as genai
 from duckduckgo_search import DDGS
 
 # ==========================================
