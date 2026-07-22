@@ -33,21 +33,15 @@ if "messages" not in st.session_state:
 # ==========================================
 
 def execute_free_search(query: str) -> str:
-    """Free web search using DuckDuckGo with fallback and query formatting."""
-    # Clean punctuation that confuses search engines
+    """Free web search using DuckDuckGo with rate-limit protection."""
     clean_query = query.strip("!? ")
     
     try:
         with DDGS(timeout=10) as ddgs:
-            # 1. Try standard text search with US region
             results = list(ddgs.text(clean_query, max_results=5, region="us-en"))
             
-            # 2. Fallback to news search if general text search returned nothing
-            if not results:
-                results = list(ddgs.news(clean_query, max_results=5, region="us-en"))
-                
         if not results:
-            return "No matching search results found. Try rephrasing your search terms."
+            return "No matching search results found. Try rephrasing your search query."
             
         sources = []
         for r in results:
@@ -58,6 +52,8 @@ def execute_free_search(query: str) -> str:
             
         return "\n\n".join(sources)
     except Exception as e:
+        if "403" in str(e) or "Ratelimit" in str(e):
+            return "⚠️ Search is temporarily rate-limited by DuckDuckGo due to shared cloud server traffic. Please wait a minute and try again!"
         return f"Search error or timeout: {str(e)}"
 
 def get_image_url(prompt: str) -> str:
