@@ -144,7 +144,12 @@ if user_input and client:
             query = user_input.replace("/search", "").strip()
             placeholder.markdown(f"🔍 *Searching live web for:* **'{query}'**...")
             
-            search_text = execute_free_search(query)
+            # Format conversational queries (e.g., "who won..." -> "winner of...")
+            search_query = query.lower()
+            if search_query.startswith("who won"):
+                search_query = search_query.replace("who won", "winner of")
+                
+            search_text = execute_free_search(search_query)
             
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
