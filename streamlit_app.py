@@ -159,6 +159,7 @@ if user_input and client:
                     "content": f"Here is your generated image for: **'{prompt}'**",
                     "image_url": fallback_url
                 })
+                
             else:
                 placeholder.error("Failed to fetch image. Please try again!")
         # 🔍 FEATURE 2: Free Live Web Search
