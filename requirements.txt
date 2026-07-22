@@ -5,3 +5,4 @@ pillow
 requests
 python-dotenv
 authlib
+tavily-python
