@@ -151,8 +151,9 @@ if user_input and client:
                         "role": "system", 
                         "content": (
                             "Today's date is in 2026. You are a helpful assistant summarizing live web search results. "
-                            "Rely strictly on the provided search context. If the search results are empty or do not "
-                            "contain the answer, state that clearly—do NOT fall back on assumptions or claim an event hasn't happened yet."
+                            "Rely strictly on the provided search context. Summarize all key facts, standings, names, or "
+                            "numbers present in the snippets clearly using bullet points. If specific numbers are missing, "
+                            "summarize the main story accurately based on what was provided."
                         )
                     },
                     {"role": "user", "content": f"Query: '{query}'\n\nSearch Results:\n{search_text}"}
