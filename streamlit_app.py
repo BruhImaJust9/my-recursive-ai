@@ -119,15 +119,18 @@ if user_input and client:
         if user_input.lower().startswith("/generate") or "generate an image" in user_input.lower():
             prompt = user_input.replace("/generate", "").strip()
             placeholder.markdown(f"🎨 *Generating image for:* **'{prompt}'**...")
-            img_url = get_generated_image_url(prompt)
             
-            placeholder.image(img_url, caption=f"Generated: {prompt}", use_column_width=True)
-            st.session_state.messages.append({
-                "role": "assistant", 
-                "content": f"Here is your generated image for: **'{prompt}'**",
-                "image_url": img_url
-            })
-
+            img_bytes = fetch_generated_image_bytes(prompt)
+            
+            if img_bytes:
+                placeholder.image(img_bytes, caption=f"Generated: {prompt}", use_container_width=True)
+                st.session_state.messages.append({
+                    "role": "assistant", 
+                    "content": f"Here is your generated image for: **'{prompt}'**",
+                    "image_bytes": img_bytes
+                })
+            else:
+                placeholder.error("Failed to fetch image. Please try again!")
         # 🔍 FEATURE 2: Free Live Web Search
         elif user_input.lower().startswith("/search"):
             query = user_input.replace("/search", "").strip()
