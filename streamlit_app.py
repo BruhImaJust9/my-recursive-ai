@@ -32,29 +32,35 @@ if "messages" not in st.session_state:
 # 2. HELPER FUNCTIONS
 # ==========================================
 
+from tavily import TavilyClient
+
+# Fetch Tavily API Key
+TAVILY_KEY = st.secrets.get("TAVILY_API_KEY", os.getenv("TAVILY_API_KEY", ""))
+
 def execute_free_search(query: str) -> str:
-    """Free web search using DuckDuckGo with rate-limit protection."""
-    clean_query = query.strip("!? ")
-    
+    """Bulletproof web search using Tavily API (No IP blocks/rate limits)."""
+    if not TAVILY_KEY:
+        return "⚠️ Missing `TAVILY_API_KEY` in Streamlit secrets!"
+
     try:
-        with DDGS(timeout=10) as ddgs:
-            results = list(ddgs.text(clean_query, max_results=5, region="us-en"))
-            
+        tavily = TavilyClient(api_key=TAVILY_KEY)
+        # Search web with up to 5 clean results
+        response = tavily.search(query=query, max_results=5)
+        
+        results = response.get("results", [])
         if not results:
-            return "No matching search results found. Try rephrasing your search query."
+            return "No matching search results found."
             
         sources = []
         for r in results:
-            title = r.get('title', 'No Title')
-            body = r.get('body', r.get('snippet', 'No description available.'))
-            url = r.get('href', r.get('url', '#'))
-            sources.append(f"**{title}**\nSnippet: {body}\nURL: {url}")
+            title = r.get("title", "No Title")
+            content = r.get("content", "No content snippet.")
+            url = r.get("url", "#")
+            sources.append(f"**{title}**\nSnippet: {content}\nURL: {url}")
             
         return "\n\n".join(sources)
     except Exception as e:
-        if "403" in str(e) or "Ratelimit" in str(e):
-            return "⚠️ Search is temporarily rate-limited by DuckDuckGo due to shared cloud server traffic. Please wait a minute and try again!"
-        return f"Search error or timeout: {str(e)}"
+        return f"Search error: {str(e)}"
 
 def get_image_url(prompt: str) -> str:
     """Returns the direct raw image URL from Pollinations."""
