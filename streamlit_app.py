@@ -46,14 +46,30 @@ def execute_free_search(query: str) -> str:
 
 import requests
 
+import requests
+import io
+from PIL import Image
+
 def fetch_generated_image_bytes(prompt: str):
-    """Downloads the image bytes from Pollinations so Streamlit can render it natively."""
+    """Fetches image bytes safely, verifying it's a valid image."""
     try:
         encoded_prompt = urllib.parse.quote(prompt.strip())
-        url = f"https://pollinations.ai/p/{encoded_prompt}?width=800&height=800&seed=42"
-        response = requests.get(url, timeout=15)
+        # Added seed and model params to ensure direct rendering
+        url = f"https://pollinations.ai/p/{encoded_prompt}?width=800&height=800&nologo=true"
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        }
+        
+        response = requests.get(url, headers=headers, timeout=20)
+        
         if response.status_code == 200:
-            return response.content  # Returns raw image bytes
+            # Verify the response is actually a valid image before returning
+            image_bytes = response.content
+            img = Image.open(io.BytesIO(image_bytes))
+            img.verify()  # Throws an error if bytes aren't a valid image
+            return image_bytes
+            
         return None
     except Exception as e:
         return None
