@@ -44,10 +44,19 @@ def execute_free_search(query: str) -> str:
     except Exception as e:
         return f"Search error or timeout: {str(e)}"
 
-def get_generated_image_url(prompt: str) -> str:
-    """Free image generation via Pollinations URL — No API Key required!"""
-    encoded_prompt = urllib.parse.quote(prompt.strip())
-    return f"https://pollinations.ai/p/{encoded_prompt}?width=800&height=800&seed=42"
+import requests
+
+def fetch_generated_image_bytes(prompt: str):
+    """Downloads the image bytes from Pollinations so Streamlit can render it natively."""
+    try:
+        encoded_prompt = urllib.parse.quote(prompt.strip())
+        url = f"https://pollinations.ai/p/{encoded_prompt}?width=800&height=800&seed=42"
+        response = requests.get(url, timeout=15)
+        if response.status_code == 200:
+            return response.content  # Returns raw image bytes
+        return None
+    except Exception as e:
+        return None
 
 def encode_image_to_base64(image: Image.Image) -> str:
     """Helper to convert uploaded PIL image into a base64 data string for Groq Vision."""
