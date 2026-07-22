@@ -3,6 +3,8 @@ import urllib.parse
 from PIL import Image
 import os
 import base64
+import io
+import requests
 from groq import Groq
 from duckduckgo_search import DDGS
 
@@ -44,17 +46,10 @@ def execute_free_search(query: str) -> str:
     except Exception as e:
         return f"Search error or timeout: {str(e)}"
 
-import requests
-
-import requests
-import io
-from PIL import Image
-
 def fetch_generated_image_bytes(prompt: str):
     """Fetches image bytes safely, verifying it's a valid image."""
     try:
         encoded_prompt = urllib.parse.quote(prompt.strip())
-        # Added seed and model params to ensure direct rendering
         url = f"https://pollinations.ai/p/{encoded_prompt}?width=800&height=800&nologo=true"
         
         headers = {
@@ -64,19 +59,17 @@ def fetch_generated_image_bytes(prompt: str):
         response = requests.get(url, headers=headers, timeout=20)
         
         if response.status_code == 200:
-            # Verify the response is actually a valid image before returning
             image_bytes = response.content
             img = Image.open(io.BytesIO(image_bytes))
             img.verify()  # Throws an error if bytes aren't a valid image
             return image_bytes
             
         return None
-    except Exception as e:
+    except Exception:
         return None
 
 def encode_image_to_base64(image: Image.Image) -> str:
     """Helper to convert uploaded PIL image into a base64 data string for Groq Vision."""
-    import io
     buffered = io.BytesIO()
     image.save(buffered, format="JPEG")
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
@@ -91,7 +84,7 @@ with st.sidebar:
     image_to_analyze = Image.open(uploaded_file) if uploaded_file else None
     
     if image_to_analyze:
-        st.image(image_to_analyze, caption="Attached Image", use_column_width=True)
+        st.image(image_to_analyze, caption="Attached Image", use_container_width=True)
         st.success("Image attached! Ask a question in chat about it.")
 
     st.markdown("---")
@@ -127,7 +120,7 @@ if user_input and client:
     with st.chat_message("user"):
         st.markdown(user_input)
         if image_to_analyze:
-            st.image(image_to_analyze, use_column_width=True)
+            st.image(image_to_analyze, use_container_width=True)
 
     # Process Assistant Response
     with st.chat_message("assistant"):
@@ -148,7 +141,7 @@ if user_input and client:
                     "image_bytes": img_bytes
                 })
             else:
-                # If Pollinations returned HTML or timed out, display the direct fallback URL!
+                # Fallback to direct URL display if image byte downloading fails
                 encoded_prompt = urllib.parse.quote(prompt.strip())
                 fallback_url = f"https://pollinations.ai/p/{encoded_prompt}?width=800&height=800"
                 
@@ -159,17 +152,8 @@ if user_input and client:
                     "content": f"Here is your generated image for: **'{prompt}'**",
                     "image_url": fallback_url
                 })
-                
-            else:
-                placeholder.error("Failed to fetch image. Please try again!")
+
         # 🔍 FEATURE 2: Free Live Web Search
-        elif user_input.lower().startswith("/search"):
-            query = user_input.replace("/search", "").strip()
-            placeholder.markdown(f"🔍 *Searching live web for:* **'{query}'**...")
-            
-            search_text = execute_free_search(query)
-            
-           # 🔍 FEATURE 2: Free Live Web Search
         elif user_input.lower().startswith("/search"):
             query = user_input.replace("/search", "").strip()
             placeholder.markdown(f"🔍 *Searching live web for:* **'{query}'**...")
