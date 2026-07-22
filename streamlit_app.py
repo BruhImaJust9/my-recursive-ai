@@ -45,12 +45,11 @@ def execute_free_search(query: str) -> str:
     except Exception as e:
         return f"Search error or timeout: {str(e)}"
 
-def get_image_generation_response(prompt: str) -> str:
-    """Constructs the direct Pollinations image Markdown response."""
+def get_image_url(prompt: str) -> str:
+    """Returns the direct raw image URL from Pollinations."""
     encoded_prompt = urllib.parse.quote(prompt.strip())
-    # This URL directly generates and hosts the image
-    image_url = f"https://pollinations.ai/p/{encoded_prompt}?width=800&height=800&seed=42&nologo=true"
-    return f"🎨 Here is your generated image for **'{prompt}'**:\n\n![Generated Image]({image_url})"
+    # Notice 'image.pollinations.ai/prompt/' instead of 'pollinations.ai/p/'
+    return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=800&nologo=true"
 
 def encode_image_to_base64(image: Image.Image) -> str:
     """Helper to convert uploaded PIL image into a base64 data string for Groq Vision."""
@@ -82,7 +81,9 @@ with st.sidebar:
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
-        if "uploaded_img" in msg:
+        if "image_url" in msg:
+            st.image(msg["image_url"], use_container_width=True)
+        elif "uploaded_img" in msg:
             st.image(msg["uploaded_img"], use_container_width=True)
 
 # ==========================================
@@ -106,18 +107,19 @@ if user_input and client:
     with st.chat_message("assistant"):
         placeholder = st.empty()
         
-        # 🎨 FEATURE 1: Image Generation (Simpler & More Reliable)
+        # 🎨 FEATURE 1: Image Generation
         if user_input.lower().startswith("/generate") or "generate an image" in user_input.lower():
             prompt = user_input.replace("/generate", "").strip()
             placeholder.markdown(f"🎨 *Generating image for:* **'{prompt}'**...")
             
-            response_content = get_image_generation_response(prompt)
+            img_url = get_image_url(prompt)
             
-            # This directly displays the image via the constructed URL
-            placeholder.markdown(response_content)
+            # Use st.image directly with the direct image endpoint
+            placeholder.image(img_url, caption=f"Generated: {prompt}", use_container_width=True)
             st.session_state.messages.append({
                 "role": "assistant", 
-                "content": response_content
+                "content": f"Here is your generated image for: **'{prompt}'**",
+                "image_url": img_url
             })
 
         # 🔍 FEATURE 2: Free Live Web Search
