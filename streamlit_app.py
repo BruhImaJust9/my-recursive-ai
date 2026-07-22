@@ -126,10 +126,24 @@ if user_input and client:
             
             search_text = execute_free_search(query)
             
+           # 🔍 FEATURE 2: Free Live Web Search
+        elif user_input.lower().startswith("/search"):
+            query = user_input.replace("/search", "").strip()
+            placeholder.markdown(f"🔍 *Searching live web for:* **'{query}'**...")
+            
+            search_text = execute_free_search(query)
+            
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant. Summarize the user's web search results clearly and accurately."},
+                    {
+                        "role": "system", 
+                        "content": (
+                            "Today's date is in 2026. You are a helpful assistant summarizing live web search results. "
+                            "Rely strictly on the provided search context. If the search results are empty or do not "
+                            "contain the answer, state that clearly—do NOT fall back on assumptions or claim an event hasn't happened yet."
+                        )
+                    },
                     {"role": "user", "content": f"Query: '{query}'\n\nSearch Results:\n{search_text}"}
                 ]
             )
