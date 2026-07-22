@@ -33,14 +33,29 @@ if "messages" not in st.session_state:
 # ==========================================
 
 def execute_free_search(query: str) -> str:
-    """Free web search using DuckDuckGo — No API Key required!"""
+    """Free web search using DuckDuckGo with fallback and query formatting."""
+    # Clean punctuation that confuses search engines
+    clean_query = query.strip("!? ")
+    
     try:
         with DDGS(timeout=10) as ddgs:
-            results = list(ddgs.text(query, max_results=3))
-        if not results:
-            return "No matching search results found."
+            # 1. Try standard text search with US region
+            results = list(ddgs.text(clean_query, max_results=5, region="us-en"))
             
-        sources = [f"**{r['title']}**\nSnippet: {r['body']}\nURL: {r['href']}" for r in results]
+            # 2. Fallback to news search if general text search returned nothing
+            if not results:
+                results = list(ddgs.news(clean_query, max_results=5, region="us-en"))
+                
+        if not results:
+            return "No matching search results found. Try rephrasing your search terms."
+            
+        sources = []
+        for r in results:
+            title = r.get('title', 'No Title')
+            body = r.get('body', r.get('snippet', 'No description available.'))
+            url = r.get('href', r.get('url', '#'))
+            sources.append(f"**{title}**\nSnippet: {body}\nURL: {url}")
+            
         return "\n\n".join(sources)
     except Exception as e:
         return f"Search error or timeout: {str(e)}"
