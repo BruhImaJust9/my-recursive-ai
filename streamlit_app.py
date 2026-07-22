@@ -107,6 +107,8 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
         if "image_bytes" in msg:
             st.image(msg["image_bytes"], use_container_width=True)
+        elif "image_url" in msg:
+            st.image(msg["image_url"], use_container_width=True)
         elif "uploaded_img" in msg:
             st.image(msg["uploaded_img"], use_container_width=True)
 
