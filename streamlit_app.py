@@ -4,7 +4,6 @@ from PIL import Image
 import os
 import base64
 import io
-import requests
 from groq import Groq
 from duckduckgo_search import DDGS
 
@@ -46,27 +45,12 @@ def execute_free_search(query: str) -> str:
     except Exception as e:
         return f"Search error or timeout: {str(e)}"
 
-def fetch_generated_image_bytes(prompt: str):
-    """Fetches image bytes safely, verifying it's a valid image."""
-    try:
-        encoded_prompt = urllib.parse.quote(prompt.strip())
-        url = f"https://pollinations.ai/p/{encoded_prompt}?width=800&height=800&nologo=true"
-        
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        }
-        
-        response = requests.get(url, headers=headers, timeout=20)
-        
-        if response.status_code == 200:
-            image_bytes = response.content
-            img = Image.open(io.BytesIO(image_bytes))
-            img.verify()  # Throws an error if bytes aren't a valid image
-            return image_bytes
-            
-        return None
-    except Exception:
-        return None
+def get_image_generation_response(prompt: str) -> str:
+    """Constructs the direct Pollinations image Markdown response."""
+    encoded_prompt = urllib.parse.quote(prompt.strip())
+    # This URL directly generates and hosts the image
+    image_url = f"https://pollinations.ai/p/{encoded_prompt}?width=800&height=800&seed=42&nologo=true"
+    return f"🎨 Here is your generated image for **'{prompt}'**:\n\n![Generated Image]({image_url})"
 
 def encode_image_to_base64(image: Image.Image) -> str:
     """Helper to convert uploaded PIL image into a base64 data string for Groq Vision."""
@@ -98,11 +82,7 @@ with st.sidebar:
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
-        if "image_bytes" in msg:
-            st.image(msg["image_bytes"], use_container_width=True)
-        elif "image_url" in msg:
-            st.image(msg["image_url"], use_container_width=True)
-        elif "uploaded_img" in msg:
+        if "uploaded_img" in msg:
             st.image(msg["uploaded_img"], use_container_width=True)
 
 # ==========================================
@@ -126,32 +106,19 @@ if user_input and client:
     with st.chat_message("assistant"):
         placeholder = st.empty()
         
-        # 🎨 FEATURE 1: Image Generation
+        # 🎨 FEATURE 1: Image Generation (Simpler & More Reliable)
         if user_input.lower().startswith("/generate") or "generate an image" in user_input.lower():
             prompt = user_input.replace("/generate", "").strip()
             placeholder.markdown(f"🎨 *Generating image for:* **'{prompt}'**...")
             
-            img_bytes = fetch_generated_image_bytes(prompt)
+            response_content = get_image_generation_response(prompt)
             
-            if img_bytes:
-                placeholder.image(img_bytes, caption=f"Generated: {prompt}", use_container_width=True)
-                st.session_state.messages.append({
-                    "role": "assistant", 
-                    "content": f"Here is your generated image for: **'{prompt}'**",
-                    "image_bytes": img_bytes
-                })
-            else:
-                # Fallback to direct URL display if image byte downloading fails
-                encoded_prompt = urllib.parse.quote(prompt.strip())
-                fallback_url = f"https://pollinations.ai/p/{encoded_prompt}?width=800&height=800"
-                
-                placeholder.markdown(f"🎨 Here is your generated image for **'{prompt}'**:")
-                placeholder.image(fallback_url, caption=f"Generated: {prompt}", use_container_width=True)
-                st.session_state.messages.append({
-                    "role": "assistant", 
-                    "content": f"Here is your generated image for: **'{prompt}'**",
-                    "image_url": fallback_url
-                })
+            # This directly displays the image via the constructed URL
+            placeholder.markdown(response_content)
+            st.session_state.messages.append({
+                "role": "assistant", 
+                "content": response_content
+            })
 
         # 🔍 FEATURE 2: Free Live Web Search
         elif user_input.lower().startswith("/search"):
@@ -202,13 +169,15 @@ if user_input and client:
             placeholder.markdown(response_text)
             st.session_state.messages.append({"role": "assistant", "content": response_text})
 
-        # 💬 FEATURE 4: Standard Chat Response
+        # 💬 FEATURE 4: Standard Chat Response (with full history memory)
         else:
             # Build history list for Groq (filters out non-text/uploaded objects)
             formatted_history = []
             for m in st.session_state.messages:
                 if "content" in m and isinstance(m["content"], str):
-                    formatted_history.append({"role": m["role"], "content": m["content"]})
+                    # Basic protection against vision analysis messages
+                    if not isinstance(m["content"], list):
+                         formatted_history.append({"role": m["role"], "content": m["content"]})
 
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
