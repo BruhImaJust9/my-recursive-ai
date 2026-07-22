@@ -177,9 +177,15 @@ if user_input and client:
 
         # 💬 FEATURE 4: Standard Chat Response
         else:
+            # Build history list for Groq (filters out non-text/uploaded objects)
+            formatted_history = []
+            for m in st.session_state.messages:
+                if "content" in m and isinstance(m["content"], str):
+                    formatted_history.append({"role": m["role"], "content": m["content"]})
+
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
-                messages=[{"role": "user", "content": user_input}]
+                messages=formatted_history
             )
             response_text = completion.choices[0].message.content
             placeholder.markdown(response_text)
