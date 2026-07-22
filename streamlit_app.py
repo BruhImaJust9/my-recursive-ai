@@ -89,10 +89,10 @@ with st.sidebar:
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
-        if "image_url" in msg:
-            st.image(msg["image_url"], use_column_width=True)
+        if "image_bytes" in msg:
+            st.image(msg["image_bytes"], use_container_width=True)
         elif "uploaded_img" in msg:
-            st.image(msg["uploaded_img"], use_column_width=True)
+            st.image(msg["uploaded_img"], use_container_width=True)
 
 # ==========================================
 # 5. INPUT LOGIC & ROUTING
