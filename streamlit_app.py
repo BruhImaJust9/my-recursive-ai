@@ -146,6 +146,18 @@ if user_input and client:
                     "image_bytes": img_bytes
                 })
             else:
+                # If Pollinations returned HTML or timed out, display the direct fallback URL!
+                encoded_prompt = urllib.parse.quote(prompt.strip())
+                fallback_url = f"https://pollinations.ai/p/{encoded_prompt}?width=800&height=800"
+                
+                placeholder.markdown(f"🎨 Here is your generated image for **'{prompt}'**:")
+                placeholder.image(fallback_url, caption=f"Generated: {prompt}", use_container_width=True)
+                st.session_state.messages.append({
+                    "role": "assistant", 
+                    "content": f"Here is your generated image for: **'{prompt}'**",
+                    "image_url": fallback_url
+                })
+            else:
                 placeholder.error("Failed to fetch image. Please try again!")
         # 🔍 FEATURE 2: Free Live Web Search
         elif user_input.lower().startswith("/search"):
