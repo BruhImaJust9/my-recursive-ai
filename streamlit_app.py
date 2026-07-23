@@ -74,6 +74,29 @@ def optimize_search_query(user_prompt: str, category: str = "general") -> str:
         
     return cleaned
 
+import re
+
+def clean_search_query(user_query: str) -> str:
+    """Strips conversational fluff and leading stop words to prevent dictionary results."""
+    # Convert to lowercase and remove leading /search command
+    query = user_query.lower().replace("/search", "").strip()
+    
+    # Strip trailing punctuation
+    query = query.strip("!? ")
+    
+    # Remove leading common stop words/phrases that cause dictionary matches
+    stop_phrases = ["the ", "a ", "an ", "who won ", "what is ", "tell me about "]
+    for phrase in stop_phrases:
+        if query.startswith(phrase):
+            query = query[len(phrase):].strip()
+            
+    # Add quotes around multi-word titles if no quotes exist
+    if " " in query and not ('"' in query or "'" in query):
+        # Keeps phrases together so it searches for the exact title
+        return f'"{query}"'
+        
+    return query
+
 def get_image_url(prompt: str) -> str:
     """Returns the direct raw image URL from Pollinations."""
     encoded_prompt = urllib.parse.quote(prompt.strip())
