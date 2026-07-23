@@ -62,6 +62,18 @@ def execute_free_search(query: str) -> str:
     except Exception as e:
         return f"Search error: {str(e)}"
 
+def optimize_search_query(user_prompt: str, category: str = "general") -> str:
+    # 1. Strip conversational fluff
+    cleaned = user_prompt.lower().replace("search", "").replace("what are", "").strip()
+    
+    # 2. Append domain anchors based on keywords
+    if "movie" in cleaned or "grossing" in cleaned or "box office" in cleaned:
+        return f'"{cleaned}" box office worldwide stats'
+    elif "world cup" in cleaned or "standings" in cleaned:
+        return f'"{cleaned}" scores standings results'
+        
+    return cleaned
+
 def get_image_url(prompt: str) -> str:
     """Returns the direct raw image URL from Pollinations."""
     encoded_prompt = urllib.parse.quote(prompt.strip())
