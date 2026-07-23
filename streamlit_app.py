@@ -174,7 +174,7 @@ if user_input and client:
                 "image_url": img_url
             })
 
-        # 🔍 FEATURE 2: Free Live Web Search
+       # 🔍 FEATURE 2: Free Live Web Search
         elif user_input.lower().startswith("/search"):
             # 1. Clean the query
             cleaned_query = clean_search_query(user_input)
@@ -196,7 +196,8 @@ if user_input and client:
                             "summarize the main story accurately based on what was provided."
                         )
                     },
-                    {"role": "user", "content": f"Query: '{query}'\n\nSearch Results:\n{search_text}"}
+                    # FIXED: Changed 'query' to 'cleaned_query' below!
+                    {"role": "user", "content": f"Query: '{cleaned_query}'\n\nSearch Results:\n{search_text}"}
                 ]
             )
             response_text = completion.choices[0].message.content
