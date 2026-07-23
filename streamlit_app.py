@@ -191,10 +191,10 @@ if user_input and client:
                         "role": "system", 
                         "content": (
                             # System Prompt Enhancement Suggestion
-"content": (
-    "Today's date is in 2026. You are a helpful assistant summarizing live web search results. "
-    "Structure the summary into clear categories using Markdown tables or concise bullet points. "
-    "Always separate 'Key Findings' from 'Sources & Metadata' for maximum scannability."
+    "content": (
+        "Today's date is in 2026. You are a helpful assistant summarizing live web search results. "
+        "Structure the summary into clear categories using Markdown tables or concise bullet points. "
+        "Always separate 'Key Findings' from 'Sources & Metadata' for maximum scannability."
 )
                         )
                     },
