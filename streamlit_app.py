@@ -176,8 +176,11 @@ def generate_speech_audio(text: str) -> bytes:
 with st.sidebar:
     st.header("⚙️ Workspace Controls")
     
-    uploaded_file = st.file_uploader("Upload Image to Analyze", type=["png", "jpg", "jpeg", "webp"])
-    image_to_analyze = Image.open(uploaded_file) if uploaded_file else None
+    uploaded_file = st.file_uploader(
+    "Upload Image to Analyze", 
+    type=["png", "jpg", "jpeg", "webp"],
+    key="sidebar_file_uploader"  # Unique key for sidebar
+)
     
     if image_to_analyze:
         st.image(image_to_analyze, caption="Attached Image", use_container_width=True)
@@ -224,12 +227,11 @@ with col_popover:
         
         st.markdown("---")
         
-        # 📸 Direct Image Uploader
         popover_file = st.file_uploader(
-            "📷 Attach Image", 
-            type=["png", "jpg", "jpeg", "webp"],
-            key="popover_file_uploader"
-        )
+    "📷 Attach Image for Vision AI", 
+    type=["png", "jpg", "jpeg", "webp"],
+    key="popover_file_uploader"  # Unique key for popover
+)
 
 with col_popover:
     # ➕ Gemini-style Floating Action Menu
