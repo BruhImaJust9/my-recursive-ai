@@ -145,6 +145,31 @@ for msg in st.session_state.messages:
 # ==========================================
 # 5. INPUT LOGIC & ROUTING
 # ==========================================
+
+# Create a two-column row at the bottom for the '+' popover menu and chat input
+col_popover, col_input = st.columns([1, 12])
+
+with col_popover:
+    # ➕ Gemini-style Floating Action Menu
+    with st.popover("➕", help="Quick Actions"):
+        st.markdown("### 🛠️ Quick Actions")
+        
+        # Shortcut 1: Web Search Tip
+        st.caption("🔍 **Live Search:** Type `/search <topic>` in chat")
+        
+        # Shortcut 2: Image Generation Tip
+        st.caption("🎨 **Generate Image:** Type `/generate <prompt>` in chat")
+        
+        st.markdown("---")
+        
+        # Quick Clear Chat Button right inside the menu
+        if st.button("🗑️ Clear History", use_container_width=True):
+            st.session_state.messages = []
+            st.rerun()
+
+with col_input:
+    # Standard Streamlit Chat Input
+    user_input = st.chat_input("Type a question, /search <query>, or /generate <prompt>...")
 user_input = st.chat_input("Type a question, /search <query>, or /generate <prompt>...")
 
 if user_input and client:
