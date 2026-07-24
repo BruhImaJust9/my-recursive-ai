@@ -121,6 +121,16 @@ def encode_image_to_base64(image: Image.Image) -> str:
     image.save(buffered, format="JPEG", quality=85)
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
+import re
+
+def strip_thinking_process(text: str) -> str:
+    """Removes internal <think>...</think> blocks from model outputs."""
+    if not text:
+        return ""
+    # Removes <think>...</think> and any trailing whitespace left behind
+    cleaned_text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    return cleaned_text.strip()
+
 # ==========================================
 # 3. SIDEBAR & IMAGE UPLOAD
 # ==========================================
