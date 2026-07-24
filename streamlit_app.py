@@ -304,3 +304,8 @@ if final_input and client:
     if file_context_str:
         full_prompt_text = f"Context from uploaded file:\n
 http://googleusercontent.com/immersive_entry_chip/0
+if file_context_str:
+        full_prompt_text = f"Context from uploaded file:\n
+http://googleusercontent.com/immersive_entry_chip/0
+
+---
