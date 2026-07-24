@@ -304,3 +304,9 @@ if final_input and client:
     if file_context_str:
         full_prompt_text = f"Context from uploaded file:\n
 http://googleusercontent.com/immersive_entry_chip/0
+
+---
+
+### 💡 Why this happens & how to make sure it saves:
+* **Literal line breaks:** Python expects an f-string starting with `f"` to close on the exact same line. When it encounters a hidden or literal line break after `\n`, it crashes instantly with `unterminated f-string literal`.
+* **Deployment cache:** If you are using **GitHub + Streamlit Cloud**, make sure you **commit the change** on GitHub. Streamlit Cloud won't update until the git commit goes through!
