@@ -308,7 +308,3 @@ http://googleusercontent.com/immersive_entry_chip/0
 7. Click the green **"Commit changes..."** button in the top right corner.
 
 ---
-
-### 💡 Why this happens & how to make sure it saves:
-* **Literal line breaks:** Python expects an f-string starting with `f"` to close on the exact same line. When it encounters a hidden or literal line break after `\n`, it crashes instantly with `unterminated f-string literal`.
-* **Deployment cache:** If you are using **GitHub + Streamlit Cloud**, make sure you **commit the change** on GitHub. Streamlit Cloud won't update until the git commit goes through!
