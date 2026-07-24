@@ -173,13 +173,18 @@ with st.sidebar:
 # ==========================================
 # 4. CHAT HISTORY DISPLAY
 # ==========================================
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-        if "image_url" in msg:
-            st.image(msg["image_url"], use_container_width=True)
-        elif "uploaded_img" in msg:
-            st.image(msg["uploaded_img"], use_container_width=True)
+
+# Create a fixed-height container for messages so it stays scrolled down
+chat_container = st.container(height=500)
+
+with chat_container:
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+            if "image_url" in msg:
+                st.image(msg["image_url"], use_container_width=True)
+            elif "uploaded_img" in msg:
+                st.image(msg["uploaded_img"], use_container_width=True)
 
 # ==========================================
 # 5. INPUT LOGIC & ROUTING
