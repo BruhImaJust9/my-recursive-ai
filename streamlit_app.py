@@ -257,8 +257,11 @@ if user_input and client:
                 ]
             )
             response_text = completion.choices[0].message.content
-            placeholder.markdown(response_text)
-            st.session_state.messages.append({"role": "assistant", "content": response_text})
+            # 🧼 Clean out any thinking tags
+            clean_response = strip_thinking_process(response_text)
+            
+            placeholder.markdown(clean_response)
+            st.session_state.messages.append({"role": "assistant", "content": clean_response})
 
         # 👀 FEATURE 3: Image Vision Analysis (via Vision AI)
         elif active_image is not None:
@@ -281,8 +284,11 @@ if user_input and client:
                 ]
             )
             response_text = completion.choices[0].message.content
-            placeholder.markdown(response_text)
-            st.session_state.messages.append({"role": "assistant", "content": response_text})
+            # 🧼 Clean out any thinking tags
+            clean_response = strip_thinking_process(response_text)
+            
+            placeholder.markdown(clean_response)
+            st.session_state.messages.append({"role": "assistant", "content": clean_response})
 
         # 💬 FEATURE 4: Standard Chat Response
         else:
@@ -297,5 +303,8 @@ if user_input and client:
                 messages=formatted_history
             )
             response_text = completion.choices[0].message.content
-            placeholder.markdown(response_text)
-            st.session_state.messages.append({"role": "assistant", "content": response_text})
+            # 🧼 Clean out any thinking tags
+            clean_response = strip_thinking_process(response_text)
+            
+            placeholder.markdown(clean_response)
+            st.session_state.messages.append({"role": "assistant", "content": clean_response})
