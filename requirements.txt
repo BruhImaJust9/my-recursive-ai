@@ -6,3 +6,5 @@ requests
 python-dotenv
 authlib
 tavily-python
+gTTS
+audio-recorder-streamlit
