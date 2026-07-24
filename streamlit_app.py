@@ -131,6 +131,45 @@ def strip_thinking_process(text: str) -> str:
     cleaned_text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
     return cleaned_text.strip()
 
+from gtts import gTTS
+import tempfile
+from audio_recorder_streamlit import audio_recorder
+
+def transcribe_audio_groq(audio_bytes: bytes, client) -> str:
+    """Sends recorded audio bytes to Groq Whisper for instant Speech-to-Text."""
+    try:
+        # Create a temporary file to hold the audio bytes for Groq
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
+            temp_audio.write(audio_bytes)
+            temp_audio_path = temp_audio.name
+
+        with open(temp_audio_path, "rb") as file:
+            transcription = client.audio.transcriptions.create(
+                file=(temp_audio_path, file.read()),
+                model="whisper-large-v3",
+                response_format="json",
+                language="en",
+            )
+        os.remove(temp_audio_path)
+        return transcription.text
+    except Exception as e:
+        return f"Speech-to-Text Error: {str(e)}"
+
+def generate_speech_audio(text: str) -> bytes:
+    """Converts response text into speech audio bytes using gTTS."""
+    # Clean out code blocks or special markdown characters before speaking
+    clean_text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+    clean_text = re.sub(r'[*_#~`]', '', clean_text).strip()
+    
+    if not clean_text:
+        clean_text = "Here is your response."
+
+    tts = gTTS(text=clean_text[:500], lang='en') # Limit length for quick playback
+    fp = io.BytesIO()
+    tts.write_to_fp(fp)
+    fp.seek(0)
+    return fp.read()
+
 # ==========================================
 # 3. SIDEBAR & IMAGE UPLOAD
 # ==========================================
@@ -169,6 +208,28 @@ col_popover, col_input = st.columns([1, 12])
 
 # Variable to hold the quick-uploaded image from the menu
 popover_image = None
+
+with col_popover:
+    with st.popover("➕", help="Quick Actions & Voice"):
+        st.markdown("### 🎙️ Voice Input")
+        
+        # Microphone Button Component
+        audio_bytes = audio_recorder(
+            text="Click to Record Voice",
+            recording_color="#e84c3d",
+            neutral_color="#6aa84f",
+            icon_name="microphone",
+            icon_size="2x",
+        )
+        
+        st.markdown("---")
+        
+        # 📸 Direct Image Uploader
+        popover_file = st.file_uploader(
+            "📷 Attach Image", 
+            type=["png", "jpg", "jpeg", "webp"],
+            key="popover_file_uploader"
+        )
 
 with col_popover:
     # ➕ Gemini-style Floating Action Menu
