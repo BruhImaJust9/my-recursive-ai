@@ -277,6 +277,18 @@ if user_input and client:
         if active_image:
             st.image(active_image, use_container_width=True)
 
+    # Check if user spoke via microphone
+recorded_text = ""
+if audio_bytes and client:
+    with st.spinner("🎙️ Transcribing voice..."):
+        recorded_text = transcribe_audio_groq(audio_bytes, client)
+
+# Combine typed input or voice transcription
+final_user_input = user_input if user_input else recorded_text
+
+if final_user_input and client:
+    # Use final_user_input instead of user_input for processing...
+
     # Process Assistant Response
     with st.chat_message("assistant"):
         placeholder = st.empty()
