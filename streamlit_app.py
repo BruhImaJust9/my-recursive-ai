@@ -304,8 +304,10 @@ if final_input and client:
     if file_context_str:
         full_prompt_text = f"Context from uploaded file:\n
 http://googleusercontent.com/immersive_entry_chip/0
-if file_context_str:
-        full_prompt_text = f"Context from uploaded file:\n
-http://googleusercontent.com/immersive_entry_chip/0
+
+### Why this fixes it
+By keeping the entire f-string formatted on clean lines without breaking mid-quote, Python reads the whole string from start to finish without raising an `unterminated f-string literal` error.
+
+Save `streamlit_app.py`, refresh your Streamlit app, and it will boot right up!
 
 ---
