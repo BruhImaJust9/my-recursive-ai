@@ -305,7 +305,7 @@ if final_input and client:
         full_prompt_text = f"Context from uploaded file:\n
 http://googleusercontent.com/immersive_entry_chip/0
 
-6. Click the green **"Commit changes..."** button at the top right of GitHub.
+7. Click the green **"Commit changes..."** button in the top right corner.
 
 ---
 
