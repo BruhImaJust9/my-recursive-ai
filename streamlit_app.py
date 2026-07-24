@@ -146,42 +146,57 @@ for msg in st.session_state.messages:
 # 5. INPUT LOGIC & ROUTING
 # ==========================================
 
-# Create a two-column row at the bottom for the '+' popover menu and chat input
+# Create a two-column row at the bottom for the '+' menu and chat bar
 col_popover, col_input = st.columns([1, 12])
+
+# Variable to hold the quick-uploaded image from the menu
+popover_image = None
 
 with col_popover:
     # ➕ Gemini-style Floating Action Menu
-    with st.popover("➕", help="Quick Actions"):
-        st.markdown("### 🛠️ Quick Actions")
+    with st.popover("➕", help="Quick Actions & Attachments"):
+        st.markdown("### 🛠️ Actions & Uploads")
         
-        # Shortcut 1: Web Search Tip
-        st.caption("🔍 **Live Search:** Type `/search <topic>` in chat")
+        # 📸 Direct Image Uploader inside the Popover Menu
+        popover_file = st.file_uploader(
+            "📷 Attach Image for Vision AI", 
+            type=["png", "jpg", "jpeg", "webp"],
+            key="popover_file_uploader"
+        )
         
-        # Shortcut 2: Image Generation Tip
-        st.caption("🎨 **Generate Image:** Type `/generate <prompt>` in chat")
-        
+        if popover_file:
+            popover_image = Image.open(popover_file)
+            st.image(popover_image, caption="Attached Image", use_container_width=True)
+            st.success("Image attached! Type a prompt below.")
+
         st.markdown("---")
         
-        # Quick Clear Chat Button right inside the menu
+        # Action Shortcuts & Tips
+        st.caption("🔍 **Live Search:** Type `/search <topic>`")
+        st.caption("🎨 **Generate Image:** Type `/generate <prompt>`")
+        
+        st.markdown("---")
         if st.button("🗑️ Clear History", use_container_width=True):
             st.session_state.messages = []
             st.rerun()
 
 with col_input:
-    # Standard Streamlit Chat Input
-    user_input = st.chat_input("Type a question, /search <query>, or /generate <prompt>...")
+    user_input = st.chat_input("Type a question, ask about an image, /search, or /generate...")
+
+# Combine sidebar upload AND popover upload into one target
+active_image = popover_image if popover_image else image_to_analyze
 
 if user_input and client:
     # Append User Input
     user_data = {"role": "user", "content": user_input}
-    if image_to_analyze:
-        user_data["uploaded_img"] = image_to_analyze
+    if active_image:
+        user_data["uploaded_img"] = active_image
     st.session_state.messages.append(user_data)
     
     with st.chat_message("user"):
         st.markdown(user_input)
-        if image_to_analyze:
-            st.image(image_to_analyze, use_container_width=True)
+        if active_image:
+            st.image(active_image, use_container_width=True)
 
     # Process Assistant Response
     with st.chat_message("assistant"):
@@ -194,7 +209,6 @@ if user_input and client:
             
             img_url = get_image_url(prompt)
             
-            # Use st.image directly with the direct image endpoint
             placeholder.image(img_url, caption=f"Generated: {prompt}", use_container_width=True)
             st.session_state.messages.append({
                 "role": "assistant", 
@@ -202,15 +216,13 @@ if user_input and client:
                 "image_url": img_url
             })
 
-       # 🔍 FEATURE 2: Free Live Web Search
+        # 🔍 FEATURE 2: Free Live Web Search
         elif user_input.lower().startswith("/search"):
-            # 1. Clean the query
             cleaned_query = clean_search_query(user_input)
+            optimized_query = optimize_search_query(cleaned_query)
             
-            placeholder.markdown(f"🔍 *Searching live web for:* **{cleaned_query}**...")
-            
-            # 2. Execute search with cleaned query
-            search_text = execute_free_search(cleaned_query)
+            placeholder.markdown(f"🔍 *Searching live web for:* **{optimized_query}**...")
+            search_text = execute_free_search(optimized_query)
             
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
@@ -223,7 +235,7 @@ if user_input and client:
                             "Always separate 'Key Findings' from 'Sources & Metadata' for maximum scannability."
                         )
                     },
-                    {"role": "user", "content": f"Query: '{cleaned_query}'\n\nSearch Results:\n{search_text}"}
+                    {"role": "user", "content": f"Query: '{optimized_query}'\n\nSearch Results:\n{search_text}"}
                 ]
             )
             response_text = completion.choices[0].message.content
@@ -231,9 +243,9 @@ if user_input and client:
             st.session_state.messages.append({"role": "assistant", "content": response_text})
 
         # 👀 FEATURE 3: Image Vision Analysis (via Llama 3.2 Vision)
-        elif image_to_analyze is not None:
-            placeholder.markdown("👀 *Analyzing uploaded image...*")
-            base64_img = encode_image_to_base64(image_to_analyze)
+        elif active_image is not None:
+            placeholder.markdown("👀 *Analyzing attached image...*")
+            base64_img = encode_image_to_base64(active_image)
             
             completion = client.chat.completions.create(
                 model="llama-3.2-11b-vision-preview",
@@ -254,15 +266,13 @@ if user_input and client:
             placeholder.markdown(response_text)
             st.session_state.messages.append({"role": "assistant", "content": response_text})
 
-        # 💬 FEATURE 4: Standard Chat Response (with full history memory)
+        # 💬 FEATURE 4: Standard Chat Response
         else:
-            # Build history list for Groq (filters out non-text/uploaded objects)
             formatted_history = []
             for m in st.session_state.messages:
                 if "content" in m and isinstance(m["content"], str):
-                    # Basic protection against vision analysis messages
                     if not isinstance(m["content"], list):
-                         formatted_history.append({"role": m["role"], "content": m["content"]})
+                        formatted_history.append({"role": m["role"], "content": m["content"]})
 
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
