@@ -65,6 +65,10 @@ def execute_free_search(query: str) -> str:
 def optimize_search_query(user_prompt: str, category: str = "general") -> str:
     # 1. Strip conversational fluff
     cleaned = user_prompt.lower().replace("search", "").replace("what are", "").strip()
+
+    # Strip betting terms and force match recap keywords
+if "world cup" in cleaned or "super bowl" in cleaned:
+    return f'"{cleaned}" final score champions match recap -betting -odds'
     
     # 2. Append domain anchors based on keywords
     if "movie" in cleaned or "grossing" in cleaned or "box office" in cleaned:
