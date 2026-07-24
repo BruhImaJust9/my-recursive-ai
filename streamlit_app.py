@@ -38,7 +38,6 @@ else:
 # 2. MULTI-CHAT SESSION STATE MANAGEMENT
 # ==========================================
 if "chats" not in st.session_state:
-    # Key: chat_id, Value: {"title": str, "messages": list}
     default_id = str(uuid.uuid4())[:8]
     st.session_state.chats = {
         default_id: {
@@ -134,7 +133,7 @@ def extract_file_content(uploaded_file) -> str:
             if pypdf:
                 reader = pypdf.PdfReader(uploaded_file)
                 text = ""
-                for page in reader.pages[:10]: # Read up to 10 pages
+                for page in reader.pages[:10]:
                     text += page.extract_text() or ""
                 return text if text else "Could not extract text from PDF."
             else:
@@ -203,7 +202,6 @@ with st.sidebar:
         st.session_state.current_chat_id = new_id
         st.rerun()
 
-    # Chat selector dropdown
     chat_options = {cid: cdata["title"] for cid, cdata in st.session_state.chats.items()}
     selected_id = st.selectbox(
         "Switch Chat",
@@ -218,7 +216,6 @@ with st.sidebar:
     st.markdown("---")
     st.header("⚙️ Workspace Attachments")
     
-    # Image Attachment
     uploaded_image = st.file_uploader(
         "Attach Image (Vision)", 
         type=["png", "jpg", "jpeg", "webp"],
@@ -228,7 +225,6 @@ with st.sidebar:
         image_to_analyze = Image.open(uploaded_image)
         st.image(image_to_analyze, caption="Attached Image", use_container_width=True)
 
-    # Document Attachment
     uploaded_doc = st.file_uploader(
         "Attach Document (PDF, TXT, CSV, Code)",
         type=["txt", "py", "md", "csv", "pdf", "json"],
@@ -258,7 +254,6 @@ for msg in current_chat["messages"]:
             st.image(msg["image_url"], use_container_width=True)
         elif "uploaded_img" in msg:
             st.image(msg["uploaded_img"], use_container_width=True)
-        # Render HTML artifact if cached
         render_html_artifact_if_present(msg.get("content", ""))
 
 # ==========================================
@@ -295,11 +290,10 @@ final_input = user_input if user_input else recorded_text
 active_image = popover_image if popover_image else image_to_analyze
 
 if final_input and client:
-    # Update Chat Title on First Message
     if len(current_chat["messages"]) <= 1:
         current_chat["title"] = final_input[:20] + "..."
 
-    # Prepend document context if present
     full_prompt_text = final_input
     if file_context_str:
         full_prompt_text = f"Context from uploaded file:\n
+http://googleusercontent.com/immersive_entry_chip/0
