@@ -170,6 +170,9 @@ def generate_speech_audio(text: str) -> bytes:
     fp.seek(0)
     return fp.read()
 
+# Initialize default image state
+image_to_analyze = None
+
 # ==========================================
 # 3. SIDEBAR & IMAGE UPLOAD
 # ==========================================
