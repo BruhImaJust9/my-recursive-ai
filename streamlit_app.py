@@ -304,7 +304,3 @@ if final_input and client:
     if file_context_str:
         full_prompt_text = f"Context from uploaded file:\n
 http://googleusercontent.com/immersive_entry_chip/0
-
-7. Click the green **"Commit changes..."** button in the top right corner.
-
----
