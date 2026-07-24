@@ -110,6 +110,11 @@ def get_image_url(prompt: str) -> str:
 def encode_image_to_base64(image: Image.Image) -> str:
     """Helper to convert uploaded PIL image into a base64 data string for Groq Vision."""
     buffered = io.BytesIO()
+    
+    # Convert RGBA, P, or LA image modes to standard RGB to prevent JPEG transparency errors
+    if image.mode in ("RGBA", "P", "LA"):
+        image = image.convert("RGB")
+        
     image.save(buffered, format="JPEG")
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
