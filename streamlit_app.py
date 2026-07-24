@@ -173,18 +173,13 @@ with st.sidebar:
 # ==========================================
 # 4. CHAT HISTORY DISPLAY
 # ==========================================
-
-# Create a fixed-height container for messages so it stays scrolled down
-chat_container = st.container(height=500)
-
-with chat_container:
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-            if "image_url" in msg:
-                st.image(msg["image_url"], use_container_width=True)
-            elif "uploaded_img" in msg:
-                st.image(msg["uploaded_img"], use_container_width=True)
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+        if "image_url" in msg:
+            st.image(msg["image_url"], use_container_width=True)
+        elif "uploaded_img" in msg:
+            st.image(msg["uploaded_img"], use_container_width=True)
 
 # ==========================================
 # 5. INPUT LOGIC & ROUTING
@@ -298,7 +293,6 @@ if final_input and client:
             
             placeholder.markdown(clean_response)
             
-            # Text-to-Speech audio output
             audio_out = generate_speech_audio(clean_response)
             st.audio(audio_out, format="audio/mp3")
             
@@ -355,8 +349,3 @@ if final_input and client:
             st.audio(audio_out, format="audio/mp3")
             
             st.session_state.messages.append({"role": "assistant", "content": clean_response})
-            # Force browser to scroll to bottom after rendering new messages
-st.components.v1.html(
-    "<script>window.scrollTo(0, document.body.scrollHeight);</script>", 
-    height=0
-)
