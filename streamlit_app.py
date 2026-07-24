@@ -250,13 +250,13 @@ if user_input and client:
             placeholder.markdown(response_text)
             st.session_state.messages.append({"role": "assistant", "content": response_text})
 
-        # 👀 FEATURE 3: Image Vision Analysis (via Llama 3.2 Vision)
+        # 👀 FEATURE 3: Image Vision Analysis (via Vision AI)
         elif active_image is not None:
             placeholder.markdown("👀 *Analyzing attached image...*")
             base64_img = encode_image_to_base64(active_image)
             
             completion = client.chat.completions.create(
-                model="llama-3.2-11b-vision-preview",
+                model="qwen/qwen3.6-27b",
                 messages=[
                     {
                         "role": "user",
