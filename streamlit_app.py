@@ -170,7 +170,6 @@ with col_popover:
 with col_input:
     # Standard Streamlit Chat Input
     user_input = st.chat_input("Type a question, /search <query>, or /generate <prompt>...")
-user_input = st.chat_input("Type a question, /search <query>, or /generate <prompt>...")
 
 if user_input and client:
     # Append User Input
