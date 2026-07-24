@@ -355,3 +355,8 @@ if final_input and client:
             st.audio(audio_out, format="audio/mp3")
             
             st.session_state.messages.append({"role": "assistant", "content": clean_response})
+            # Force browser to scroll to bottom after rendering new messages
+st.components.v1.html(
+    "<script>window.scrollTo(0, document.body.scrollHeight);</script>", 
+    height=0
+)
