@@ -292,8 +292,3 @@ active_image = popover_image if popover_image else image_to_analyze
 if final_input and client:
     if len(current_chat["messages"]) <= 1:
         current_chat["title"] = final_input[:20] + "..."
-
-    full_prompt_text = final_input
-    if file_context_str:
-        full_prompt_text = f"Context from uploaded file:\n
-http://googleusercontent.com/immersive_entry_chip/0
