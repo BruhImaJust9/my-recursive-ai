@@ -247,6 +247,25 @@ with st.sidebar:
             mime="text/plain",
             use_container_width=True
         )
+
+    # 🗂️ Multi-Chat Session Controls
+    st.markdown("---")
+    st.header("💬 Chat Sessions")
+    
+    # Dropdown to pick active thread
+    chat_names = list(st.session_state.chats.keys())
+    selected_chat = st.selectbox("Select Thread:", chat_names, index=chat_names.index(st.session_state.current_chat))
+    
+    if selected_chat != st.session_state.current_chat:
+        st.session_state.current_chat = selected_chat
+        st.rerun()
+
+    # Button to start a brand-new chat
+    if st.button("➕ New Chat Session", use_container_width=True):
+        new_chat_name = f"Chat {len(st.session_state.chats) + 1}"
+        st.session_state.chats[new_chat_name] = []
+        st.session_state.current_chat = new_chat_name
+        st.rerun()
     
     if uploaded_file:
         image_to_analyze = Image.open(uploaded_file)
