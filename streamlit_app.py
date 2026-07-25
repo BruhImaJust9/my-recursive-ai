@@ -298,7 +298,7 @@ audio_bytes = None
 with col_popover:
     with st.popover("➕", help="Quick Actions, Attachments & Voice"):
         st.markdown("### 🎙️ Voice Input")
-        audio_bytes = audio_recorder(...)
+        audio_bytes = audio_recorder(
         text="Click to Record Voice",
         recording_color="#e84c3d",
         neutral_color="#6aa84f",
