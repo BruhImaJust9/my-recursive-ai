@@ -293,7 +293,7 @@ if final_input and client:
     elif active_image is not None:
         base64_img = encode_image_to_base64(active_image)
         completion = client.chat.completions.create(
-            model="qwen/qwen3.6-27b",
+            model="llama-3.2-11b-vision-preview",
             messages=[
                 {
                     "role": "user",
