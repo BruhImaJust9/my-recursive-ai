@@ -173,6 +173,7 @@ with st.sidebar:
 # ==========================================
 # 4. CHAT HISTORY DISPLAY
 # ==========================================
+# Render all previous chat history first
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
@@ -182,7 +183,7 @@ for msg in st.session_state.messages:
             st.image(msg["uploaded_img"], use_container_width=True)
 
 # ==========================================
-# 5. INPUT LOGIC & ROUTING
+# 5. INPUT LOGIC & ROUTING (ALWAYS AT BOTTOM)
 # ==========================================
 
 col_popover, col_input = st.columns([1, 12])
@@ -243,109 +244,72 @@ if final_input and client:
     user_data = {"role": "user", "content": final_input}
     if active_image:
         user_data["uploaded_img"] = active_image
+        
+    # Append to state and rerun immediately so it renders inside the history loop!
     st.session_state.messages.append(user_data)
     
-    with st.chat_message("user"):
-        st.markdown(final_input)
-        if active_image:
-            st.image(active_image, use_container_width=True)
+    # Process Assistant Response
+    # (We save the assistant response to state and rerun so the bar stays at the bottom)
+    if final_input.lower().startswith("/generate") or "generate an image" in final_input.lower():
+        prompt = final_input.replace("/generate", "").strip()
+        img_url = get_image_url(prompt)
+        st.session_state.messages.append({
+            "role": "assistant", 
+            "content": f"Here is your generated image for: **'{prompt}'**",
+            "image_url": img_url
+        })
 
-    with st.chat_message("assistant"):
-        placeholder = st.empty()
+    elif final_input.lower().startswith("/search"):
+        cleaned_query = clean_search_query(final_input)
+        optimized_query = optimize_search_query(cleaned_query)
+        search_text = execute_free_search(optimized_query)
         
-        # 🎨 FEATURE 1: Image Generation
-        if final_input.lower().startswith("/generate") or "generate an image" in final_input.lower():
-            prompt = final_input.replace("/generate", "").strip()
-            placeholder.markdown(f"🎨 *Generating image for:* **'{prompt}'**...")
-            
-            img_url = get_image_url(prompt)
-            placeholder.image(img_url, caption=f"Generated: {prompt}", use_container_width=True)
-            
-            st.session_state.messages.append({
-                "role": "assistant", 
-                "content": f"Here is your generated image for: **'{prompt}'**",
-                "image_url": img_url
-            })
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {
+                    "role": "system", 
+                    "content": "Today's date is in 2026. You are a helpful assistant summarizing live web search results."
+                },
+                {"role": "user", "content": f"Query: '{optimized_query}'\n\nSearch Results:\n{search_text}"}
+            ]
+        )
+        response_text = completion.choices[0].message.content
+        clean_response = strip_thinking_process(response_text)
+        st.session_state.messages.append({"role": "assistant", "content": clean_response})
 
-        # 🔍 FEATURE 2: Free Live Web Search
-        elif final_input.lower().startswith("/search"):
-            cleaned_query = clean_search_query(final_input)
-            optimized_query = optimize_search_query(cleaned_query)
-            
-            placeholder.markdown(f"🔍 *Searching live web for:* **{optimized_query}**...")
-            search_text = execute_free_search(optimized_query)
-            
-            completion = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[
-                    {
-                        "role": "system", 
-                        "content": (
-                            "Today's date is in 2026. You are a helpful assistant summarizing live web search results. "
-                            "Structure the summary into clear categories using Markdown tables or concise bullet points."
-                        )
-                    },
-                    {"role": "user", "content": f"Query: '{optimized_query}'\n\nSearch Results:\n{search_text}"}
-                ]
-            )
-            response_text = completion.choices[0].message.content
-            clean_response = strip_thinking_process(response_text)
-            
-            placeholder.markdown(clean_response)
-            
-            audio_out = generate_speech_audio(clean_response)
-            st.audio(audio_out, format="audio/mp3")
-            
-            st.session_state.messages.append({"role": "assistant", "content": clean_response})
+    elif active_image is not None:
+        base64_img = encode_image_to_base64(active_image)
+        completion = client.chat.completions.create(
+            model="qwen/qwen3.6-27b",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": final_input},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_img}"}}
+                    ]
+                }
+            ]
+        )
+        response_text = completion.choices[0].message.content
+        clean_response = strip_thinking_process(response_text)
+        st.session_state.messages.append({"role": "assistant", "content": clean_response})
 
-        # 👀 FEATURE 3: Image Vision Analysis
-        elif active_image is not None:
-            placeholder.markdown("👀 *Analyzing attached image...*")
-            base64_img = encode_image_to_base64(active_image)
-            
-            completion = client.chat.completions.create(
-                model="qwen/qwen3.6-27b",
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": final_input},
-                            {
-                                "type": "image_url",
-                                "image_url": {"url": f"data:image/jpeg;base64,{base64_img}"}
-                            }
-                        ]
-                    }
-                ]
-            )
-            response_text = completion.choices[0].message.content
-            clean_response = strip_thinking_process(response_text)
-            
-            placeholder.markdown(clean_response)
-            
-            audio_out = generate_speech_audio(clean_response)
-            st.audio(audio_out, format="audio/mp3")
-            
-            st.session_state.messages.append({"role": "assistant", "content": clean_response})
+    else:
+        formatted_history = []
+        for m in st.session_state.messages:
+            if "content" in m and isinstance(m["content"], str):
+                if not isinstance(m["content"], list):
+                    formatted_history.append({"role": m["role"], "content": m["content"]})
 
-        # 💬 FEATURE 4: Standard Chat Response
-        else:
-            formatted_history = []
-            for m in st.session_state.messages:
-                if "content" in m and isinstance(m["content"], str):
-                    if not isinstance(m["content"], list):
-                        formatted_history.append({"role": m["role"], "content": m["content"]})
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=formatted_history
+        )
+        response_text = completion.choices[0].message.content
+        clean_response = strip_thinking_process(response_text)
+        st.session_state.messages.append({"role": "assistant", "content": clean_response})
 
-            completion = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=formatted_history
-            )
-            response_text = completion.choices[0].message.content
-            clean_response = strip_thinking_process(response_text)
-            
-            placeholder.markdown(clean_response)
-            
-            audio_out = generate_speech_audio(clean_response)
-            st.audio(audio_out, format="audio/mp3")
-            
-            st.session_state.messages.append({"role": "assistant", "content": clean_response})
+    # Trigger a rerun so new messages render ABOVE the input bar
+    st.rerun()
