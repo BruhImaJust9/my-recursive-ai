@@ -237,6 +237,18 @@ with st.sidebar:
         key="sidebar_file_uploader"
     )
 
+    # 🧠 Model Selection
+    st.markdown("---")
+    st.header("🧠 Choose AI Model")
+    selected_model = st.selectbox(
+        "Select Model:",
+        [
+            "llama-3.3-70b-versatile",   # Best all-rounder & complex reasoning
+            "llama-3.1-8b-instant",      # Super fast, lightweight responses
+            "mixtral-8x7b-32768"         # Great for long contexts & creative writing
+        ]
+    )
+
     # Convert chat history to downloadable string
     if st.session_state.messages:
         chat_text = convert_chat_to_text(st.session_state.messages)
