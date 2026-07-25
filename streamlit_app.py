@@ -24,7 +24,7 @@ except ImportError:
 # ==========================================
 st.set_page_config(page_title="AI Master Studio", page_icon="🤖", layout="wide")
 st.title("🤖 Intelligent AI Workspace (Master Studio)")
-st.caption("Powered by Groq, Multi-Chat, Real-Time Streaming, Doc Analysis, Vision & Voice")
+st.caption("Powered by Groq Llama 3.3, Multi-Chat, Real-Time Streaming, Doc Analysis, Vision & Voice")
 
 # Initialize Groq Client
 GROQ_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
@@ -174,8 +174,10 @@ def generate_speech_audio(text: str) -> bytes:
 def stream_groq_response(stream):
     """Generator function to stream Groq response chunks into st.write_stream."""
     for chunk in stream:
-        if chunk.choices and chunk.choices[0].delta.content:
-            yield chunk.choices[0].delta.content
+        if chunk.choices and len(chunk.choices) > 0:
+            content = chunk.choices[0].delta.content
+            if content:
+                yield content
 
 def render_html_artifact_if_present(text: str):
     """Extracts and renders live HTML code blocks as interactive Artifact previews."""
@@ -290,5 +292,11 @@ final_input = user_input if user_input else recorded_text
 active_image = popover_image if popover_image else image_to_analyze
 
 if final_input and client:
-    if len(current_chat["messages"]) <= 1:
+    # Update Chat Title on First Message
+    if len(current_chat["messages"]) <= 1 or current_chat["title"] == "New Chat":
         current_chat["title"] = final_input[:20] + "..."
+
+    full_prompt_text = final_input
+    if file_context_str:
+        full_prompt_text = f"Context from uploaded file:\n
+        
