@@ -200,6 +200,20 @@ with st.sidebar:
         "Choose AI Persona:",
         ["Helpful Assistant", "Code Expert", "Sarcastic Buddy", "Strict Tutor"]
     )
+
+    # Document File Uploader
+    st.markdown("---")
+    st.header("📄 Document Analysis")
+    uploaded_doc = st.file_uploader(
+        "Upload Doc or Code (TXT, PDF, CSV, PY, JSON)",
+        type=["txt", "pdf", "csv", "md", "json", "py"],
+        key="doc_uploader"
+    )
+    
+    doc_context = ""
+    if uploaded_doc:
+        doc_context = extract_file_content(uploaded_doc)
+        st.success(f"📄 Attached `{uploaded_doc.name}` ({len(doc_context)} characters loaded)")
     
     uploaded_file = st.file_uploader(
         "Upload Image to Analyze", 
