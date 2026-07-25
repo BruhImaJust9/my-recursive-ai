@@ -289,7 +289,8 @@ for msg in st.session_state.chats[st.session_state.current_chat]:
 # ==========================================
 # 5. INPUT LOGIC & ROUTING
 # ==========================================
-col_popover, col_input = st.columns([1, 12])
+# 1. Popover menu stays in its own row/area above or beside
+col_popover, _ = st.columns([1, 12])
 
 popover_image = None
 audio_bytes = None
@@ -297,7 +298,7 @@ audio_bytes = None
 with col_popover:
     with st.popover("➕", help="Quick Actions, Attachments & Voice"):
         st.markdown("### 🎙️ Voice Input")
-        audio_bytes = audio_recorder(
+        audio_bytes = audio_recorder(...)
             text="Click to Record Voice",
             recording_color="#e84c3d",
             neutral_color="#6aa84f",
@@ -323,7 +324,7 @@ with col_popover:
         st.caption("🎨 **Generate Image:** `/generate <prompt>`")
 
 with col_input:
-    user_input = st.chat_input("Type a question, ask about an image, /search, or /generate...")
+    user_input = st.chat_input("Type a question, ask about an image, /search, or /generate...") # 👈 Pinned to screen bottom!
 
 recorded_text = ""
 if audio_bytes and client:
