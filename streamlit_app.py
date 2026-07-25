@@ -322,9 +322,20 @@ if final_input and client:
             "audio": audio_data
         })
 
-    # ⚡ ROUTE 4: Standard Chat (THIS IS BLOCK C)
+    # ⚡ ROUTE 4: Standard Chat
     else:
-        formatted_history = []
+        # Define persona prompts
+        system_prompts = {
+            "Helpful Assistant": "You are a friendly and helpful AI assistant.",
+            "Code Expert": "You are a master programmer. Give clean, well-commented code snippets.",
+            "Sarcastic Buddy": "You are a witty, slightly sarcastic friend who likes to joke around.",
+            "Strict Tutor": "You are a precise, educational tutor. Explain concepts clearly and encourage critical thinking."
+        }
+
+        formatted_history = [
+            {"role": "system", "content": system_prompts[personality]}
+        ]
+
         for m in st.session_state.messages:
             if "content" in m and isinstance(m["content"], str):
                 if not isinstance(m["content"], list):
