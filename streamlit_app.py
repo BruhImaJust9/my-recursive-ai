@@ -277,11 +277,8 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
 
-# ==========================================
-# 4. CHAT HISTORY DISPLAY
-# ==========================================
-# Render all previous chat history first
-for msg in st.session_state.messages:
+# Render active conversation thread
+for msg in st.session_state.chats[st.session_state.current_chat]:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
         if "image_url" in msg:
@@ -289,7 +286,6 @@ for msg in st.session_state.messages:
         elif "uploaded_img" in msg:
             st.image(msg["uploaded_img"], use_container_width=True)
         
-        # 🎙️ Play audio if present
         if "audio" in msg and msg["audio"]:
             st.audio(msg["audio"], format="audio/mp3")
 
