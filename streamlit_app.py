@@ -414,23 +414,25 @@ if final_input and client:
         })
 
     # ⚡ ROUTE 4: Standard Chat
-    else:
-        system_prompts = {
-            "Helpful Assistant": "You are a friendly and helpful AI assistant.",
-            "Code Expert": "You are a master programmer. Give clean, well-commented code snippets.",
-            "Sarcastic Buddy": "You are a witty, slightly sarcastic friend who likes to joke around.",
-            "Strict Tutor": "You are a precise, educational tutor. Explain concepts clearly and encourage critical thinking."
-        }
+        # ... (formatted_history setup stays the same) ...
 
-        formatted_history = [
-            {"role": "system", "content": system_prompts[personality]}
-        ]
+        stream = client.chat.completions.create(
+            model=selected_model,
+            messages=formatted_history,
+            stream=True  # 👈 Enable stream here where formatted_history lives!
+        )
 
-        if doc_context:
-            formatted_history.append({
-                "role": "system",
-                "content": f"The user uploaded a document named '{uploaded_doc.name}'. Here is its content:\n\n{doc_context[:10000]}"
-            })
+        with st.chat_message("assistant"):
+            clean_response = st.write_stream(stream)
+
+        clean_response = strip_thinking_process(clean_response)
+        audio_data = generate_speech_audio(clean_response)
+        
+        active_chat_list.append({
+            "role": "assistant", 
+            "content": clean_response,
+            "audio": audio_data
+        })
 
         for m in active_chat_list:
             if "content" in m and isinstance(m["content"], str):
