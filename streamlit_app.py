@@ -174,6 +174,17 @@ with st.sidebar:
         type=["png", "jpg", "jpeg", "webp"],
         key="sidebar_file_uploader"
     )
+
+    # Convert chat history to downloadable string
+    if st.session_state.messages:
+        chat_text = convert_chat_to_text(st.session_state.messages)
+        st.download_button(
+            label="📥 Export Chat History",
+            data=chat_text,
+            file_name="chat_history.txt",
+            mime="text/plain",
+            use_container_width=True
+        )
     
     if uploaded_file:
         image_to_analyze = Image.open(uploaded_file)
