@@ -153,6 +153,12 @@ image_to_analyze = None
 
 with st.sidebar:
     st.header("⚙️ Workspace Controls")
+    st.markdown("---")
+    st.header("🎭 AI Personality")
+    personality = st.selectbox(
+        "Choose AI Persona:",
+        ["Helpful Assistant", "Code Expert", "Sarcastic Buddy", "Strict Tutor"]
+    )
     
     uploaded_file = st.file_uploader(
         "Upload Image to Analyze", 
