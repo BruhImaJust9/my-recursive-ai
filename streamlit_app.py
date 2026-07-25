@@ -390,7 +390,6 @@ if final_input and client:
 
     # ⚡ ROUTE 4: Standard Chat
     else:
-        # Define persona prompts
         system_prompts = {
             "Helpful Assistant": "You are a friendly and helpful AI assistant.",
             "Code Expert": "You are a master programmer. Give clean, well-commented code snippets.",
@@ -401,6 +400,13 @@ if final_input and client:
         formatted_history = [
             {"role": "system", "content": system_prompts[personality]}
         ]
+
+        # Add Document Context if attached
+        if doc_context:
+            formatted_history.append({
+                "role": "system", 
+                "content": f"The user uploaded a document named '{uploaded_doc.name}'. Here is its content:\n\n{doc_context[:10000]}"
+            })
 
         for m in st.session_state.messages:
             if "content" in m and isinstance(m["content"], str):
@@ -422,5 +428,3 @@ if final_input and client:
             "content": clean_response,
             "audio": audio_data
         })
-
-    st.rerun()
