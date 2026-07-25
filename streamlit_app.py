@@ -444,20 +444,13 @@ if final_input and client:
             {"role": "system", "content": system_prompts[personality]}
         ]
 
-        # Add Document Context if attached
-        if doc_context:
-            formatted_history.append({
-                "role": "system", 
-                "content": f"The user uploaded a document named '{uploaded_doc.name}'. Here is its content:\n\n{doc_context[:10000]}"
-            })
-
         for m in st.session_state.messages:
             if "content" in m and isinstance(m["content"], str):
                 if not isinstance(m["content"], list):
                     formatted_history.append({"role": m["role"], "content": m["content"]})
 
         completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model=selected_model,  # 👈 Update here!
             messages=formatted_history
         )
         response_text = completion.choices[0].message.content
