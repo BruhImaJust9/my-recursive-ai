@@ -289,7 +289,8 @@ for msg in st.session_state.chats[st.session_state.current_chat]:
 # ==========================================
 # 5. INPUT LOGIC & ROUTING
 # ==========================================
-# 1. Popover menu stays in its own row/area above or beside
+
+# 1. Popover container for attachments & voice
 col_popover, _ = st.columns([1, 12])
 
 popover_image = None
@@ -299,13 +300,13 @@ with col_popover:
     with st.popover("➕", help="Quick Actions, Attachments & Voice"):
         st.markdown("### 🎙️ Voice Input")
         audio_bytes = audio_recorder(
-        text="Click to Record Voice",
-        recording_color="#e84c3d",
-        neutral_color="#6aa84f",
-        icon_name="microphone",
-        icon_size="2x",
-        key="voice_recorder"
-    )
+            text="Click to Record Voice",
+            recording_color="#e84c3d",
+            neutral_color="#6aa84f",
+            icon_name="microphone",
+            icon_size="2x",
+            key="voice_recorder"
+        )
         
         st.markdown("---")
         st.markdown("### 📷 Attach Image")
@@ -322,6 +323,9 @@ with col_popover:
         st.markdown("---")
         st.caption("🔍 **Live Search:** `/search <topic>`")
         st.caption("🎨 **Generate Image:** `/generate <prompt>`")
+
+# 2. Main Chat Input (Outside columns, pinned to the bottom of the screen!)
+user_input = st.chat_input("Type a question, ask about an image, /search, or /generate...")
 
 with col_input:
     user_input = st.chat_input("Type a question, ask about an image, /search, or /generate...") # 👈 Pinned to screen bottom!
