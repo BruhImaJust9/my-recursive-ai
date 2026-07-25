@@ -249,11 +249,9 @@ if final_input and client:
     if active_image:
         user_data["uploaded_img"] = active_image
         
-    # Append to state and rerun immediately so it renders inside the history loop!
     st.session_state.messages.append(user_data)
     
-    # Process Assistant Response
-    # (We save the assistant response to state and rerun so the bar stays at the bottom)
+    # 🎨 ROUTE 1: Image Generation
     if final_input.lower().startswith("/generate") or "generate an image" in final_input.lower():
         prompt = final_input.replace("/generate", "").strip()
         img_url = get_image_url(prompt)
@@ -263,6 +261,7 @@ if final_input and client:
             "image_url": img_url
         })
 
+    # 🔍 ROUTE 2: Web Search
     elif final_input.lower().startswith("/search"):
         cleaned_query = clean_search_query(final_input)
         optimized_query = optimize_search_query(cleaned_query)
@@ -281,7 +280,7 @@ if final_input and client:
         response_text = completion.choices[0].message.content
         clean_response = strip_thinking_process(response_text)
         
-        # Generate TTS audio
+        # 🎙️ Generate TTS audio
         audio_data = generate_speech_audio(clean_response)
         
         st.session_state.messages.append({
@@ -290,6 +289,7 @@ if final_input and client:
             "audio": audio_data
         })
 
+    # 👀 ROUTE 3: Vision Analysis
     elif active_image is not None:
         base64_img = encode_image_to_base64(active_image)
         completion = client.chat.completions.create(
@@ -306,8 +306,17 @@ if final_input and client:
         )
         response_text = completion.choices[0].message.content
         clean_response = strip_thinking_process(response_text)
-        st.session_state.messages.append({"role": "assistant", "content": clean_response})
+        
+        # 🎙️ Generate TTS audio
+        audio_data = generate_speech_audio(clean_response)
+        
+        st.session_state.messages.append({
+            "role": "assistant", 
+            "content": clean_response,
+            "audio": audio_data
+        })
 
+    # ⚡ ROUTE 4: Standard Chat (THIS IS BLOCK C)
     else:
         formatted_history = []
         for m in st.session_state.messages:
@@ -321,7 +330,14 @@ if final_input and client:
         )
         response_text = completion.choices[0].message.content
         clean_response = strip_thinking_process(response_text)
-        st.session_state.messages.append({"role": "assistant", "content": clean_response})
+        
+        # 🎙️ Generate TTS audio
+        audio_data = generate_speech_audio(clean_response)
+        
+        st.session_state.messages.append({
+            "role": "assistant", 
+            "content": clean_response,
+            "audio": audio_data
+        })
 
-    # Trigger a rerun so new messages render ABOVE the input bar
     st.rerun()
