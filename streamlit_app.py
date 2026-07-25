@@ -305,7 +305,7 @@ with col_popover:
         icon_name="microphone",
         icon_size="2x",
         key="voice_recorder"
-        )
+    )
         
         st.markdown("---")
         st.markdown("### 📷 Attach Image")
