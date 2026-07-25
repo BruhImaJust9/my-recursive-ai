@@ -6,67 +6,48 @@ import base64
 import io
 import re
 import tempfile
-import uuid
-import pandas as pd
 from groq import Groq
 from tavily import TavilyClient
 from gtts import gTTS
 from audio_recorder_streamlit import audio_recorder
 
-# Optional PDF parsing
-try:
-    import pypdf
-except ImportError:
-    pypdf = None
-
 # ==========================================
 # 1. PAGE SETUP & CONFIG
 # ==========================================
-st.set_page_config(page_title="AI Master Studio", page_icon="🤖", layout="wide")
-st.title("🤖 Intelligent AI Workspace (Master Studio)")
-st.caption("Powered by Groq Llama 3.3, Multi-Chat, Real-Time Streaming, Doc Analysis, Vision & Voice")
+st.set_page_config(page_title="AI Workspace", page_icon="🤖", layout="wide")
+st.title("🤖 Intelligent AI Workspace")
+st.caption("Powered by Groq Llama 3, Free Web Search, Image Generation & Voice")
 
 # Initialize Groq Client
 GROQ_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
+
 if GROQ_KEY:
     client = Groq(api_key=GROQ_KEY)
 else:
     st.warning("⚠️ Missing `GROQ_API_KEY` in Streamlit secrets! Please add it to continue.")
     client = None
 
-# ==========================================
-# 2. MULTI-CHAT SESSION STATE MANAGEMENT
-# ==========================================
-if "chats" not in st.session_state:
-    default_id = str(uuid.uuid4())[:8]
-    st.session_state.chats = {
-        default_id: {
-            "title": "New Chat",
-            "messages": [
-                {"role": "assistant", "content": "Hey there! Ask me anything, upload images or documents, try `/search <topic>`, `/generate <prompt>`, or record voice!"}
-            ]
-        }
-    }
-    st.session_state.current_chat_id = default_id
-
-if st.session_state.current_chat_id not in st.session_state.chats:
-    st.session_state.current_chat_id = list(st.session_state.chats.keys())[0]
-
-current_chat = st.session_state.chats[st.session_state.current_chat_id]
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "assistant", "content": "Hey there! I'm powered by Groq. Ask me anything, upload an image to analyze, try `/search <topic>`, `/generate <prompt>`, or speak using the ➕ menu!"}
+    ]
 
 # ==========================================
-# 3. HELPER FUNCTIONS
+# 2. HELPER FUNCTIONS
 # ==========================================
+
+# Fetch Tavily API Key
 TAVILY_KEY = st.secrets.get("TAVILY_API_KEY", os.getenv("TAVILY_API_KEY", ""))
 
 def execute_free_search(query: str) -> str:
-    """Bulletproof web search using Tavily API."""
+    """Bulletproof web search using Tavily API (No IP blocks/rate limits)."""
     if not TAVILY_KEY:
         return "⚠️ Missing `TAVILY_API_KEY` in Streamlit secrets!"
 
     try:
         tavily = TavilyClient(api_key=TAVILY_KEY)
         response = tavily.search(query=query, max_results=5)
+        
         results = response.get("results", [])
         if not results:
             return "No matching search results found."
@@ -82,67 +63,58 @@ def execute_free_search(query: str) -> str:
     except Exception as e:
         return f"Search error: {str(e)}"
 
-def optimize_search_query(user_prompt: str) -> str:
+def optimize_search_query(user_prompt: str, category: str = "general") -> str:
     cleaned = user_prompt.lower().replace("search", "").replace("what are", "").strip()
+
     if "world cup" in cleaned or "super bowl" in cleaned:
         return f'"{cleaned}" final score champions match recap -betting -odds'
+    
     if "movie" in cleaned or "grossing" in cleaned or "box office" in cleaned:
         return f'"{cleaned}" box office worldwide stats'
     elif "standings" in cleaned:
         return f'"{cleaned}" scores standings results'
+        
     return cleaned
 
 def clean_search_query(user_query: str) -> str:
+    """Strips conversational fluff and leading stop words."""
     query = user_query.lower().replace("/search", "").strip().strip("!? ")
+    
     stop_phrases = ["the ", "a ", "an ", "who won ", "what is ", "tell me about "]
     for phrase in stop_phrases:
         if query.startswith(phrase):
             query = query[len(phrase):].strip()
+            
     if " " in query and not ('"' in query or "'" in query):
         return f'"{query}"'
+        
     return query
 
 def get_image_url(prompt: str) -> str:
+    """Returns the direct raw image URL from Pollinations."""
     encoded_prompt = urllib.parse.quote(prompt.strip())
     return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=800&nologo=true"
 
 def encode_image_to_base64(image: Image.Image) -> str:
+    """Helper to convert uploaded PIL image into a base64 data string for Groq Vision."""
     buffered = io.BytesIO()
+    
     if image.mode in ("RGBA", "P", "LA"):
         image = image.convert("RGB")
+        
     image.thumbnail((1024, 1024))
     image.save(buffered, format="JPEG", quality=85)
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
 def strip_thinking_process(text: str) -> str:
+    """Removes internal <think>...</think> blocks from model outputs."""
     if not text:
         return ""
     cleaned_text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
     return cleaned_text.strip()
 
-def extract_file_content(uploaded_file) -> str:
-    """Reads text from .txt, .py, .md, .csv, and .pdf files."""
-    filename = uploaded_file.name.lower()
-    try:
-        if filename.endswith(('.txt', '.py', '.md', '.json', '.html', '.css', '.js')):
-            return uploaded_file.getvalue().decode('utf-8')
-        elif filename.endswith('.csv'):
-            df = pd.read_csv(uploaded_file)
-            return f"CSV Data Snippet (First 20 rows):\n{df.head(20).to_string()}"
-        elif filename.endswith('.pdf'):
-            if pypdf:
-                reader = pypdf.PdfReader(uploaded_file)
-                text = ""
-                for page in reader.pages[:10]:
-                    text += page.extract_text() or ""
-                return text if text else "Could not extract text from PDF."
-            else:
-                return "PDF parser not installed (`pip install pypdf`). Please convert PDF to text."
-    except Exception as e:
-        return f"Error parsing document: {str(e)}"
-    return ""
-
 def transcribe_audio_groq(audio_bytes: bytes, client) -> str:
+    """Sends recorded audio bytes to Groq Whisper for instant Speech-to-Text."""
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
             temp_audio.write(audio_bytes)
@@ -161,142 +133,219 @@ def transcribe_audio_groq(audio_bytes: bytes, client) -> str:
         return f"Speech-to-Text Error: {str(e)}"
 
 def generate_speech_audio(text: str) -> bytes:
+    """Converts response text into speech audio bytes using gTTS."""
     clean_text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
     clean_text = re.sub(r'[*_#~`]', '', clean_text).strip()
+    
     if not clean_text:
         clean_text = "Here is your response."
+
     tts = gTTS(text=clean_text[:500], lang='en')
     fp = io.BytesIO()
     tts.write_to_fp(fp)
     fp.seek(0)
     return fp.read()
 
-def stream_groq_response(stream):
-    """Generator function to stream Groq response chunks into st.write_stream."""
-    for chunk in stream:
-        if chunk.choices and len(chunk.choices) > 0:
-            content = chunk.choices[0].delta.content
-            if content:
-                yield content
-
-def render_html_artifact_if_present(text: str):
-    """Extracts and renders live HTML code blocks as interactive Artifact previews."""
-    html_blocks = re.findall(r'```html\s*(.*?)\s*```', text, re.DOTALL)
-    for code in html_blocks:
-        st.markdown("### 🎨 Interactive Artifact Preview")
-        st.components.v1.html(code, height=350, scrolling=True)
-
 # ==========================================
-# 4. SIDEBAR (MULTI-CHAT & FILES)
+# 3. SIDEBAR & IMAGE UPLOAD
 # ==========================================
 image_to_analyze = None
-file_context_str = ""
 
 with st.sidebar:
-    st.header("🗂️ Chat Sessions")
+    st.header("⚙️ Workspace Controls")
     
-    if st.button("➕ New Chat", use_container_width=True):
-        new_id = str(uuid.uuid4())[:8]
-        st.session_state.chats[new_id] = {
-            "title": "New Chat",
-            "messages": [{"role": "assistant", "content": "How can I help you in this new session?"}]
-        }
-        st.session_state.current_chat_id = new_id
-        st.rerun()
-
-    chat_options = {cid: cdata["title"] for cid, cdata in st.session_state.chats.items()}
-    selected_id = st.selectbox(
-        "Switch Chat",
-        options=list(chat_options.keys()),
-        format_func=lambda cid: chat_options[cid],
-        index=list(chat_options.keys()).index(st.session_state.current_chat_id)
-    )
-    if selected_id != st.session_state.current_chat_id:
-        st.session_state.current_chat_id = selected_id
-        st.rerun()
-
-    st.markdown("---")
-    st.header("⚙️ Workspace Attachments")
-    
-    uploaded_image = st.file_uploader(
-        "Attach Image (Vision)", 
+    uploaded_file = st.file_uploader(
+        "Upload Image to Analyze", 
         type=["png", "jpg", "jpeg", "webp"],
-        key="sidebar_img_uploader"
+        key="sidebar_file_uploader"
     )
-    if uploaded_image:
-        image_to_analyze = Image.open(uploaded_image)
-        st.image(image_to_analyze, caption="Attached Image", use_container_width=True)
-
-    uploaded_doc = st.file_uploader(
-        "Attach Document (PDF, TXT, CSV, Code)",
-        type=["txt", "py", "md", "csv", "pdf", "json"],
-        key="sidebar_doc_uploader"
-    )
-    if uploaded_doc:
-        file_context_str = extract_file_content(uploaded_doc)
-        st.success(f"Loaded: `{uploaded_doc.name}`")
+    
+    if uploaded_file:
+        image_to_analyze = Image.open(uploaded_file)
+        st.image(image_to_analyze, caption="Sidebar Attached Image", use_container_width=True)
+        st.success("Image attached! Ask a question in chat about it.")
 
     st.markdown("---")
-    if st.button("🗑️ Delete Current Chat", use_container_width=True):
-        if len(st.session_state.chats) > 1:
-            del st.session_state.chats[st.session_state.current_chat_id]
-            st.session_state.current_chat_id = list(st.session_state.chats.keys())[0]
-            st.rerun()
-        else:
-            current_chat["messages"] = []
-            st.rerun()
+    if st.button("🗑️ Clear Chat"):
+        st.session_state.messages = []
+        st.rerun()
 
 # ==========================================
-# 5. CHAT HISTORY DISPLAY
+# 4. CHAT HISTORY DISPLAY
 # ==========================================
-for msg in current_chat["messages"]:
+for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
         if "image_url" in msg:
             st.image(msg["image_url"], use_container_width=True)
         elif "uploaded_img" in msg:
             st.image(msg["uploaded_img"], use_container_width=True)
-        render_html_artifact_if_present(msg.get("content", ""))
 
 # ==========================================
-# 6. INPUT CONTROLS & ROUTING
+# 5. INPUT LOGIC & ROUTING
 # ==========================================
+
 col_popover, col_input = st.columns([1, 12])
+
 popover_image = None
 audio_bytes = None
 
 with col_popover:
-    with st.popover("➕", help="Quick Actions & Voice"):
+    with st.popover("➕", help="Quick Actions, Attachments & Voice"):
         st.markdown("### 🎙️ Voice Input")
+        
         audio_bytes = audio_recorder(
-            text="Record Voice",
+            text="Click to Record Voice",
             recording_color="#e84c3d",
             neutral_color="#6aa84f",
             icon_name="microphone",
             icon_size="2x",
             key="voice_recorder"
         )
+        
         st.markdown("---")
-        st.caption("🔍 `/search <topic>`")
-        st.caption("🎨 `/generate <prompt>`")
+        st.markdown("### 📷 Attach Image")
+        
+        popover_file = st.file_uploader(
+            "Upload Vision Image", 
+            type=["png", "jpg", "jpeg", "webp"],
+            key="popover_file_uploader"
+        )
+        
+        if popover_file:
+            popover_image = Image.open(popover_file)
+            st.image(popover_image, caption="Popover Attached Image", use_container_width=True)
+            st.success("Image attached! Type a prompt below.")
+
+        st.markdown("---")
+        st.caption("🔍 **Live Search:** `/search <topic>`")
+        st.caption("🎨 **Generate Image:** `/generate <prompt>`")
+        
+        st.markdown("---")
+        if st.button("🗑️ Clear History", use_container_width=True):
+            st.session_state.messages = []
+            st.rerun()
 
 with col_input:
-    user_input = st.chat_input("Ask a question, analyze documents, /search, or /generate...")
+    user_input = st.chat_input("Type a question, ask about an image, /search, or /generate...")
 
+# Process Speech-to-Text if audio recorded
 recorded_text = ""
 if audio_bytes and client:
     with st.spinner("🎙️ Transcribing voice..."):
         recorded_text = transcribe_audio_groq(audio_bytes, client)
 
+# Combine text input or recorded voice
 final_input = user_input if user_input else recorded_text
 active_image = popover_image if popover_image else image_to_analyze
 
 if final_input and client:
-    # Update Chat Title on First Message
-    if len(current_chat["messages"]) <= 1 or current_chat["title"] == "New Chat":
-        current_chat["title"] = final_input[:20] + "..."
+    user_data = {"role": "user", "content": final_input}
+    if active_image:
+        user_data["uploaded_img"] = active_image
+    st.session_state.messages.append(user_data)
+    
+    with st.chat_message("user"):
+        st.markdown(final_input)
+        if active_image:
+            st.image(active_image, use_container_width=True)
 
-    full_prompt_text = final_input
-    if file_context_str:
-        full_prompt_text = f"Context from uploaded file:\n
+    with st.chat_message("assistant"):
+        placeholder = st.empty()
         
+        # 🎨 FEATURE 1: Image Generation
+        if final_input.lower().startswith("/generate") or "generate an image" in final_input.lower():
+            prompt = final_input.replace("/generate", "").strip()
+            placeholder.markdown(f"🎨 *Generating image for:* **'{prompt}'**...")
+            
+            img_url = get_image_url(prompt)
+            placeholder.image(img_url, caption=f"Generated: {prompt}", use_container_width=True)
+            
+            st.session_state.messages.append({
+                "role": "assistant", 
+                "content": f"Here is your generated image for: **'{prompt}'**",
+                "image_url": img_url
+            })
+
+        # 🔍 FEATURE 2: Free Live Web Search
+        elif final_input.lower().startswith("/search"):
+            cleaned_query = clean_search_query(final_input)
+            optimized_query = optimize_search_query(cleaned_query)
+            
+            placeholder.markdown(f"🔍 *Searching live web for:* **{optimized_query}**...")
+            search_text = execute_free_search(optimized_query)
+            
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {
+                        "role": "system", 
+                        "content": (
+                            "Today's date is in 2026. You are a helpful assistant summarizing live web search results. "
+                            "Structure the summary into clear categories using Markdown tables or concise bullet points."
+                        )
+                    },
+                    {"role": "user", "content": f"Query: '{optimized_query}'\n\nSearch Results:\n{search_text}"}
+                ]
+            )
+            response_text = completion.choices[0].message.content
+            clean_response = strip_thinking_process(response_text)
+            
+            placeholder.markdown(clean_response)
+            
+            audio_out = generate_speech_audio(clean_response)
+            st.audio(audio_out, format="audio/mp3")
+            
+            st.session_state.messages.append({"role": "assistant", "content": clean_response})
+
+        # 👀 FEATURE 3: Image Vision Analysis
+        elif active_image is not None:
+            placeholder.markdown("👀 *Analyzing attached image...*")
+            base64_img = encode_image_to_base64(active_image)
+            
+            completion = client.chat.completions.create(
+                model="qwen/qwen3.6-27b",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": final_input},
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:image/jpeg;base64,{base64_img}"}
+                            }
+                        ]
+                    }
+                ]
+            )
+            response_text = completion.choices[0].message.content
+            clean_response = strip_thinking_process(response_text)
+            
+            placeholder.markdown(clean_response)
+            
+            audio_out = generate_speech_audio(clean_response)
+            st.audio(audio_out, format="audio/mp3")
+            
+            st.session_state.messages.append({"role": "assistant", "content": clean_response})
+
+        # 💬 FEATURE 4: Standard Chat Response
+        else:
+            formatted_history = []
+            for m in st.session_state.messages:
+                if "content" in m and isinstance(m["content"], str):
+                    if not isinstance(m["content"], list):
+                        formatted_history.append({"role": m["role"], "content": m["content"]})
+
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=formatted_history
+            )
+            response_text = completion.choices[0].message.content
+            clean_response = strip_thinking_process(response_text)
+            
+            placeholder.markdown(clean_response)
+            
+            audio_out = generate_speech_audio(clean_response)
+            st.audio(audio_out, format="audio/mp3")
+            
+            st.session_state.messages.append({"role": "assistant", "content": clean_response})
