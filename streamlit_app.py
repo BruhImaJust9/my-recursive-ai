@@ -360,20 +360,22 @@ if final_input and client:
         optimized_query = optimize_search_query(cleaned_query)
         search_text = execute_free_search(optimized_query)
         
-        completion = client.chat.completions.create(
+        # 1. Enable stream=True in Groq call
+        stream = client.chat.completions.create(
             model=selected_model,
-            messages=[
-                {
-                    "role": "system", 
-                    "content": "Today's date is in 2026. You are a helpful assistant summarizing live web search results."
-                },
-                {"role": "user", "content": f"Query: '{optimized_query}'\n\nSearch Results:\n{search_text}"}
-            ]
+            messages=formatted_history,
+            stream=True  # 👈 Enables real-time word streaming!
         )
-        response_text = completion.choices[0].message.content
-        clean_response = strip_thinking_process(response_text)
+
+        # 2. Render live typewriter effect in chat window
+        with st.chat_message("assistant"):
+            clean_response = st.write_stream(stream)
+        
+        # 3. Clean thinking tags if any & generate audio
+        clean_response = strip_thinking_process(clean_response)
         audio_data = generate_speech_audio(clean_response)
         
+        # 4. Save to history
         active_chat_list.append({
             "role": "assistant", 
             "content": clean_response,
