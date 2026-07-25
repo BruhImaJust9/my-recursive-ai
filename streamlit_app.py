@@ -300,11 +300,11 @@ with col_popover:
         st.markdown("### 🎙️ Voice Input")
         audio_bytes = audio_recorder(...)
         text="Click to Record Voice",
-            recording_color="#e84c3d",
-            neutral_color="#6aa84f",
-            icon_name="microphone",
-            icon_size="2x",
-            key="voice_recorder"
+        recording_color="#e84c3d",
+         neutral_color="#6aa84f",
+        icon_name="microphone",
+         icon_size="2x",
+        key="voice_recorder"
         )
         
         st.markdown("---")
