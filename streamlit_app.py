@@ -106,6 +106,15 @@ def encode_image_to_base64(image: Image.Image) -> str:
     image.save(buffered, format="JPEG", quality=85)
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
+def convert_chat_to_text(messages) -> str:
+    """Formats st.session_state.messages into a readable plain text log."""
+    chat_log = []
+    for msg in messages:
+        role = msg.get("role", "unknown").capitalize()
+        content = msg.get("content", "")
+        chat_log.append(f"{role}:\n{content}\n" + "-" * 40)
+    return "\n\n".join(chat_log)
+
 def strip_thinking_process(text: str) -> str:
     """Removes internal <think>...</think> blocks from model outputs."""
     if not text:
