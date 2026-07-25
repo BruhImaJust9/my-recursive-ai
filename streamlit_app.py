@@ -366,28 +366,22 @@ if final_input and client:
         optimized_query = optimize_search_query(cleaned_query)
         search_text = execute_free_search(optimized_query)
         
-        # 1. Enable stream=True with proper inline search messages!
+        # 1. Start stream
         stream = client.chat.completions.create(
             model=selected_model,
-            messages=[
-                {
-                    "role": "system", 
-                    "content": "Today's date is in 2026. You are a helpful assistant summarizing live web search results."
-                },
-                {"role": "user", "content": f"Query: '{optimized_query}'\n\nSearch Results:\n{search_text}"}
-            ],
-            stream=True  # 👈 Word-by-word streaming!
+            messages=formatted_history,
+            stream=True
         )
 
-        # 2. Render live typewriter effect
+        # 2. Pass stream through our helper function!
         with st.chat_message("assistant"):
-            clean_response = st.write_stream(stream)
+            clean_response = st.write_stream(generate_stream_response(stream))
         
-        # 3. Clean thinking tags & generate speech audio
+        # 3. Clean tags and generate audio safely
         clean_response = strip_thinking_process(clean_response)
         audio_data = generate_speech_audio(clean_response)
         
-        # 4. Save response to chat history
+        # 4. Save to history
         active_chat_list.append({
             "role": "assistant", 
             "content": clean_response,
