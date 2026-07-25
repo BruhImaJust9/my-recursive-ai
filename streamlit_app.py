@@ -280,7 +280,15 @@ if final_input and client:
         )
         response_text = completion.choices[0].message.content
         clean_response = strip_thinking_process(response_text)
-        st.session_state.messages.append({"role": "assistant", "content": clean_response})
+        
+        # Generate TTS audio
+        audio_data = generate_speech_audio(clean_response)
+        
+        st.session_state.messages.append({
+            "role": "assistant", 
+            "content": clean_response,
+            "audio": audio_data
+        })
 
     elif active_image is not None:
         base64_img = encode_image_to_base64(active_image)
