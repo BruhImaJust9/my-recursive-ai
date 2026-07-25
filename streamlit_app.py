@@ -181,6 +181,10 @@ for msg in st.session_state.messages:
             st.image(msg["image_url"], use_container_width=True)
         elif "uploaded_img" in msg:
             st.image(msg["uploaded_img"], use_container_width=True)
+        
+        # 🎙️ Play audio if present
+        if "audio" in msg and msg["audio"]:
+            st.audio(msg["audio"], format="audio/mp3")
 
 # ==========================================
 # 5. INPUT LOGIC & ROUTING (ALWAYS AT BOTTOM)
