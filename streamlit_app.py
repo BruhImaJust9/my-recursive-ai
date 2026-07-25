@@ -325,10 +325,7 @@ with col_popover:
         st.caption("🎨 **Generate Image:** `/generate <prompt>`")
 
 # 2. Main Chat Input (Outside columns, pinned to the bottom of the screen!)
-user_input = st.chat_input("Type a question, ask about an image, /search, or /generate...")
-
-with col_input:
-    user_input = st.chat_input("Type a question, ask about an image, /search, or /generate...") # 👈 Pinned to screen bottom!
+user_input = st.chat_input("Type a question, ask about an image, /search, or /generate..."
 
 recorded_text = ""
 if audio_bytes and client:
