@@ -141,6 +141,38 @@ def transcribe_audio_groq(audio_bytes: bytes, client) -> str:
     except Exception as e:
         return f"Speech-to-Text Error: {str(e)}"
 
+def extract_file_content(uploaded_file) -> str:
+    """Reads text content from TXT, PY, CSV, MD, JSON, and PDF files."""
+    if uploaded_file is None:
+        return ""
+    
+    file_name = uploaded_file.name.lower()
+    
+    # 1. Plain text / Code / CSV / JSON files
+    if file_name.endswith((".txt", ".py", ".csv", ".md", ".json", ".html", ".css")):
+        try:
+            return uploaded_file.read().decode("utf-8", errors="ignore")
+        except Exception as e:
+            return f"[Error reading text file: {str(e)}]"
+            
+    # 2. PDF Files
+    elif file_name.endswith(".pdf"):
+        try:
+            import pypdf
+            reader = pypdf.PdfReader(uploaded_file)
+            text = ""
+            for page in reader.pages:
+                extracted = page.extract_text()
+                if extracted:
+                    text += extracted + "\n"
+            return text
+        except ImportError:
+            return "[Error: `pypdf` library is not installed. Install it via `pip install pypdf` to analyze PDFs!]"
+        except Exception as e:
+            return f"[Error reading PDF: {str(e)}]"
+            
+    return ""
+
 def generate_speech_audio(text: str) -> bytes:
     """Converts response text into speech audio bytes using gTTS."""
     clean_text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
