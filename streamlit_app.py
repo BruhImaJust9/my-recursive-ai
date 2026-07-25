@@ -187,6 +187,12 @@ def generate_speech_audio(text: str) -> bytes:
     fp.seek(0)
     return fp.read()
 
+def generate_stream_response(stream):
+    """Extracts plain text chunks from Groq's streaming response."""
+    for chunk in stream:
+        if chunk.choices and chunk.choices[0].delta.content:
+            yield chunk.choices[0].delta.content
+
 # ==========================================
 # 3. SIDEBAR & CONTROLS
 # ==========================================
