@@ -32,6 +32,22 @@ if "messages" not in st.session_state:
         {"role": "assistant", "content": "Hey there! I'm powered by Groq. Ask me anything, upload an image to analyze, try `/search <topic>`, `/generate <prompt>`, or speak using the ➕ menu!"}
     ]
 
+# Initialize Multi-Chat Sessions
+if "chats" not in st.session_state:
+    st.session_state.chats = {"Chat 1": []}
+
+if "current_chat" not in st.session_state:
+    st.session_state.current_chat = "Chat 1"
+
+# Reference the active chat's messages easily
+messages = st.session_state.chats[st.session_state.current_chat]
+
+if not messages:
+    messages.append({
+        "role": "assistant", 
+        "content": "Hey there! I'm powered by Groq. Ask me anything, upload an image to analyze, try `/search <topic>`, `/generate <prompt>`, or speak using the ➕ menu!"
+    })
+
 # ==========================================
 # 2. HELPER FUNCTIONS
 # ==========================================
