@@ -441,44 +441,57 @@ if final_input and client:
             "audio": audio_data
         })
 
-    # ⚡ ROUTE 4: Standard Chat
-        # ... (formatted_history setup stays the same) ...
+# ⚡ ROUTE 4: Standard Chat
+    else:
+        system_prompts = {
+            "Helpful Assistant": "You are a friendly and helpful AI assistant.",
+            "Code Expert": "You are a master programmer. Give clean, well-commented code snippets.",
+            "Sarcastic Buddy": "You are a witty, slightly sarcastic friend who likes to joke around.",
+            "Strict Tutor": "You are a precise, educational tutor. Explain concepts clearly and encourage critical thinking."
+        }
 
-        stream = client.chat.completions.create(
-            model=selected_model,
-            messages=formatted_history,
-            stream=True  # 👈 Enable stream here where formatted_history lives!
-        )
+        formatted_history = [
+            {"role": "system", "content": system_prompts[personality]}
+        ]
 
-        with st.chat_message("assistant"):
-            clean_response = st.write_stream(stream)
-
-        clean_response = strip_thinking_process(clean_response)
-        audio_data = generate_speech_audio(clean_response)
-        
-        active_chat_list.append({
-            "role": "assistant", 
-            "content": clean_response,
-            "audio": audio_data
-        })
+        if doc_context:
+            formatted_history.append({
+                "role": "system",
+                "content": f"The user uploaded a document named '{uploaded_doc.name}'. Here is its content:\n\n{doc_context[:10000]}"
+            })
 
         for m in active_chat_list:
             if "content" in m and isinstance(m["content"], str):
                 if not isinstance(m["content"], list):
                     formatted_history.append({"role": m["role"], "content": m["content"]})
 
-        completion = client.chat.completions.create(
+        stream = client.chat.completions.create(
             model=selected_model,
-            messages=formatted_history
+            messages=formatted_history,
+            stream=True
         )
-        response_text = completion.choices[0].message.content
-        clean_response = strip_thinking_process(response_text)
+
+        with st.chat_message("assistant"):
+            clean_response = st.write_stream(generate_stream_response(stream))
+
+        clean_response = strip_thinking_process(clean_response)
         audio_data = generate_speech_audio(clean_response)
         
+        # 1. Save response to active chat
         active_chat_list.append({
             "role": "assistant", 
             "content": clean_response,
             "audio": audio_data
         })
+
+        # 💡 2. PLACE IT HERE! Render Smart Action Cards right before rerun
+        suggestions = generate_action_cards(clean_response)
+        st.markdown("##### 🚀 Quick Actions & Next Steps:")
+        cols = st.columns(len(suggestions))
+        
+        for idx, option in enumerate(suggestions):
+            if cols[idx].button(option, key=f"suggest_{idx}_{len(active_chat_list)}"):
+                active_chat_list.append({"role": "user", "content": option})
+                st.rerun()
 
     st.rerun()
