@@ -396,17 +396,32 @@ if audio_bytes and client:
     with st.spinner("🎙️ Transcribing voice..."):
         recorded_text = transcribe_audio_groq(audio_bytes, client)
 
-final_input = user_input if user_input else recorded_text
+recorded_text = ""
+if audio_bytes and client:
+    with st.spinner("🎙️ Transcribing voice..."):
+        recorded_text = transcribe_audio_groq(audio_bytes, client)
+
+active_chat_list = st.session_state.chats[st.session_state.current_chat]
+
+# 1. Determine prompt from text input, audio, OR recent button click
+final_input = None
+if user_input:
+    final_input = user_input
+elif recorded_text:
+    final_input = recorded_text
+elif active_chat_list and active_chat_list[-1]["role"] == "user":
+    # Triggered by "Surprise Me!" or Quick Action buttons!
+    final_input = active_chat_list[-1]["content"]
+
 active_image = popover_image if popover_image else image_to_analyze
 
+# 2. Only append user message if typed/spoken (buttons already appended it)
 if final_input and client:
-    active_chat_list = st.session_state.chats[st.session_state.current_chat]
-    
-    user_data = {"role": "user", "content": final_input}
-    if active_image:
-        user_data["uploaded_img"] = active_image
-        
-    active_chat_list.append(user_data)
+    if user_input or recorded_text:
+        user_data = {"role": "user", "content": final_input}
+        if active_image:
+            user_data["uploaded_img"] = active_image
+        active_chat_list.append(user_data)
     
    # 🎨 ROUTE 1: Image Generation
     if final_input.lower().startswith("/generate") or "generate an image" in final_input.lower():
