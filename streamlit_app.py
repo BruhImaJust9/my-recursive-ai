@@ -408,15 +408,22 @@ if final_input and client:
         
     active_chat_list.append(user_data)
     
-    # 🎨 ROUTE 1: Image Generation
+   # 🎨 ROUTE 1: Image Generation
     if final_input.lower().startswith("/generate") or "generate an image" in final_input.lower():
         prompt = final_input.replace("/generate", "").strip()
-        img_url = get_image_url(prompt)
-        active_chat_list.append({
-            "role": "assistant", 
-            "content": f"Here is your generated image for: **'{prompt}'**",
-            "image_url": img_url
-        })
+        img_bytes = get_image_url(prompt)
+        
+        if img_bytes:
+            active_chat_list.append({
+                "role": "assistant", 
+                "content": f"Here is your generated image for: **'{prompt}'**",
+                "image_url": img_bytes
+            })
+        else:
+            active_chat_list.append({
+                "role": "assistant",
+                "content": "⚠️ Sorry, image generation timed out or failed. Please try again!"
+            })
 
     # 🔍 ROUTE 2: Web Search
     elif final_input.lower().startswith("/search"):
