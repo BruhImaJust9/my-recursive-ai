@@ -124,18 +124,20 @@ def generate_action_cards(response_text: str):
 
 import urllib.request
 
-def get_image_url(prompt: str) -> bytes:
-    """Fetches image bytes directly from Pollinations AI to prevent Streamlit MediaFileStorageError."""
+def get_image_url(prompt: str):
+    """Fetches image bytes directly from Pollinations AI with proper browser headers."""
     try:
         encoded_prompt = urllib.parse.quote(prompt.strip())
         url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=800&nologo=true"
         
-        # Download image bytes directly
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=10) as response:
+        # Pass a realistic User-Agent so the request isn't blocked
+        req = urllib.request.Request(
+            url, 
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        )
+        with urllib.request.urlopen(req, timeout=15) as response:
             return response.read()
     except Exception as e:
-        st.error(f"Failed to generate image: {str(e)}")
         return None
 
 def encode_image_to_base64(image: Image.Image) -> str:
