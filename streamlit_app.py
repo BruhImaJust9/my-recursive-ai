@@ -99,6 +99,28 @@ def clean_search_query(user_query: str) -> str:
         
     return query
 
+def generate_action_cards(response_text: str):
+    """Detects content type and creates interactive suggestion chips."""
+    suggestions = []
+    
+    # Detect Code
+    if "```" in response_text:
+        suggestions.append("🔍 Explain this code step-by-step")
+        suggestions.append("⚡ Optimize this code for speed")
+    
+    # Detect Math or Science
+    elif any(term in response_text.lower() for term in ["equation", "formula", "calculate", "math"]):
+        suggestions.append("🧮 Show alternative solution method")
+        suggestions.append("📝 Give me a practice problem on this")
+        
+    # Standard Chat / General Topics
+    else:
+        suggestions.append("💡 Give me 3 real-world examples")
+        suggestions.append("📌 Summarize this in 2 bullet points")
+        suggestions.append("❓ What are the main criticisms of this?")
+        
+    return suggestions
+
 def get_image_url(prompt: str) -> str:
     encoded_prompt = urllib.parse.quote(prompt.strip())
     return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=800&nologo=true"
