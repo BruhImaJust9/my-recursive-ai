@@ -6,6 +6,7 @@ import base64
 import io
 import re
 import tempfile
+import random
 from groq import Groq
 from tavily import TavilyClient
 from gtts import gTTS
@@ -123,7 +124,7 @@ def generate_action_cards(response_text: str):
 
 def get_image_url(prompt: str) -> str:
     encoded_prompt = urllib.parse.quote(prompt.strip())
-    return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=800&nologo=true"
+    return f"[https://image.pollinations.ai/prompt/](https://image.pollinations.ai/prompt/){encoded_prompt}?width=800&height=800&nologo=true"
 
 def encode_image_to_base64(image: Image.Image) -> str:
     buffered = io.BytesIO()
@@ -284,7 +285,22 @@ with st.sidebar:
         st.image(image_to_analyze, caption="Sidebar Attached Image", use_container_width=True)
         st.success("Image attached! Ask a question in chat about it.")
 
-    # Export Chat
+    # Quality of Life Shortcuts
+    st.markdown("---")
+    st.header("⚡ Shortcuts")
+    
+    sample_prompts = [
+        "/search What are the top trending space discoveries this week?",
+        "Explain quantum computing using an analogy about pizza.",
+        "/generate A futuristic neon city covered in bioluminescent plants",
+        "Give me a 5-minute productivity hack for studying."
+    ]
+    if st.button("🎲 Surprise Me!", use_container_width=True):
+        random_prompt = random.choice(sample_prompts)
+        st.session_state.chats[st.session_state.current_chat].append({"role": "user", "content": random_prompt})
+        st.rerun()
+
+    # Export & Management Controls
     st.markdown("---")
     if current_messages:
         chat_text = convert_chat_to_text(current_messages)
@@ -299,6 +315,14 @@ with st.sidebar:
     if st.button("🗑️ Clear Chat", use_container_width=True):
         st.session_state.chats[st.session_state.current_chat] = []
         st.rerun()
+
+    # Analytics Dashboard Badge
+    with st.expander("📊 Session Analytics"):
+        active_list = st.session_state.chats[st.session_state.current_chat]
+        msg_count = len(active_list)
+        char_count = sum(len(m.get("content", "")) for m in active_list if isinstance(m.get("content"), str))
+        st.write(f"**Total Messages:** {msg_count}")
+        st.write(f"**Total Characters:** {char_count:,}")
 
 # ==========================================
 # 4. CHAT HISTORY DISPLAY
@@ -352,7 +376,7 @@ with col_popover:
         st.caption("🔍 **Live Search:** `/search <topic>`")
         st.caption("🎨 **Generate Image:** `/generate <prompt>`")
 
-# 2. Main Chat Input (Outside columns, pinned to the bottom of the screen!)
+# 2. Main Chat Input (Outside columns, pinned to bottom!)
 user_input = st.chat_input("Type a question, ask about an image, /search, or /generate...")
 
 recorded_text = ""
@@ -441,7 +465,7 @@ if final_input and client:
             "audio": audio_data
         })
 
-# ⚡ ROUTE 4: Standard Chat
+    # ⚡ ROUTE 4: Standard Chat
     else:
         system_prompts = {
             "Helpful Assistant": "You are a friendly and helpful AI assistant.",
@@ -484,7 +508,7 @@ if final_input and client:
             "audio": audio_data
         })
 
-        # 💡 2. PLACE IT HERE! Render Smart Action Cards right before rerun
+        # 💡 2. Render Smart Action Cards right before rerun
         suggestions = generate_action_cards(clean_response)
         st.markdown("##### 🚀 Quick Actions & Next Steps:")
         cols = st.columns(len(suggestions))
