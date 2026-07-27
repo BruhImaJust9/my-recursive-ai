@@ -75,6 +75,50 @@ def execute_free_search(query: str) -> str:
     except Exception as e:
         return f"Search error: {str(e)}"
 
+def run_deep_research_agent(topic: str, client, selected_model) -> str:
+    """Autonomous agent that plans sub-queries, executes multiple searches, and compiles a research brief."""
+    if not TAVILY_KEY:
+        return "⚠️ Missing `TAVILY_API_KEY` for Deep Research!"
+
+    tavily = TavilyClient(api_key=TAVILY_KEY)
+    
+    # 1. Ask the AI to generate 3 targeted sub-queries
+    plan_prompt = f"Break down this research topic into 3 distinct, specific search queries to get comprehensive coverage: '{topic}'. Output ONLY 3 queries, one per line."
+    try:
+        plan_res = client.chat.completions.create(
+            model=selected_model,
+            messages=[{"role": "user", "content": plan_prompt}]
+        )
+        sub_queries = [q.strip(" 123456789.-*") for q in plan_res.choices[0].message.content.strip().split("\n") if q.strip()][:3]
+    except Exception:
+        sub_queries = [topic]
+
+    # 2. Gather search results across all queries
+    compiled_findings = []
+    for q in sub_queries:
+        try:
+            res = tavily.search(query=q, max_results=3)
+            for r in res.get("results", []):
+                compiled_findings.append(f"Source [{r.get('title', 'Link')}]: {r.get('content', '')}")
+        except Exception:
+            continue
+
+    if not compiled_findings:
+        return "No deep research findings could be retrieved."
+
+    # 3. Synthesize findings into an Executive Brief
+    synthesis_prompt = (
+        f"You are a Lead Intelligence Analyst. Based on the following raw search data, produce an Executive Research Brief on: '{topic}'.\n\n"
+        f"Include:\n- 📌 Executive Summary\n- 🔍 Key Findings & Trends\n- 💡 Tactical Implications\n\n"
+        f"Raw Data:\n" + "\n\n".join(compiled_findings[:8])
+    )
+
+    summary_res = client.chat.completions.create(
+        model=selected_model,
+        messages=[{"role": "user", "content": synthesis_prompt}]
+    )
+    return summary_res.choices[0].message.content
+
 def render_data_canvas(response_text: str):
     """Detects Markdown tables or CSV structures and renders interactive charts."""
     lines = [line.strip() for line in response_text.split("\n") if "|" in line]
