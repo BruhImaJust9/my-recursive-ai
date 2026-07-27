@@ -49,6 +49,10 @@ if not current_messages:
         "content": "Hey there! I'm powered by Groq. Ask me anything, upload an image to analyze, try `/search <topic>`, `/generate <prompt>`, or speak using the ➕ menu!"
     })
 
+# Initialize Bookmarks Storage
+if "bookmarks" not in st.session_state:
+    st.session_state.bookmarks = []
+
 # ==========================================
 # 2. HELPER FUNCTIONS
 # ==========================================
