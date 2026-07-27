@@ -669,30 +669,21 @@ if final_input and client:
         audio_data = safe_execute(lambda: generate_speech_audio(clean_response), default_return=None)
         active_chat_list.append({"role": "assistant", "content": clean_response, "audio": audio_data})
 
-    # 👀 ROUTE 3: Vision Analysis
-    elif active_image is not None:
-        base64_img = encode_image_to_base64(active_image)
-        completion = client.chat.completions.create(
-            model="llama-3.2-11b-vision-preview",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": final_input},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_img}"}}
-                    ]
-                }
-            ]
-        )
-        response_text = completion.choices[0].message.content
-        clean_response = strip_thinking_process(response_text)
-        audio_data = generate_speech_audio(clean_response)
+    # 🕵️ ROUTE 3: Safe Deep Research Agent
+    elif detected_intent == "RESEARCH":
+        topic = re.sub(r'^/research', '', final_input, flags=re.IGNORECASE).strip()
         
-        active_chat_list.append({
-            "role": "assistant", 
-            "content": clean_response,
-            "audio": audio_data
-        })
+        with st.spinner(f"🕵️ Autonomous Agent analyzing '{topic}'..."):
+            # Wrapped research agent call inside safe_execute
+            brief = safe_execute(
+                lambda: run_deep_research_agent(topic, client, selected_model),
+                default_return="Research agent could not complete the multi-source analysis.",
+                error_msg="Deep Research Agent ran into an API timeout."
+            )
+        
+        # Audio rendering safe wrap
+        audio_data = safe_execute(lambda: generate_speech_audio(brief), default_return=None)
+        active_chat_list.append({"role": "assistant", "content": brief, "audio": audio_data})
 
     # 🕵️ ROUTE 5: Deep Research Agent
     elif final_input.lower().startswith("/research"):
