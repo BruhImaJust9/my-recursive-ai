@@ -7,6 +7,8 @@ import io
 import re
 import tempfile
 import random
+import json
+import urllib.request
 import pandas as pd
 from groq import Groq
 from tavily import TavilyClient
@@ -43,15 +45,15 @@ current_messages = st.session_state.chats[st.session_state.current_chat]
 if "memory_vault" not in st.session_state:
     st.session_state.memory_vault = []
 
+# Initialize Bookmarks Storage
+if "bookmarks" not in st.session_state:
+    st.session_state.bookmarks = []
+
 if not current_messages:
     current_messages.append({
         "role": "assistant", 
         "content": "Hey there! I'm powered by Groq. Ask me anything, upload an image to analyze, try `/search <topic>`, `/generate <prompt>`, or speak using the ➕ menu!"
     })
-
-# Initialize Bookmarks Storage
-if "bookmarks" not in st.session_state:
-    st.session_state.bookmarks = []
 
 # ==========================================
 # 2. HELPER FUNCTIONS
@@ -90,7 +92,6 @@ def run_deep_research_agent(topic: str, client, selected_model) -> str:
 
     tavily = TavilyClient(api_key=TAVILY_KEY)
     
-    # 1. Ask the AI to generate 3 targeted sub-queries
     plan_prompt = f"Break down this research topic into 3 distinct, specific search queries to get comprehensive coverage: '{topic}'. Output ONLY 3 queries, one per line."
     try:
         plan_res = client.chat.completions.create(
@@ -101,7 +102,6 @@ def run_deep_research_agent(topic: str, client, selected_model) -> str:
     except Exception:
         sub_queries = [topic]
 
-    # 2. Gather search results across all queries
     compiled_findings = []
     for q in sub_queries:
         try:
@@ -114,14 +114,11 @@ def run_deep_research_agent(topic: str, client, selected_model) -> str:
     if not compiled_findings:
         return "No deep research findings could be retrieved."
 
-    # 3. Synthesize findings into an Executive Brief
     synthesis_prompt = (
         f"You are a Lead Intelligence Analyst. Based on the following information, produce a research brief on: '{topic}'.\n\n"
         f"DYNAMIC TONE & FORMAT RULE:\n"
-        f"- If the topic is professional/academic (e.g., business, technology, finance), use headers like: 📌 Executive Summary, 🔍 Key Findings, and 💡 Tactical Implications.\n"
-        f"- If the topic is casual, sports-related, or pop culture (e.g., sports debates, movies, entertainment), drop corporate jargon! Use headers like: 🏆 Top Contenders, 📊 Key Trends, and 💡 The Verdict.\n\n"
-        f"NATURAL SYNTHESIS PROTOCOL:\n"
-        f"State facts authoritatively. Never mention 'search results', 'raw data', or 'snippets'.\n\n"
+        f"- If the topic is professional/academic, use headers like: 📌 Executive Summary, 🔍 Key Findings, and 💡 Tactical Implications.\n"
+        f"- If the topic is casual, sports-related, or pop culture, use headers like: 🏆 Top Contenders, 📊 Key Trends, and 💡 The Verdict.\n\n"
         f"Information:\n" + "\n\n".join(compiled_findings[:8])
     )
 
@@ -135,19 +132,13 @@ def render_data_canvas(response_text: str):
     """Detects Markdown tables or CSV structures and renders interactive charts."""
     lines = [line.strip() for line in response_text.split("\n") if "|" in line]
     
-    # Must have at least 3 markdown table lines (header, separator, data)
     if len(lines) >= 3:
         try:
-            # Clean markdown table borders
-            cleaned_lines = [re.sub(r'^\||\|$', '', line) for line in lines if not re.match(r'^[|\s:-]+$', line)]
-            
-            # Parse into a list of rows
+            cleaned_lines = [re.sub(r'^\||\|$', '', line) for line in lines if not re.match(r'^[\vert{}\s:-]+$', line)]
             data = [[cell.strip() for cell in line.split("|")] for line in cleaned_lines]
             
             if len(data) > 1:
                 df = pd.DataFrame(data[1:], columns=data[0])
-                
-                # Attempt to convert numerical columns
                 for col in df.columns:
                     df[col] = pd.to_numeric(df[col].str.replace(',', ''), errors='ignore')
                 
@@ -156,15 +147,13 @@ def render_data_canvas(response_text: str):
                 if num_cols:
                     st.markdown("#### 📊 Dynamic Visual Canvas")
                     st.dataframe(df, use_container_width=True)
-                    
-                    # Render chart based on numerical data
                     chart_type = st.radio("Chart Type:", ["Bar", "Line"], horizontal=True, key=f"chart_type_{hash(response_text)}")
                     if chart_type == "Bar":
                         st.bar_chart(df.set_index(df.columns[0])[num_cols])
                     else:
                         st.line_chart(df.set_index(df.columns[0])[num_cols])
         except Exception:
-            pass  # Fall back gracefully if parsing fails
+            pass
 
 def audit_response(original_prompt: str, ai_response: str, client, model_name: str) -> str:
     """Uses a secondary model pass to evaluate the accuracy and logic of a response."""
@@ -190,7 +179,7 @@ def generate_chat_title(first_prompt: str, client) -> str:
     """Generates a concise 3-4 word title for a new chat session."""
     try:
         completion = client.chat.completions.create(
-            model="llama-3.1-8b-instant",  # Fast model for zero delay
+            model="llama-3.1-8b-instant",
             messages=[
                 {"role": "system", "content": "Create a 2-4 word title for this user prompt. Do not use quotes or punctuation. Return ONLY the title text."},
                 {"role": "user", "content": first_prompt}
@@ -227,7 +216,7 @@ def classify_user_intent(user_prompt: str, client, selected_model: str) -> str:
     
     try:
         completion = client.chat.completions.create(
-            model="llama-3.1-8b-instant",  # Ultra-fast model for low-latency classification
+            model="llama-3.1-8b-instant",
             messages=[
                 {"role": "system", "content": classification_system_prompt},
                 {"role": "user", "content": user_prompt}
@@ -240,12 +229,10 @@ def classify_user_intent(user_prompt: str, client, selected_model: str) -> str:
     except Exception:
         return "CHAT"
 
-import json
-
 def generate_markdown_export(chat_list, memory_vault) -> str:
     """Formats active chat messages and memory vault into a clean Markdown document."""
     md = "# 🚀 AI Workspace Export\n"
-    md += f"**Export Date:** {st.session_state.get('current_time', 'Active Session')}\n\n"
+    md += f"**Export Date:** Active Session\n\n"
     
     if memory_vault:
         md += "## 🧠 Memory Vault Facts\n"
@@ -290,36 +277,23 @@ def clean_search_query(user_query: str) -> str:
     return query
 
 def generate_action_cards(response_text: str):
-    """Detects content type and creates interactive suggestion chips."""
     suggestions = []
-    
-    # Detect Code
     if "```" in response_text:
         suggestions.append("🔍 Explain this code step-by-step")
         suggestions.append("⚡ Optimize this code for speed")
-    
-    # Detect Math or Science
     elif any(term in response_text.lower() for term in ["equation", "formula", "calculate", "math"]):
         suggestions.append("🧮 Show alternative solution method")
         suggestions.append("📝 Give me a practice problem on this")
-        
-    # Standard Chat / General Topics
     else:
         suggestions.append("💡 Give me 3 real-world examples")
         suggestions.append("📌 Summarize this in 2 bullet points")
         suggestions.append("❓ What are the main criticisms of this?")
-        
     return suggestions
 
-import urllib.request
-
 def get_image_url(prompt: str):
-    """Fetches image bytes directly from Pollinations AI with proper browser headers."""
     try:
         encoded_prompt = urllib.parse.quote(prompt.strip())
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=800&nologo=true"
-        
-        # Pass a realistic User-Agent so the request isn't blocked
+        url = f"[https://image.pollinations.ai/prompt/](https://image.pollinations.ai/prompt/){encoded_prompt}?width=800&height=800&nologo=true"
         req = urllib.request.Request(
             url, 
             headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
@@ -331,10 +305,8 @@ def get_image_url(prompt: str):
 
 def encode_image_to_base64(image: Image.Image) -> str:
     buffered = io.BytesIO()
-    
     if image.mode in ("RGBA", "P", "LA"):
         image = image.convert("RGB")
-        
     image.thumbnail((1024, 1024))
     image.save(buffered, format="JPEG", quality=85)
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
@@ -346,12 +318,6 @@ def convert_chat_to_text(messages) -> str:
         content = msg.get("content", "")
         chat_log.append(f"{role}:\n{content}\n" + "-" * 40)
     return "\n\n".join(chat_log)
-
-def strip_thinking_process(text: str) -> str:
-    if not text:
-        return ""
-    cleaned_text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-    return cleaned_text.strip()
 
 def transcribe_audio_groq(audio_bytes: bytes, client) -> str:
     try:
@@ -374,15 +340,12 @@ def transcribe_audio_groq(audio_bytes: bytes, client) -> str:
 def extract_file_content(uploaded_file) -> str:
     if uploaded_file is None:
         return ""
-    
     file_name = uploaded_file.name.lower()
-    
     if file_name.endswith((".txt", ".py", ".csv", ".md", ".json", ".html", ".css")):
         try:
             return uploaded_file.read().decode("utf-8", errors="ignore")
         except Exception as e:
             return f"[Error reading text file: {str(e)}]"
-            
     elif file_name.endswith(".pdf"):
         try:
             import pypdf
@@ -397,13 +360,11 @@ def extract_file_content(uploaded_file) -> str:
             return "[Error: `pypdf` library is not installed. Install it via `pip install pypdf` to analyze PDFs!]"
         except Exception as e:
             return f"[Error reading PDF: {str(e)}]"
-            
     return ""
 
 def generate_speech_audio(text: str) -> bytes:
     clean_text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
     clean_text = re.sub(r'[*_#~`]', '', clean_text).strip()
-    
     if not clean_text:
         clean_text = "Here is your response."
 
@@ -412,12 +373,6 @@ def generate_speech_audio(text: str) -> bytes:
     tts.write_to_fp(fp)
     fp.seek(0)
     return fp.read()
-
-def generate_stream_response(stream):
-    """Extracts plain text chunks from Groq's streaming response."""
-    for chunk in stream:
-        if chunk.choices and chunk.choices[0].delta.content:
-            yield chunk.choices[0].delta.content
 
 # ==========================================
 # 3. SIDEBAR & CONTROLS
@@ -437,7 +392,7 @@ with st.sidebar:
         st.session_state.current_chat = selected_chat
         st.rerun()
 
- # 📦 Feature #15: Workspace Export Engine
+    # 📦 Feature #15: Workspace Export Engine
     st.markdown("---")
     with st.expander("📦 Session Export & Backup"):
         st.caption("Download your active chat history and memory vault facts.")
@@ -445,7 +400,6 @@ with st.sidebar:
         active_chats = st.session_state.chats.get(st.session_state.current_chat, [])
         
         if active_chats:
-            # Generate Markdown file data
             md_data = generate_markdown_export(active_chats, st.session_state.memory_vault)
             st.download_button(
                 label="📄 Export as Markdown (.md)",
@@ -455,7 +409,32 @@ with st.sidebar:
                 use_container_width=True
             )
 
-            # 🔖 Feature #17: Saved Bookmarks & Snippets
+            sanitized_chats = []
+            for msg in active_chats:
+                clean_msg = {
+                    "role": msg.get("role", "user"),
+                    "content": msg.get("content", "")
+                }
+                if "image_url" in msg and isinstance(msg["image_url"], str):
+                    clean_msg["image_url"] = msg["image_url"]
+                sanitized_chats.append(clean_msg)
+
+            json_data = json.dumps({
+                "memory_vault": st.session_state.memory_vault,
+                "chat_history": sanitized_chats
+            }, indent=2)
+            
+            st.download_button(
+                label="💾 Export Raw Backup (.json)",
+                data=json_data,
+                file_name="workspace_backup.json",
+                mime="application/json",
+                use_container_width=True
+            )
+        else:
+            st.info("Start a chat session to enable export options.")
+
+    # 🔖 Feature #17: Saved Bookmarks & Snippets
     st.markdown("---")
     with st.expander("🔖 Saved Snippets & Bookmarks"):
         st.caption("Quickly view or copy your pinned responses!")
@@ -474,36 +453,8 @@ with st.sidebar:
                     st.rerun()
                 st.markdown("---")
         else:
-            st.info("No saved snippets yet. Click '🔖 Bookmark Response' on any AI message!")
-            
-            # 🧹 Sanitize chat history for JSON export (stripping non-serializable binary data)
-            sanitized_chats = []
-            for msg in active_chats:
-                clean_msg = {
-                    "role": msg.get("role", "user"),
-                    "content": msg.get("content", "")
-                }
-                # Keep text/URL fields, skip raw audio/image BytesIO objects
-                if "image_url" in msg and isinstance(msg["image_url"], str):
-                    clean_msg["image_url"] = msg["image_url"]
-                sanitized_chats.append(clean_msg)
+            st.info("No saved snippets yet. Click '🔖 Save Snippet' on any AI message!")
 
-            # Generate JSON backup data safely
-            json_data = json.dumps({
-                "memory_vault": st.session_state.memory_vault,
-                "chat_history": sanitized_chats
-            }, indent=2)
-            
-            st.download_button(
-                label="💾 Export Raw Backup (.json)",
-                data=json_data,
-                file_name="workspace_backup.json",
-                mime="application/json",
-                use_container_width=True
-            )
-        else:
-            st.info("Start a chat session to enable export options.")
-            
     # 🧠 Feature #12: Global Memory Vault
     st.markdown("---")
     with st.expander("🧠 Persistent Memory Vault"):
@@ -531,7 +482,7 @@ with st.sidebar:
         st.session_state.current_chat = new_chat_name
         st.rerun()
 
-    auto_play_voice = st.sidebar.toggle("🔊 Auto-Play Voice Answers", value=False)
+    auto_play_voice = st.toggle("🔊 Auto-Play Voice Answers", value=False)
 
     st.markdown("---")
     st.header("🎭 AI Personality")
@@ -540,7 +491,6 @@ with st.sidebar:
         ["Helpful Assistant", "Code Expert", "Sarcastic Buddy", "Strict Tutor"]
     )
 
-    # 🧠 Model Selection
     st.markdown("---")
     st.header("🧠 Choose AI Model")
     selected_model = st.selectbox(
@@ -552,7 +502,6 @@ with st.sidebar:
         ]
     )
 
-    # Document File Uploader
     st.markdown("---")
     st.header("📄 Document Analysis")
     uploaded_doc = st.file_uploader(
@@ -578,7 +527,6 @@ with st.sidebar:
         st.image(image_to_analyze, caption="Sidebar Attached Image", use_container_width=True)
         st.success("Image attached! Ask a question in chat about it.")
 
-    # Quality of Life Shortcuts
     st.markdown("---")
     st.header("⚡ Shortcuts")
     
@@ -593,7 +541,6 @@ with st.sidebar:
         st.session_state.chats[st.session_state.current_chat].append({"role": "user", "content": random_prompt})
         st.rerun()
 
-    # Export & Management Controls
     st.markdown("---")
     if current_messages:
         chat_text = convert_chat_to_text(current_messages)
@@ -609,7 +556,6 @@ with st.sidebar:
         st.session_state.chats[st.session_state.current_chat] = []
         st.rerun()
 
-    # Analytics Dashboard Badge
     with st.expander("📊 Session Analytics"):
         active_list = st.session_state.chats[st.session_state.current_chat]
         msg_count = len(active_list)
@@ -624,12 +570,9 @@ for idx, msg in enumerate(st.session_state.chats[st.session_state.current_chat])
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
         
-        # 📊 Feature #9: Dynamic Data Visual Canvas
         if msg["role"] == "assistant" and "content" in msg and msg["content"]:
             render_data_canvas(msg["content"])
 
-        # 🔖 Feature #17: Pin / Bookmark Response Button
-        if msg["role"] == "assistant" and "content" in msg and msg["content"]:
             col_bm, _ = st.columns([1, 4])
             with col_bm:
                 if st.button("🔖 Save Snippet", key=f"bookmark_btn_{idx}"):
@@ -644,12 +587,10 @@ for idx, msg in enumerate(st.session_state.chats[st.session_state.current_chat])
         elif "uploaded_img" in msg:
             st.image(msg["uploaded_img"], use_container_width=True)
         
-    if "audio" in msg and msg["audio"]:
-        # Auto-plays the latest assistant response if Hands-Free Mode is ON!
-        is_latest_msg = (idx == len(st.session_state.chats[st.session_state.current_chat]) - 1)
-        st.audio(msg["audio"], format="audio/mp3", autoplay=(auto_play_voice and is_latest_msg))
+        if "audio" in msg and msg["audio"]:
+            is_latest_msg = (idx == len(st.session_state.chats[st.session_state.current_chat]) - 1)
+            st.audio(msg["audio"], format="audio/mp3", autoplay=(auto_play_voice and is_latest_msg))
 
-        # 🛡️ Feature #8: Fact-Check / Audit Button for Assistant Responses
         if msg["role"] == "assistant" and "content" in msg and msg["content"]:
             with st.expander("🛡️ Verify & Audit Response"):
                 if st.button("Run Self-Critique", key=f"audit_btn_{idx}"):
@@ -665,7 +606,6 @@ for idx, msg in enumerate(st.session_state.chats[st.session_state.current_chat])
 # 5. INPUT LOGIC & ROUTING
 # ==========================================
 
-# 1. Popover container for attachments & voice
 col_popover, _ = st.columns([1, 12])
 
 popover_image = None
@@ -699,13 +639,7 @@ with col_popover:
         st.caption("🔍 **Live Search:** `/search <topic>`")
         st.caption("🎨 **Generate Image:** `/generate <prompt>`")
 
-# 2. Main Chat Input (Outside columns, pinned to bottom!)
 user_input = st.chat_input("Type a question, ask about an image, /search, or /generate...")
-
-recorded_text = ""
-if audio_bytes and client:
-    with st.spinner("🎙️ Transcribing voice..."):
-        recorded_text = transcribe_audio_groq(audio_bytes, client)
 
 recorded_text = ""
 if audio_bytes and client:
@@ -714,29 +648,33 @@ if audio_bytes and client:
 
 active_chat_list = st.session_state.chats[st.session_state.current_chat]
 
-# 1. Determine prompt from text input, audio, OR recent button click
 final_input = None
 if user_input:
     final_input = user_input
 elif recorded_text:
     final_input = recorded_text
 elif active_chat_list and active_chat_list[-1]["role"] == "user":
-    # Triggered by "Surprise Me!" or Quick Action buttons!
     final_input = active_chat_list[-1]["content"]
 
 active_image = popover_image if popover_image else image_to_analyze
 
-# 2. Only append user message if typed/spoken (buttons already appended it)
 if final_input and client:
-    active_chat_list = st.session_state.chats[st.session_state.current_chat]
-    
     if user_input or recorded_text:
         user_data = {"role": "user", "content": final_input}
         if active_image:
             user_data["uploaded_img"] = active_image
         active_chat_list.append(user_data)
 
-    # 🔀 Feature #13: Detect intent automatically if no explicit slash command is used
+    if len(active_chat_list) == 1 and st.session_state.current_chat.startswith("Chat "):
+        new_title = safe_execute(
+            lambda: generate_chat_title(final_input, client),
+            default_return="New Session"
+        )
+        if new_title and new_title != "New Session":
+            st.session_state.chats[new_title] = st.session_state.chats.pop(st.session_state.current_chat)
+            st.session_state.current_chat = new_title
+            st.rerun()
+
     detected_intent = "CHAT"
     if final_input.lower().startswith("/generate"):
         detected_intent = "GENERATE"
@@ -745,10 +683,8 @@ if final_input and client:
     elif final_input.lower().startswith("/research"):
         detected_intent = "RESEARCH"
     elif not active_image:
-        # Run auto-classifier for plain text/voice inputs!
         detected_intent = classify_user_intent(final_input, client, selected_model)
-    
-   # 🎨 ROUTE 1: Safe Image Generation
+
     if detected_intent == "GENERATE":
         prompt = re.sub(r'^/generate', '', final_input, flags=re.IGNORECASE).strip()
         with st.spinner("🎨 Creating your image safely..."):
@@ -765,7 +701,6 @@ if final_input and client:
                 "image_url": img_bytes
             })
 
-  # 🔍 ROUTE 2: Enhanced Web Search
     elif detected_intent == "SEARCH":
         cleaned_query = clean_search_query(final_input)
         optimized_query = optimize_search_query(cleaned_query)
@@ -776,146 +711,48 @@ if final_input and client:
             error_msg="Web Search encountered a connection issue."
         )
         
-        # 🎨 Enhanced System Prompt for Beautiful Formatting
         search_system_prompt = (
             "You are a world-class news editor and research assistant.\n"
             "Analyze the search results and format your response with high visual appeal:\n"
             "1. Use clear, bold Headings (###) to separate distinct sections.\n"
-            "2. Use bullet points and relevant emojis (e.g., 🏆, 🏎️, ⚽, 📊, 🏁) to make data scan-friendly.\n"
-            "3. If scores or match results are present, create a clean mini-table or formatted summary block at the top.\n"
-            "4. If there are conflicting search results, explicitly note the discrepancy.\n"
-            "5. End with 1-2 thoughtful, optional follow-up research questions or next steps.\n\n"
-            "INTENT DISAMBIGUATION RULE:\n"
-            "If the prompt uses ambiguous terms (e.g., 'football' meaning Soccer vs. NFL), analyze search snippets to determine the dominant context. "
-            "If both contexts appear, split your response into clear sections (e.g., '### Soccer' and '### American Football (NFL)').\n\n"
-            "NATURAL SYNTHESIS PROTOCOL (NO FOURTH-WALL BREAKS):\n"
-            "Never mention 'search results', 'Tavily', 'raw data', 'snippets', or 'the web search'. "
-            "State facts directly and authoritatively as if you naturally know the information."
+            "2. Use bullet points and relevant emojis to make data scan-friendly.\n"
+            "3. If scores or match results are present, create a clean mini-table or formatted summary block.\n"
+            "4. If there are conflicting search results, explicitly note the discrepancy."
         )
-
-        stream = client.chat.completions.create(
-            model=selected_model,
-            messages=[
-                {"role": "system", "content": search_system_prompt},
-                {"role": "user", "content": f"Query: '{optimized_query}'\n\nSearch Results:\n{search_text}"}
-            ],
-            stream=True
-        )
-
-        with st.chat_message("assistant"):
-            clean_response = st.write_stream(generate_stream_response(stream))
         
-        clean_response = strip_thinking_process(clean_response)
-        
-        # Audio rendering safe wrap
-        audio_data = safe_execute(lambda: generate_speech_audio(clean_response), default_return=None)
-        active_chat_list.append({"role": "assistant", "content": clean_response, "audio": audio_data})
-
-    # 🕵️ ROUTE 3: Safe Deep Research Agent
-    elif detected_intent == "RESEARCH":
-        topic = re.sub(r'^/research', '', final_input, flags=re.IGNORECASE).strip()
-        
-        with st.spinner(f"🕵️ Autonomous Agent analyzing '{topic}'..."):
-            # Wrapped research agent call inside safe_execute
-            brief = safe_execute(
-                lambda: run_deep_research_agent(topic, client, selected_model),
-                default_return="Research agent could not complete the multi-source analysis.",
-                error_msg="Deep Research Agent ran into an API timeout."
+        with st.spinner("🔍 Searching live web data..."):
+            res = client.chat.completions.create(
+                model=selected_model,
+                messages=[
+                    {"role": "system", "content": search_system_prompt},
+                    {"role": "user", "content": f"Query: {final_input}\nSearch Results:\n{search_text}"}
+                ]
             )
-        
-        # Audio rendering safe wrap
-        audio_data = safe_execute(lambda: generate_speech_audio(brief), default_return=None)
-        active_chat_list.append({"role": "assistant", "content": brief, "audio": audio_data})
+            active_chat_list.append({"role": "assistant", "content": res.choices[0].message.content})
 
-    # 🕵️ ROUTE 5: Deep Research Agent
-    elif final_input.lower().startswith("/research"):
-        topic = final_input.replace("/research", "").strip()
-        with st.spinner(f"🕵️ Autonomous Agent analyzing '{topic}' across multiple sources..."):
-            brief = run_deep_research_agent(topic, client, selected_model)
-        
-        audio_data = generate_speech_audio(brief)
-        active_chat_list.append({
-            "role": "assistant",
-            "content": brief,
-            "audio": audio_data
-        })
+    elif detected_intent == "RESEARCH":
+        with st.spinner("🔬 Running Deep Research Agent..."):
+            research_res = run_deep_research_agent(final_input, client, selected_model)
+            active_chat_list.append({"role": "assistant", "content": research_res})
 
-# ⚡ ROUTE 4: Standard Chat
     else:
-        system_prompts = {
-            "Helpful Assistant": "You are a friendly and helpful AI assistant.",
-            "Code Expert": "You are a master programmer. Give clean, well-commented code snippets.",
-            "Sarcastic Buddy": "You are a witty, slightly sarcastic friend who likes to joke around.",
-            "Strict Tutor": "You are a precise, educational tutor. Explain concepts clearly and encourage critical thinking."
-        }
-
-        # Include Memory Vault facts into standard chat system context!
-        vault_context = ""
+        system_prompt = f"You are a {personality}. Help the user to the best of your ability."
         if st.session_state.memory_vault:
-            vault_context = "\n\nUser Context Facts to remember:\n" + "\n".join([f"- {m}" for m in st.session_state.memory_vault])
-
-        formatted_history = [
-            {"role": "system", "content": system_prompts[personality] + vault_context}
-        ]
-
-        # 🧠 Feature #12: Inject Memory Vault Context!
-        if st.session_state.memory_vault:
-            memory_context = "\n".join([f"- {m}" for m in st.session_state.memory_vault])
-            formatted_history.append({
-                "role": "system",
-                "content": f"Here are persistent facts you know about the user across sessions:\n{memory_context}"
-            })
-
+            system_prompt += "\nSaved User Information:\n" + "\n".join([f"- {m}" for m in st.session_state.memory_vault])
         if doc_context:
-            formatted_history.append({
-                "role": "system",
-                "content": f"The user uploaded a document named '{uploaded_doc.name}'. Here is its content:\n\n{doc_context[:10000]}"
-            })
+            system_prompt += f"\n\nAttached Document Content:\n{doc_context[:4000]}"
 
+        messages_payload = [{"role": "system", "content": system_prompt}]
         for m in active_chat_list:
-            if "content" in m and isinstance(m["content"], str):
-                if not isinstance(m["content"], list):
-                    formatted_history.append({"role": m["role"], "content": m["content"]})
+            if isinstance(m.get("content"), str):
+                messages_payload.append({"role": m["role"], "content": m["content"]})
 
-        stream = client.chat.completions.create(
-            model=selected_model,
-            messages=formatted_history,
-            stream=True
-        )
-
-        with st.chat_message("assistant"):
-            clean_response = st.write_stream(generate_stream_response(stream))
-
-        clean_response = strip_thinking_process(clean_response)
-        audio_data = generate_speech_audio(clean_response)
-        
-        # Save response to active chat
-        active_chat_list.append({
-            "role": "assistant", 
-            "content": clean_response,
-            "audio": audio_data
-        })
-
-        # 🏷️ Feature #16: Auto-Rename Chat Thread on First User Message
-    if len(active_chat_list) == 1 and st.session_state.current_chat.startswith("Chat "):
-        new_title = safe_execute(
-            lambda: generate_chat_title(final_input, client),
-            default_return="New Session"
-        )
-        # Rename session state key safely
-        if new_title and new_title != "New Session":
-            st.session_state.chats[new_title] = st.session_state.chats.pop(st.session_state.current_chat)
-            st.session_state.current_chat = new_title
-            st.rerun()
-
-        # Render Smart Action Cards
-        suggestions = generate_action_cards(clean_response)
-        st.markdown("##### 🚀 Quick Actions & Next Steps:")
-        cols = st.columns(len(suggestions))
-        
-        for idx, option in enumerate(suggestions):
-            if cols[idx].button(option, key=f"suggest_{idx}_{len(active_chat_list)}"):
-                active_chat_list.append({"role": "user", "content": option})
-                st.rerun()
+        with st.spinner("Thinking..."):
+            response = client.chat.completions.create(
+                model=selected_model,
+                messages=messages_payload
+            )
+            assistant_reply = response.choices[0].message.content
+            active_chat_list.append({"role": "assistant", "content": assistant_reply})
 
     st.rerun()
