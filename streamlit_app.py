@@ -503,7 +503,7 @@ with st.sidebar:
             )
         else:
             st.info("Start a chat session to enable export options.")
-            
+
     # 🧠 Feature #12: Global Memory Vault
     st.markdown("---")
     with st.expander("🧠 Persistent Memory Vault"):
