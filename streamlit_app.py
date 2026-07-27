@@ -503,10 +503,11 @@ with st.sidebar:
             )
         else:
             st.info("Start a chat session to enable export options.")
-            # 🧠 Feature #12: Global Memory Vault
-            st.markdown("---")
-            with st.expander("🧠 Persistent Memory Vault"):
-            st.caption("Information saved here is remembered across ALL chat sessions!")
+            
+     # 🧠 Feature #12: Global Memory Vault
+     st.markdown("---")
+     with st.expander("🧠 Persistent Memory Vault"):
+         st.caption("Information saved here is remembered across ALL chat sessions!")
         
         new_memory = st.text_input("Add a fact about yourself/project:", key="new_memory_input")
         if st.button("💾 Save Memory", use_container_width=True):
