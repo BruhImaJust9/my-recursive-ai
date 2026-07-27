@@ -352,6 +352,27 @@ with st.sidebar:
         st.session_state.current_chat = selected_chat
         st.rerun()
 
+    # 🧠 Feature #12: Global Memory Vault
+    st.markdown("---")
+    with st.expander("🧠 Persistent Memory Vault"):
+        st.caption("Information saved here is remembered across ALL chat sessions!")
+        
+        new_memory = st.text_input("Add a fact about yourself/project:", key="new_memory_input")
+        if st.button("💾 Save Memory", use_container_width=True):
+            if new_memory.strip():
+                st.session_state.memory_vault.append(new_memory.strip())
+                st.success("Saved to memory!")
+                st.rerun()
+
+        if st.session_state.memory_vault:
+            st.markdown("**Current Memories:**")
+            for m_idx, mem in enumerate(st.session_state.memory_vault):
+                st.write(f"• {mem}")
+            
+            if st.button("🗑️ Clear All Memories", use_container_width=True):
+                st.session_state.memory_vault = []
+                st.rerun()
+
     if st.button("➕ New Chat Session", use_container_width=True):
         new_chat_name = f"Chat {len(st.session_state.chats) + 1}"
         st.session_state.chats[new_chat_name] = []
