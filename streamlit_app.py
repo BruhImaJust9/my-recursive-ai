@@ -178,6 +178,33 @@ def audit_response(original_prompt: str, ai_response: str, client, model_name: s
     except Exception as e:
         return f"Audit Error: {str(e)}"
 
+def classify_user_intent(user_prompt: str, client, selected_model: str) -> str:
+    """Uses a fast model pass to automatically route prompts to the correct feature."""
+    classification_system_prompt = (
+        "You are an intent classifier for an AI workspace. "
+        "Analyze the user's input and respond with EXACTLY ONE word from this list:\n"
+        "- GENERATE (if they want to create/draw an image)\n"
+        "- SEARCH (if they ask for real-time news, sports, weather, or recent facts)\n"
+        "- RESEARCH (if they ask for an in-depth report, deep dive, or multi-source investigation)\n"
+        "- CHAT (for standard questions, coding, conversation, or math)\n\n"
+        "Output ONLY the single classification keyword."
+    )
+    
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.1-8b-instant",  # Ultra-fast model for low-latency classification
+            messages=[
+                {"role": "system", "content": classification_system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            max_tokens=5,
+            temperature=0.0
+        )
+        intent = completion.choices[0].message.content.strip().upper()
+        return intent if intent in ["GENERATE", "SEARCH", "RESEARCH"] else "CHAT"
+    except Exception:
+        return "CHAT"
+
 def optimize_search_query(user_prompt: str, category: str = "general") -> str:
     cleaned = user_prompt.lower().replace("search", "").replace("what are", "").strip()
 
