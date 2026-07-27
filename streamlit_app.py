@@ -414,8 +414,8 @@ for idx, msg in enumerate(st.session_state.chats[st.session_state.current_chat])
         
         if "audio" in msg and msg["audio"]:
     # Auto-plays the latest assistant response if Hands-Free Mode is ON!
-    is_latest_msg = (idx == len(st.session_state.chats[st.session_state.current_chat]) - 1)
-    st.audio(msg["audio"], format="audio/mp3", autoplay=(auto_play_voice and is_latest_msg))
+        is_latest_msg = (idx == len(st.session_state.chats[st.session_state.current_chat]) - 1)
+        st.audio(msg["audio"], format="audio/mp3", autoplay=(auto_play_voice and is_latest_msg))
 
         # 🛡️ Feature #8: Fact-Check / Audit Button for Assistant Responses
         if msg["role"] == "assistant" and "content" in msg and msg["content"]:
