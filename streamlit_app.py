@@ -860,6 +860,18 @@ if final_input and client:
             "audio": audio_data
         })
 
+        # 🏷️ Feature #16: Auto-Rename Chat Thread on First User Message
+    if len(active_chat_list) == 1 and st.session_state.current_chat.startswith("Chat "):
+        new_title = safe_execute(
+            lambda: generate_chat_title(final_input, client),
+            default_return="New Session"
+        )
+        # Rename session state key safely
+        if new_title and new_title != "New Session":
+            st.session_state.chats[new_title] = st.session_state.chats.pop(st.session_state.current_chat)
+            st.session_state.current_chat = new_title
+            st.rerun()
+
         # Render Smart Action Cards
         suggestions = generate_action_cards(clean_response)
         st.markdown("##### 🚀 Quick Actions & Next Steps:")
