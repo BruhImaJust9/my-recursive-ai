@@ -358,10 +358,8 @@ with st.sidebar:
         st.write(f"**Total Messages:** {msg_count}")
         st.write(f"**Total Characters:** {char_count:,}")
 
-# ==========================================
-# 4. CHAT HISTORY DISPLAY
-# ==========================================
-for msg in st.session_state.chats[st.session_state.current_chat]:
+# In SECTION 4: Chat History Display
+for idx, msg in enumerate(st.session_state.chats[st.session_state.current_chat]):
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
         if "image_url" in msg:
@@ -371,6 +369,19 @@ for msg in st.session_state.chats[st.session_state.current_chat]:
         
         if "audio" in msg and msg["audio"]:
             st.audio(msg["audio"], format="audio/mp3")
+
+        # 🔍 Feature #8: Fact-Check / Audit Button for Assistant Responses
+        if msg["role"] == "assistant" and "content" in msg and msg["content"]:
+            with st.expander("🛡️ Verify & Audit Response"):
+                if st.button("Run Self-Critique", key=f"audit_btn_{idx}"):
+                    # Finds the user prompt immediately preceding this assistant answer
+                    previous_prompt = "General query"
+                    if idx > 0 and st.session_state.chats[st.session_state.current_chat][idx-1]["role"] == "user":
+                        previous_prompt = st.session_state.chats[st.session_state.current_chat][idx-1]["content"]
+                    
+                    with st.spinner("Analyzing response accuracy..."):
+                        audit_result = audit_response(previous_prompt, msg["content"], client, selected_model)
+                        st.info(audit_result)
 
 # ==========================================
 # 5. INPUT LOGIC & ROUTING
