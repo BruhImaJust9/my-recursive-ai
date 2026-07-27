@@ -75,6 +75,41 @@ def execute_free_search(query: str) -> str:
     except Exception as e:
         return f"Search error: {str(e)}"
 
+def render_data_canvas(response_text: str):
+    """Detects Markdown tables or CSV structures and renders interactive charts."""
+    lines = [line.strip() for line in response_text.split("\n") if "|" in line]
+    
+    # Must have at least 3 markdown table lines (header, separator, data)
+    if len(lines) >= 3:
+        try:
+            # Clean markdown table borders
+            cleaned_lines = [re.sub(r'^\||\|$', '', line) for line in lines if not re.match(r'^[|\s:-]+$', line)]
+            
+            # Parse into a list of rows
+            data = [[cell.strip() for cell in line.split("|")] for line in cleaned_lines]
+            
+            if len(data) > 1:
+                df = pd.DataFrame(data[1:], columns=data[0])
+                
+                # Attempt to convert numerical columns
+                for col in df.columns:
+                    df[col] = pd.to_numeric(df[col].str.replace(',', ''), errors='ignore')
+                
+                num_cols = df.select_dtypes(include=['number']).columns.tolist()
+                
+                if num_cols:
+                    st.markdown("#### 📊 Dynamic Visual Canvas")
+                    st.dataframe(df, use_container_width=True)
+                    
+                    # Render chart based on numerical data
+                    chart_type = st.radio("Chart Type:", ["Bar", "Line"], horizontal=True, key=f"chart_type_{hash(response_text)}")
+                    if chart_type == "Bar":
+                        st.bar_chart(df.set_index(df.columns[0])[num_cols])
+                    else:
+                        st.line_chart(df.set_index(df.columns[0])[num_cols])
+        except Exception:
+            pass  # Fall back gracefully if parsing fails
+
 def audit_response(original_prompt: str, ai_response: str, client, model_name: str) -> str:
     """Uses a secondary model pass to evaluate the accuracy and logic of a response."""
     audit_system_prompt = (
