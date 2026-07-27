@@ -74,6 +74,26 @@ def execute_free_search(query: str) -> str:
     except Exception as e:
         return f"Search error: {str(e)}"
 
+def audit_response(original_prompt: str, ai_response: str, client, model_name: str) -> str:
+    """Uses a secondary model pass to evaluate the accuracy and logic of a response."""
+    audit_system_prompt = (
+        "You are an impartial AI auditor. Review the user's prompt and the assistant's response. "
+        "Provide: 1) A Confidence Rating (e.g., 95/100), 2) A brief check for accuracy/logic, "
+        "and 3) Any necessary corrections or missing nuances."
+    )
+    
+    try:
+        completion = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": audit_system_prompt},
+                {"role": "user", "content": f"User Prompt: {original_prompt}\n\nAssistant Response:\n{ai_response}"}
+            ]
+        )
+        return completion.choices[0].message.content
+    except Exception as e:
+        return f"Audit Error: {str(e)}"
+
 def optimize_search_query(user_prompt: str, category: str = "general") -> str:
     cleaned = user_prompt.lower().replace("search", "").replace("what are", "").strip()
 
