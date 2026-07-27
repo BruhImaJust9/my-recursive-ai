@@ -7,6 +7,7 @@ import io
 import re
 import tempfile
 import random
+import pandas as pd
 from groq import Groq
 from tavily import TavilyClient
 from gtts import gTTS
