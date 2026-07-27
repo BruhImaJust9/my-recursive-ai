@@ -669,14 +669,16 @@ if final_input and client:
             "Strict Tutor": "You are a precise, educational tutor. Explain concepts clearly and encourage critical thinking."
         }
 
-        formatted_history = [
+       formatted_history = [
             {"role": "system", "content": system_prompts[personality]}
         ]
 
-        if doc_context:
+        # 🧠 Inject Memory Vault Facts!
+        if st.session_state.memory_vault:
+            memory_context = "\n".join([f"- {m}" for m in st.session_state.memory_vault])
             formatted_history.append({
                 "role": "system",
-                "content": f"The user uploaded a document named '{uploaded_doc.name}'. Here is its content:\n\n{doc_context[:10000]}"
+                "content": f"Here are persistent facts you know about the user across sessions:\n{memory_context}"
             })
 
         for m in active_chat_list:
