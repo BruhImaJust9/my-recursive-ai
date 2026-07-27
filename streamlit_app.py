@@ -727,7 +727,13 @@ if final_input and client:
             "2. Use bullet points and relevant emojis (e.g., 🏆, 🏎️, ⚽, 📊, 🏁) to make data scan-friendly.\n"
             "3. If scores or match results are present, create a clean mini-table or formatted summary block at the top.\n"
             "4. If there are conflicting search results, explicitly note the discrepancy.\n"
-            "5. End with 1-2 thoughtful, optional follow-up research questions or next steps."
+            "5. End with 1-2 thoughtful, optional follow-up research questions or next steps.\n\n"
+            "INTENT DISAMBIGUATION RULE:\n"
+            "If the prompt uses ambiguous terms (e.g., 'football' meaning Soccer vs. NFL), analyze search snippets to determine the dominant context. "
+            "If both contexts appear, split your response into clear sections (e.g., '### Soccer' and '### American Football (NFL)').\n\n"
+            "NATURAL SYNTHESIS PROTOCOL (NO FOURTH-WALL BREAKS):\n"
+            "Never mention 'search results', 'Tavily', 'raw data', 'snippets', or 'the web search'. "
+            "State facts directly and authoritatively as if you naturally know the information."
         )
 
         stream = client.chat.completions.create(
