@@ -394,13 +394,15 @@ with st.sidebar:
         st.write(f"**Total Messages:** {msg_count}")
         st.write(f"**Total Characters:** {char_count:,}")
 
-# In SECTION 4: Chat History Display
-for msg in st.session_state.chats[st.session_state.current_chat]:
+# ==========================================
+# 4. CHAT HISTORY DISPLAY
+# ==========================================
+for idx, msg in enumerate(st.session_state.chats[st.session_state.current_chat]):
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
         
-        # 📊 Feature #9: Render Data Visuals if tables/data exist
-        if msg["role"] == "assistant" and "content" in msg:
+        # 📊 Feature #9: Dynamic Data Visual Canvas
+        if msg["role"] == "assistant" and "content" in msg and msg["content"]:
             render_data_canvas(msg["content"])
 
         if "image_url" in msg:
@@ -411,11 +413,10 @@ for msg in st.session_state.chats[st.session_state.current_chat]:
         if "audio" in msg and msg["audio"]:
             st.audio(msg["audio"], format="audio/mp3")
 
-        # 🔍 Feature #8: Fact-Check / Audit Button for Assistant Responses
+        # 🛡️ Feature #8: Fact-Check / Audit Button for Assistant Responses
         if msg["role"] == "assistant" and "content" in msg and msg["content"]:
             with st.expander("🛡️ Verify & Audit Response"):
                 if st.button("Run Self-Critique", key=f"audit_btn_{idx}"):
-                    # Finds the user prompt immediately preceding this assistant answer
                     previous_prompt = "General query"
                     if idx > 0 and st.session_state.chats[st.session_state.current_chat][idx-1]["role"] == "user":
                         previous_prompt = st.session_state.chats[st.session_state.current_chat][idx-1]["content"]
