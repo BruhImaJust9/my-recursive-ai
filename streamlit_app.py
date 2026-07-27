@@ -412,6 +412,40 @@ with st.sidebar:
         st.session_state.current_chat = selected_chat
         st.rerun()
 
+    # 📦 Feature #15: Workspace Export Engine
+    st.markdown("---")
+    with st.expander("📦 Session Export & Backup"):
+        st.caption("Download your active chat history and memory vault facts.")
+        
+        active_chats = st.session_state.chats.get(st.session_state.current_chat, [])
+        
+        if active_chats:
+            # Generate Markdown file data
+            md_data = generate_markdown_export(active_chats, st.session_state.memory_vault)
+            st.download_button(
+                label="📄 Export as Markdown (.md)",
+                data=md_data,
+                file_name="workspace_chat_export.md",
+                mime="text/markdown",
+                use_container_width=True
+            )
+            
+            # Generate JSON backup data
+            json_data = json.dumps({
+                "memory_vault": st.session_state.memory_vault,
+                "chat_history": active_chats
+            }, indent=2)
+            
+            st.download_button(
+                label="💾 Export Raw Backup (.json)",
+                data=json_data,
+                file_name="workspace_backup.json",
+                mime="application/json",
+                use_container_width=True
+            )
+        else:
+            st.info("Start a chat session to enable export options.")
+
     # 🧠 Feature #12: Global Memory Vault
     st.markdown("---")
     with st.expander("🧠 Persistent Memory Vault"):
