@@ -639,39 +639,35 @@ if final_input and client:
                 "image_url": img_bytes
             })
 
-    # 🔍 ROUTE 2: Web Search
-    elif final_input.lower().startswith("/search"):
+   # 🔍 ROUTE 2: Safe Web Search
+    elif detected_intent == "SEARCH":
         cleaned_query = clean_search_query(final_input)
         optimized_query = optimize_search_query(cleaned_query)
-        search_text = execute_free_search(optimized_query)
         
-        # 1. Start stream with inline web search messages
+        # Wrapped search API call inside safe_execute
+        search_text = safe_execute(
+            lambda: execute_free_search(optimized_query),
+            default_return="No search results could be retrieved at this time.",
+            error_msg="Web Search encountered a connection issue."
+        )
+        
         stream = client.chat.completions.create(
             model=selected_model,
             messages=[
-                {
-                    "role": "system", 
-                    "content": "Today's date is in 2026. You are a helpful assistant summarizing live web search results."
-                },
+                {"role": "system", "content": "You are a helpful assistant summarizing live web search results."},
                 {"role": "user", "content": f"Query: '{optimized_query}'\n\nSearch Results:\n{search_text}"}
             ],
             stream=True
         )
 
-        # 2. Pass stream through generator helper for clean streaming
         with st.chat_message("assistant"):
             clean_response = st.write_stream(generate_stream_response(stream))
         
-        # 3. Clean tags and generate audio safely
         clean_response = strip_thinking_process(clean_response)
-        audio_data = generate_speech_audio(clean_response)
         
-        # 4. Save to active chat history
-        active_chat_list.append({
-            "role": "assistant", 
-            "content": clean_response,
-            "audio": audio_data
-        })
+        # Audio rendering safe wrap
+        audio_data = safe_execute(lambda: generate_speech_audio(clean_response), default_return=None)
+        active_chat_list.append({"role": "assistant", "content": clean_response, "audio": audio_data})
 
     # 👀 ROUTE 3: Vision Analysis
     elif active_image is not None:
