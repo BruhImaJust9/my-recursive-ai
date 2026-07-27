@@ -412,7 +412,7 @@ with st.sidebar:
         st.session_state.current_chat = selected_chat
         st.rerun()
 
-    # 📦 Feature #15: Workspace Export Engine
+ # 📦 Feature #15: Workspace Export Engine
     st.markdown("---")
     with st.expander("📦 Session Export & Backup"):
         st.caption("Download your active chat history and memory vault facts.")
@@ -430,10 +430,22 @@ with st.sidebar:
                 use_container_width=True
             )
             
-            # Generate JSON backup data
+            # 🧹 Sanitize chat history for JSON export (stripping non-serializable binary data)
+            sanitized_chats = []
+            for msg in active_chats:
+                clean_msg = {
+                    "role": msg.get("role", "user"),
+                    "content": msg.get("content", "")
+                }
+                # Keep text/URL fields, skip raw audio/image BytesIO objects
+                if "image_url" in msg and isinstance(msg["image_url"], str):
+                    clean_msg["image_url"] = msg["image_url"]
+                sanitized_chats.append(clean_msg)
+
+            # Generate JSON backup data safely
             json_data = json.dumps({
                 "memory_vault": st.session_state.memory_vault,
-                "chat_history": active_chats
+                "chat_history": sanitized_chats
             }, indent=2)
             
             st.download_button(
@@ -445,7 +457,7 @@ with st.sidebar:
             )
         else:
             st.info("Start a chat session to enable export options.")
-
+            
     # 🧠 Feature #12: Global Memory Vault
     st.markdown("---")
     with st.expander("🧠 Persistent Memory Vault"):
