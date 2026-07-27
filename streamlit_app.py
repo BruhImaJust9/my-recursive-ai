@@ -787,7 +787,7 @@ if final_input and client:
             "audio": audio_data
         })
 
-  # ⚡ ROUTE 4: Standard Chat
+# ⚡ ROUTE 4: Standard Chat
     else:
         system_prompts = {
             "Helpful Assistant": "You are a friendly and helpful AI assistant.",
@@ -796,8 +796,13 @@ if final_input and client:
             "Strict Tutor": "You are a precise, educational tutor. Explain concepts clearly and encourage critical thinking."
         }
 
+        # Include Memory Vault facts into standard chat system context!
+        vault_context = ""
+        if st.session_state.memory_vault:
+            vault_context = "\n\nUser Context Facts to remember:\n" + "\n".join([f"- {m}" for m in st.session_state.memory_vault])
+
         formatted_history = [
-            {"role": "system", "content": system_prompts[personality]}
+            {"role": "system", "content": system_prompts[personality] + vault_context}
         ]
 
         # 🧠 Feature #12: Inject Memory Vault Context!
