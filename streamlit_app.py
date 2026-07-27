@@ -112,9 +112,13 @@ def run_deep_research_agent(topic: str, client, selected_model) -> str:
 
     # 3. Synthesize findings into an Executive Brief
     synthesis_prompt = (
-        f"You are a Lead Intelligence Analyst. Based on the following raw search data, produce an Executive Research Brief on: '{topic}'.\n\n"
-        f"Include:\n- 📌 Executive Summary\n- 🔍 Key Findings & Trends\n- 💡 Tactical Implications\n\n"
-        f"Raw Data:\n" + "\n\n".join(compiled_findings[:8])
+        f"You are a Lead Intelligence Analyst. Based on the following information, produce a research brief on: '{topic}'.\n\n"
+        f"DYNAMIC TONE & FORMAT RULE:\n"
+        f"- If the topic is professional/academic (e.g., business, technology, finance), use headers like: 📌 Executive Summary, 🔍 Key Findings, and 💡 Tactical Implications.\n"
+        f"- If the topic is casual, sports-related, or pop culture (e.g., sports debates, movies, entertainment), drop corporate jargon! Use headers like: 🏆 Top Contenders, 📊 Key Trends, and 💡 The Verdict.\n\n"
+        f"NATURAL SYNTHESIS PROTOCOL:\n"
+        f"State facts authoritatively. Never mention 'search results', 'raw data', or 'snippets'.\n\n"
+        f"Information:\n" + "\n\n".join(compiled_findings[:8])
     )
 
     summary_res = client.chat.completions.create(
