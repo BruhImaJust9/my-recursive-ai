@@ -39,6 +39,10 @@ if "current_chat" not in st.session_state:
 # Helper reference for current active message list
 current_messages = st.session_state.chats[st.session_state.current_chat]
 
+# Initialize Persistent Memory Vault
+if "memory_vault" not in st.session_state:
+    st.session_state.memory_vault = []
+
 if not current_messages:
     current_messages.append({
         "role": "assistant", 
