@@ -660,7 +660,7 @@ if final_input and client:
             "audio": audio_data
         })
 
-    # ⚡ ROUTE 4: Standard Chat
+  # ⚡ ROUTE 4: Standard Chat
     else:
         system_prompts = {
             "Helpful Assistant": "You are a friendly and helpful AI assistant.",
@@ -669,16 +669,22 @@ if final_input and client:
             "Strict Tutor": "You are a precise, educational tutor. Explain concepts clearly and encourage critical thinking."
         }
 
-       formatted_history = [
+        formatted_history = [
             {"role": "system", "content": system_prompts[personality]}
         ]
 
-        # 🧠 Inject Memory Vault Facts!
+        # 🧠 Feature #12: Inject Memory Vault Context!
         if st.session_state.memory_vault:
             memory_context = "\n".join([f"- {m}" for m in st.session_state.memory_vault])
             formatted_history.append({
                 "role": "system",
                 "content": f"Here are persistent facts you know about the user across sessions:\n{memory_context}"
+            })
+
+        if doc_context:
+            formatted_history.append({
+                "role": "system",
+                "content": f"The user uploaded a document named '{uploaded_doc.name}'. Here is its content:\n\n{doc_context[:10000]}"
             })
 
         for m in active_chat_list:
@@ -698,14 +704,14 @@ if final_input and client:
         clean_response = strip_thinking_process(clean_response)
         audio_data = generate_speech_audio(clean_response)
         
-        # 1. Save response to active chat
+        # Save response to active chat
         active_chat_list.append({
             "role": "assistant", 
             "content": clean_response,
             "audio": audio_data
         })
 
-        # 💡 2. Render Smart Action Cards right before rerun
+        # Render Smart Action Cards
         suggestions = generate_action_cards(clean_response)
         st.markdown("##### 🚀 Quick Actions & Next Steps:")
         cols = st.columns(len(suggestions))
