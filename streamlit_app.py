@@ -395,9 +395,14 @@ with st.sidebar:
         st.write(f"**Total Characters:** {char_count:,}")
 
 # In SECTION 4: Chat History Display
-for idx, msg in enumerate(st.session_state.chats[st.session_state.current_chat]):
+for msg in st.session_state.chats[st.session_state.current_chat]:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
+        
+        # 📊 Feature #9: Render Data Visuals if tables/data exist
+        if msg["role"] == "assistant" and "content" in msg:
+            render_data_canvas(msg["content"])
+
         if "image_url" in msg:
             st.image(msg["image_url"], use_container_width=True)
         elif "uploaded_img" in msg:
