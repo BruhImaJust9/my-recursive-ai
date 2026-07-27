@@ -178,6 +178,16 @@ def audit_response(original_prompt: str, ai_response: str, client, model_name: s
     except Exception as e:
         return f"Audit Error: {str(e)}"
 
+def safe_execute(func, default_return=None, error_msg="Feature temporarily unavailable."):
+    """Executes any app feature safely, catching errors without breaking the UI."""
+    try:
+        return func()
+    except Exception as e:
+        st.warning(f"⚠️ {error_msg}")
+        with st.expander("🔧 View Error Diagnostic"):
+            st.code(str(e), language="python")
+        return default_return
+
 def classify_user_intent(user_prompt: str, client, selected_model: str) -> str:
     """Uses a fast model pass to automatically route prompts to the correct feature."""
     classification_system_prompt = (
