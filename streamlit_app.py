@@ -182,6 +182,23 @@ def audit_response(original_prompt: str, ai_response: str, client, model_name: s
     except Exception as e:
         return f"Audit Error: {str(e)}"
 
+def generate_chat_title(first_prompt: str, client) -> str:
+    """Generates a concise 3-4 word title for a new chat session."""
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.1-8b-instant",  # Fast model for zero delay
+            messages=[
+                {"role": "system", "content": "Create a 2-4 word title for this user prompt. Do not use quotes or punctuation. Return ONLY the title text."},
+                {"role": "user", "content": first_prompt}
+            ],
+            max_tokens=10,
+            temperature=0.3
+        )
+        title = completion.choices[0].message.content.strip().title()
+        return title if title else "New Session"
+    except Exception:
+        return "New Session"
+
 def safe_execute(func, default_return=None, error_msg="Feature temporarily unavailable."):
     """Executes any app feature safely, catching errors without breaking the UI."""
     try:
