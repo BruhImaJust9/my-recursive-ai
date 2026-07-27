@@ -708,22 +708,32 @@ if final_input and client:
                 "image_url": img_bytes
             })
 
-   # 🔍 ROUTE 2: Safe Web Search
+  # 🔍 ROUTE 2: Enhanced Web Search
     elif detected_intent == "SEARCH":
         cleaned_query = clean_search_query(final_input)
         optimized_query = optimize_search_query(cleaned_query)
         
-        # Wrapped search API call inside safe_execute
         search_text = safe_execute(
             lambda: execute_free_search(optimized_query),
             default_return="No search results could be retrieved at this time.",
             error_msg="Web Search encountered a connection issue."
         )
         
+        # 🎨 Enhanced System Prompt for Beautiful Formatting
+        search_system_prompt = (
+            "You are a world-class news editor and research assistant.\n"
+            "Analyze the search results and format your response with high visual appeal:\n"
+            "1. Use clear, bold Headings (###) to separate distinct sections.\n"
+            "2. Use bullet points and relevant emojis (e.g., 🏆, 🏎️, ⚽, 📊, 🏁) to make data scan-friendly.\n"
+            "3. If scores or match results are present, create a clean mini-table or formatted summary block at the top.\n"
+            "4. If there are conflicting search results, explicitly note the discrepancy.\n"
+            "5. End with 1-2 thoughtful, optional follow-up research questions or next steps."
+        )
+
         stream = client.chat.completions.create(
             model=selected_model,
             messages=[
-                {"role": "system", "content": "You are a helpful assistant summarizing live web search results."},
+                {"role": "system", "content": search_system_prompt},
                 {"role": "user", "content": f"Query: '{optimized_query}'\n\nSearch Results:\n{search_text}"}
             ],
             stream=True
