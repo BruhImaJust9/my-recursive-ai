@@ -628,6 +628,17 @@ for idx, msg in enumerate(st.session_state.chats[st.session_state.current_chat])
         if msg["role"] == "assistant" and "content" in msg and msg["content"]:
             render_data_canvas(msg["content"])
 
+        # 🔖 Feature #17: Pin / Bookmark Response Button
+        if msg["role"] == "assistant" and "content" in msg and msg["content"]:
+            col_bm, _ = st.columns([1, 4])
+            with col_bm:
+                if st.button("🔖 Save Snippet", key=f"bookmark_btn_{idx}"):
+                    if msg["content"] not in st.session_state.bookmarks:
+                        st.session_state.bookmarks.append(msg["content"])
+                        st.toast("Snippet saved to your Bookmarks tab!", icon="🔖")
+                    else:
+                        st.toast("Snippet is already saved!", icon="ℹ️")
+
         if "image_url" in msg:
             st.image(msg["image_url"], use_container_width=True)
         elif "uploaded_img" in msg:
