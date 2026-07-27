@@ -310,6 +310,8 @@ with st.sidebar:
         st.session_state.current_chat = new_chat_name
         st.rerun()
 
+    auto_play_voice = st.sidebar.toggle("🔊 Auto-Play Voice Answers", value=False)
+
     st.markdown("---")
     st.header("🎭 AI Personality")
     personality = st.selectbox(
