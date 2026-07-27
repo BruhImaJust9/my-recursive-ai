@@ -622,6 +622,19 @@ if final_input and client:
             "audio": audio_data
         })
 
+    # 🕵️ ROUTE 5: Deep Research Agent
+    elif final_input.lower().startswith("/research"):
+        topic = final_input.replace("/research", "").strip()
+        with st.spinner(f"🕵️ Autonomous Agent analyzing '{topic}' across multiple sources..."):
+            brief = run_deep_research_agent(topic, client, selected_model)
+        
+        audio_data = generate_speech_audio(brief)
+        active_chat_list.append({
+            "role": "assistant",
+            "content": brief,
+            "audio": audio_data
+        })
+
     # ⚡ ROUTE 4: Standard Chat
     else:
         system_prompts = {
