@@ -215,6 +215,29 @@ def classify_user_intent(user_prompt: str, client, selected_model: str) -> str:
     except Exception:
         return "CHAT"
 
+import json
+
+def generate_markdown_export(chat_list, memory_vault) -> str:
+    """Formats active chat messages and memory vault into a clean Markdown document."""
+    md = "# 🚀 AI Workspace Export\n"
+    md += f"**Export Date:** {st.session_state.get('current_time', 'Active Session')}\n\n"
+    
+    if memory_vault:
+        md += "## 🧠 Memory Vault Facts\n"
+        for mem in memory_vault:
+            md += f"- {mem}\n"
+        md += "\n---\n"
+
+    md += "## 💬 Chat Transcript\n\n"
+    for idx, msg in enumerate(chat_list, 1):
+        role = msg.get("role", "user").capitalize()
+        content = msg.get("content", "")
+        md += f"### {role}\n{content}\n\n"
+        if "image_url" in msg:
+            md += "*[Image Generated]*\n\n"
+    
+    return md
+
 def optimize_search_query(user_prompt: str, category: str = "general") -> str:
     cleaned = user_prompt.lower().replace("search", "").replace("what are", "").strip()
 
