@@ -622,21 +622,21 @@ if final_input and client:
         # Run auto-classifier for plain text/voice inputs!
         detected_intent = classify_user_intent(final_input, client, selected_model)
     
-   # 🎨 ROUTE 1: Image Generation
-    if final_input.lower().startswith("/generate") or "generate an image" in final_input.lower():
-        prompt = final_input.replace("/generate", "").strip()
-        img_bytes = get_image_url(prompt)
-        
+   # 🎨 ROUTE 1: Safe Image Generation
+    if detected_intent == "GENERATE":
+        prompt = re.sub(r'^/generate', '', final_input, flags=re.IGNORECASE).strip()
+        with st.spinner("🎨 Creating your image safely..."):
+            img_bytes = safe_execute(
+                lambda: get_image_url(prompt), 
+                default_return=None, 
+                error_msg="Could not generate image right now. Please try again!"
+            )
+            
         if img_bytes:
             active_chat_list.append({
                 "role": "assistant", 
                 "content": f"Here is your generated image for: **'{prompt}'**",
                 "image_url": img_bytes
-            })
-        else:
-            active_chat_list.append({
-                "role": "assistant",
-                "content": "⚠️ Sorry, image generation timed out or failed. Please try again!"
             })
 
     # 🔍 ROUTE 2: Web Search
