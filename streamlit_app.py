@@ -412,8 +412,8 @@ for idx, msg in enumerate(st.session_state.chats[st.session_state.current_chat])
         elif "uploaded_img" in msg:
             st.image(msg["uploaded_img"], use_container_width=True)
         
-        if "audio" in msg and msg["audio"]:
-    # Auto-plays the latest assistant response if Hands-Free Mode is ON!
+    if "audio" in msg and msg["audio"]:
+        # Auto-plays the latest assistant response if Hands-Free Mode is ON!
         is_latest_msg = (idx == len(st.session_state.chats[st.session_state.current_chat]) - 1)
         st.audio(msg["audio"], format="audio/mp3", autoplay=(auto_play_voice and is_latest_msg))
 
