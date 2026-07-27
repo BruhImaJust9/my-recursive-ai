@@ -454,6 +454,27 @@ with st.sidebar:
                 mime="text/markdown",
                 use_container_width=True
             )
+
+            # 🔖 Feature #17: Saved Bookmarks & Snippets
+    st.markdown("---")
+    with st.expander("🔖 Saved Snippets & Bookmarks"):
+        st.caption("Quickly view or copy your pinned responses!")
+        if st.session_state.bookmarks:
+            for b_idx, bookmark in enumerate(st.session_state.bookmarks):
+                st.markdown(f"**Snippet #{b_idx + 1}**")
+                st.text_area(
+                    label=f"Bookmark {b_idx + 1}",
+                    value=bookmark,
+                    height=100,
+                    key=f"bm_val_{b_idx}",
+                    label_visibility="collapsed"
+                )
+                if st.button("🗑️ Remove", key=f"del_bm_{b_idx}", use_container_width=True):
+                    st.session_state.bookmarks.pop(b_idx)
+                    st.rerun()
+                st.markdown("---")
+        else:
+            st.info("No saved snippets yet. Click '🔖 Bookmark Response' on any AI message!")
             
             # 🧹 Sanitize chat history for JSON export (stripping non-serializable binary data)
             sanitized_chats = []
