@@ -85,6 +85,34 @@ def execute_free_search(query: str) -> str:
     except Exception as e:
         return f"Search error: {str(e)}"
 
+def build_dynamic_system_prompt(user_input, base_personality, language):
+    # Base core instructions
+    prompt = f"You are an adaptable AI workspace assistant acting as a {base_personality}."
+    
+    # 🏎️ Auto-detect domain context (e.g., Sports / Complex Analytics)
+    sports_keywords = ["nascar", "nfl", "nba", "prediction", "stats", "race", "game"]
+    if any(kw in user_input.lower() for kw in sports_keywords):
+        prompt += (
+            "\n\n[MODE: ANALYTICAL SPORTS EXPERT]"
+            "\n- Provide zero generic fluff."
+            "\n- Use structured confidence scores (%) and tactical 'Why' bullet points."
+            "\n- Use team-colored visual markers/emojis for readability."
+        )
+    
+    # 💻 Auto-detect coding context
+    elif any(kw in user_input.lower() for kw in ["code", "python", "error", "streamlit", "function"]):
+        prompt += (
+            "\n\n[MODE: SENIOR SOFTWARE ENGINEER]"
+            "\n- Diagnoses root causes clearly before offering code."
+            "\n- Write clean, production-ready code blocks without unnecessary intro prose."
+        )
+
+    # 🌐 Append global settings (Feature #18)
+    if language != "English":
+        prompt += f"\n\nCRITICAL: Respond entirely in {language}."
+
+    return prompt
+
 def run_deep_research_agent(topic: str, client, selected_model) -> str:
     """Autonomous agent that plans sub-queries, executes multiple searches, and compiles a research brief."""
     if not TAVILY_KEY:
