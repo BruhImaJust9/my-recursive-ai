@@ -728,76 +728,10 @@ for idx, msg in enumerate(st.session_state.chats[st.session_state.current_chat])
 # 5. INPUT LOGIC & ROUTING
 # ==========================================
 
-col_popover, _ = st.columns([1, 12])
-
-popover_image = None
-audio_bytes = None
-
-with col_popover:
-    with st.popover("➕", help="Quick Actions, Attachments & Voice"):
-        st.markdown("### 🎙️ Voice Input")
-        audio_bytes = audio_recorder(
-            text="Click to Record Voice",
-            recording_color="#e84c3d",
-            neutral_color="#6aa84f",
-            icon_name="microphone",
-            icon_size="2x",
-            key="voice_recorder"
-        )
-        
-        st.markdown("---")
-        st.markdown("### 📷 Attach Image")
-        popover_file = st.file_uploader(
-            "Upload Vision Image", 
-            type=["png", "jpg", "jpeg", "webp"],
-            key="popover_file_uploader"
-        )
-        if popover_file:
-            popover_image = Image.open(popover_file)
-            st.image(popover_image, caption="Popover Attached Image", use_container_width=True)
-            st.success("Image attached! Type a prompt below.")
-
-        st.markdown("---")
-        st.caption("🔍 **Live Search:** `/search <topic>`")
-        st.caption("🎨 **Generate Image:** `/generate <prompt>`")
-
-user_input = st.chat_input("Type a question, ask about an image, /search, or /generate...")
-
-recorded_text = ""
-if audio_bytes and client:
-    with st.spinner("🎙️ Transcribing voice..."):
-        recorded_text = transcribe_audio_groq(audio_bytes, client)
-
-active_chat_list = st.session_state.chats[st.session_state.current_chat]
-
-final_input = None
-if user_input:
-    final_input = user_input
-elif recorded_text:
-    final_input = recorded_text
-elif active_chat_list and active_chat_list[-1]["role"] == "user":
-    final_input = active_chat_list[-1]["content"]
-
-active_image = popover_image if popover_image else image_to_analyze
-
 if final_input and client:
-    if user_input or recorded_text:
-        user_data = {"role": "user", "content": final_input}
-        if active_image:
-            user_data["uploaded_img"] = active_image
-        active_chat_list.append(user_data)
+    # ... (your chat recording and title generation logic above) ...
 
-    # 🏷️ Auto-Rename Chat Thread on First User Message
-    if len(active_chat_list) == 1 and st.session_state.current_chat.startswith("Chat "):
-        new_title = safe_execute(
-            lambda: generate_chat_title(final_input, client),
-            default_return="New Session"
-        )
-        if new_title and new_title != "New Session":
-            st.session_state.chats[new_title] = st.session_state.chats.pop(st.session_state.current_chat)
-            st.session_state.current_chat = new_title
-            st.rerun()
-
+    # 1. Detect Intent
     detected_intent = "CHAT"
     if final_input.lower().startswith("/generate"):
         detected_intent = "GENERATE"
@@ -808,83 +742,55 @@ if final_input and client:
     elif not active_image:
         detected_intent = classify_user_intent(final_input, client, selected_model)
 
-    # Pass the detected style straight into your prompt logic:
-if detected_style == "ANALYTICAL":
-    system_prompt += "\nFormat response with clear headings, bulleted logic, and concise takeaways."
-
-    # 🎨 ROUTE 1: Image Generation
-    if detected_intent == "GENERATE":
-        prompt = re.sub(r'^/generate', '', final_input, flags=re.IGNORECASE).strip()
-        with st.spinner("🎨 Creating your image safely..."):
-            img_bytes = safe_execute(
-                lambda: get_image_url(prompt), 
-                default_return=None, 
-                error_msg="Could not generate image right now. Please try again!"
-            )
-            
-        if img_bytes:
-            active_chat_list.append({
-                "role": "assistant", 
-                "content": f"Here is your generated image for: **'{prompt}'**",
-                "image_url": img_bytes
-            })
-
-    # 🔍 ROUTE 2: Web Search
-    elif detected_intent == "SEARCH":
-        cleaned_query = clean_search_query(final_input)
-        optimized_query = optimize_search_query(cleaned_query)
-        
-        search_text = safe_execute(
-            lambda: execute_free_search(optimized_query),
-            default_return="No search results could be retrieved at this time.",
-            error_msg="Web Search encountered a connection issue."
-        )
-        
-        search_system_prompt = (
-            "You are a world-class news editor and research assistant.\n"
-            "Analyze the search results and format your response with high visual appeal:\n"
-            "1. Use clear, bold Headings (###) to separate distinct sections.\n"
-            "2. Use bullet points and relevant emojis to make data scan-friendly.\n"
-            "3. If scores or match results are present, create a clean mini-table or formatted summary block.\n"
-            "4. If there are conflicting search results, explicitly note the discrepancy."
-        )
-        
-        # 🌐 Feature #18: Inject Target Language Instruction
-        if 'target_language' in locals() and target_language != "English":
-            search_system_prompt += f"\n5. Write your complete response natively in {target_language}."
-        
-        with st.spinner("🔍 Searching live web data..."):
-            res = client.chat.completions.create(
-                model=selected_model,
-                messages=[
-                    {"role": "system", "content": search_system_prompt},
-                    {"role": "user", "content": f"Query: {final_input}\nSearch Results:\n{search_text}"}
-                ]
-            )
-            active_chat_list.append({"role": "assistant", "content": res.choices[0].message.content})
-
-    # 🔬 ROUTE 3: Deep Research
-    elif detected_intent == "RESEARCH":
-        with st.spinner("🔬 Running Deep Research Agent..."):
-            research_res = run_deep_research_agent(final_input, client, selected_model)
-            active_chat_list.append({"role": "assistant", "content": research_res})
-
-    # 💬 ROUTE 4: Standard Chat
+    # 2. Auto-Detect Style (Prevents NameError!)
+    sports_keywords = ["nascar", "nfl", "nba", "prediction", "stats", "race", "game"]
+    if any(kw in final_input.lower() for kw in sports_keywords):
+        detected_style = "ANALYTICAL"
+    elif any(kw in final_input.lower() for kw in ["code", "python", "error", "streamlit"]):
+        detected_style = "TECHNICAL"
     else:
-        # Check if Prompt Studio Override is active (Feature #20)
+        detected_style = "GENERAL"
+
+    # ROUTE 1: Image Generation
+    if detected_intent == "GENERATE":
+        # ... image logic ...
+        pass
+
+    # ROUTE 2: Web Search
+    elif detected_intent == "SEARCH":
+        # ... search logic ...
+        pass
+
+    # ROUTE 3: Deep Research
+    elif detected_intent == "RESEARCH":
+        # ... research logic ...
+        pass
+
+    # ROUTE 4: Standard Dynamic Chat
+    else:
+        # Check Feature #20 Override first
         if 'use_custom_override' in locals() and use_custom_override and custom_system_override.strip():
             system_prompt = custom_system_override.strip()
         else:
             system_prompt = f"You are a {personality}. Help the user to the best of your ability."
-        
-        # 🌐 Feature #18: Inject Target Language Rule
+
+        # Dynamically inject style instructions based on detected_style
+        if detected_style == "ANALYTICAL":
+            system_prompt += (
+                "\n\n[ANALYTICAL MODE ACTIVE]"
+                "\n- Provide zero generic fluff."
+                "\n- Use structured confidence scores (%) and tactical 'Why' bullet points."
+                "\n- Use colored visual indicators/emojis for team/data readability."
+            )
+        elif detected_style == "TECHNICAL":
+            system_prompt += "\n\n[TECHNICAL MODE ACTIVE]\n- Diagnose root causes clearly and provide clean code blocks."
+
+        # Feature #18 Language Injection
         if 'target_language' in locals() and target_language != "English":
             system_prompt += f"\n\nCRITICAL LANGUAGE RULE: Respond entirely in {target_language}."
-            
+
         if st.session_state.memory_vault:
             system_prompt += "\nSaved User Information:\n" + "\n".join([f"- {m}" for m in st.session_state.memory_vault])
-        if doc_context:
-            system_prompt += f"\n\nAttached Document Content:\n{doc_context[:4000]}"
 
         messages_payload = [{"role": "system", "content": system_prompt}]
         for m in active_chat_list:
@@ -894,7 +800,8 @@ if detected_style == "ANALYTICAL":
         with st.spinner("Thinking..."):
             response = client.chat.completions.create(
                 model=selected_model,
-                messages=messages_payload
+                messages=messages_payload,
+                temperature=0.4 if detected_style == "ANALYTICAL" else 0.7
             )
             assistant_reply = response.choices[0].message.content
             active_chat_list.append({"role": "assistant", "content": assistant_reply})
