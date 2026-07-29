@@ -404,7 +404,34 @@ with st.sidebar:
     st.header("💬 Chat Sessions")
     chat_names = list(st.session_state.chats.keys())
     selected_chat = st.selectbox("Select Thread:", chat_names, index=chat_names.index(st.session_state.current_chat))
-    
+
+    # 🚀 Upgrade #22: Export & Management
+    active_chat_export = st.session_state.chats[st.session_state.current_chat]
+    if active_chat_export:
+        md_data = generate_markdown_export(active_chat_export, st.session_state.memory_vault)
+        st.download_button(
+            label="📥 Export Chat (.md)",
+            data=md_data,
+            file_name=f"{st.session_state.current_chat.lower().replace(' ', '_')}.md",
+            mime="text/markdown",
+            use_container_width=True
+        )
+
+    col_clr, col_del = st.columns(2)
+    with col_clr:
+        if st.button("🧹 Clear", use_container_width=True):
+            st.session_state.chats[st.session_state.current_chat] = []
+            save_chats_to_disk()
+            st.rerun()
+            
+    with col_del:
+        if len(st.session_state.chats) > 1:
+            if st.button("🗑️ Delete", use_container_width=True):
+                del st.session_state.chats[st.session_state.current_chat]
+                st.session_state.current_chat = list(st.session_state.chats.keys())[0]
+                save_chats_to_disk()
+                st.rerun()
+                
     if selected_chat != st.session_state.current_chat:
         st.session_state.current_chat = selected_chat
         st.rerun()
