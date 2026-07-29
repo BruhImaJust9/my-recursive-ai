@@ -638,6 +638,18 @@ with st.sidebar:
         st.write(f"**Total Messages:** {msg_count}")
         st.write(f"**Total Characters:** {char_count:,}")
 
+    # Dynamic temperature assignment
+if detected_intent in ["SEARCH", "RESEARCH"] or "code" in final_input.lower():
+    active_temp = 0.3  # Precision mode: factual & sharp
+else:
+    active_temp = 0.7  # Creative/Conversational mode: expressive & fluid
+
+response = client.chat.completions.create(
+    model=selected_model,
+    messages=messages_payload,
+    temperature=active_temp  # <-- Set dynamically!
+)
+
 # 🛠️📦 Feature #20: Prompt Studio & Session Exporter
     st.markdown("---")
     st.header("🛠️ Prompt Studio & Export")
