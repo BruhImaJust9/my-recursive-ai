@@ -796,6 +796,10 @@ if final_input and client:
     elif not active_image:
         detected_intent = classify_user_intent(final_input, client, selected_model)
 
+    # Pass the detected style straight into your prompt logic:
+if detected_style == "ANALYTICAL":
+    system_prompt += "\nFormat response with clear headings, bulleted logic, and concise takeaways."
+
     # 🎨 ROUTE 1: Image Generation
     if detected_intent == "GENERATE":
         prompt = re.sub(r'^/generate', '', final_input, flags=re.IGNORECASE).strip()
