@@ -153,6 +153,34 @@ def run_deep_research_agent(topic: str, client, selected_model) -> str:
     )
     return summary_res.choices[0].message.content
 
+CHAT_STORAGE_FILE = "persistent_chats.json"
+
+def load_saved_chats():
+    """Loads chat history from disk if it exists."""
+    if os.path.exists(CHAT_STORAGE_FILE):
+        try:
+            with open(CHAT_STORAGE_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"Chat 1": []}
+
+def save_chats_to_disk():
+    """Saves active session state chats to disk automatically."""
+    try:
+        # Filter out non-serializable objects (like raw audio bytes)
+        clean_chats = {}
+        for session_name, msg_list in st.session_state.chats.items():
+            clean_chats[session_name] = []
+            for msg in msg_list:
+                clean_msg = {k: v for k, v in msg.items() if k != "audio"}
+                clean_chats[session_name].append(clean_msg)
+                
+        with open(CHAT_STORAGE_FILE, "w") as f:
+            json.dump(clean_chats, f, indent=2)
+    except Exception as e:
+        pass
+
 def render_data_canvas(response_text: str):
     """Detects Markdown tables or CSV structures and renders interactive charts."""
     lines = [line.strip() for line in response_text.split("\n") if "|" in line]
