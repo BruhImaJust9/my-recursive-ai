@@ -16,6 +16,36 @@ from gtts import gTTS
 from audio_recorder_streamlit import audio_recorder
 
 # ==========================================
+# 0. PERSISTENCE HELPERS (Defined FIRST!)
+# ==========================================
+CHAT_STORAGE_FILE = "persistent_chats.json"
+
+def load_saved_chats():
+    """Loads chat history from disk if it exists."""
+    if os.path.exists(CHAT_STORAGE_FILE):
+        try:
+            with open(CHAT_STORAGE_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"Chat 1": []}
+
+def save_chats_to_disk():
+    """Saves active session state chats to disk automatically."""
+    try:
+        clean_chats = {}
+        for session_name, msg_list in st.session_state.chats.items():
+            clean_chats[session_name] = []
+            for msg in msg_list:
+                clean_msg = {k: v for k, v in msg.items() if k != "audio"}
+                clean_chats[session_name].append(clean_msg)
+                
+        with open(CHAT_STORAGE_FILE, "w") as f:
+            json.dump(clean_chats, f, indent=2)
+    except Exception:
+        pass
+
+# ==========================================
 # 1. PAGE SETUP & CONFIG
 # ==========================================
 st.set_page_config(page_title="AI Workspace", page_icon="🤖", layout="wide")
@@ -31,7 +61,7 @@ else:
     st.warning("⚠️ Missing `GROQ_API_KEY` in Streamlit secrets! Please add it to continue.")
     client = None
 
-# Initialize Multi-Chat Sessions (Persisted across refreshes!)
+# Initialize Multi-Chat Sessions (Now safe to call!)
 if "chats" not in st.session_state:
     st.session_state.chats = load_saved_chats()
 
