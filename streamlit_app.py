@@ -455,21 +455,23 @@ user_input = st.chat_input("Ask anything, use /search, /generate, or /research..
 audio_bytes = audio_recorder(text="🎤 Record Voice", recording_color="#e84c3d", neutral_color="#6aa84f")
 
 final_input = user_input
+transcribed = ""  # 👈 Safely initialize transcribed to avoid NameError!
+
 if audio_bytes and client:
     transcribed = transcribe_audio_groq(audio_bytes, client)
     if transcribed and not transcribed.startswith("Speech-to-Text Error"):
-        final_input = transcribed
+        # 🛡️ BANWEECHKEY Loop Guard: Check if voice echoes previous assistant output
+        active_chat_list = st.session_state.chats[st.session_state.current_chat]
+        last_ai_msg = next((m["content"] for m in reversed(active_chat_list) if m["role"] == "assistant"), "")
+        
+        if last_ai_msg and (transcribed in last_ai_msg or last_ai_msg in transcribed):
+            st.warning("⚠️ Audio feedback loop detected and muted!")
+            st.stop()
+        else:
+            final_input = transcribed
 
 if final_input and client:
     active_chat_list = st.session_state.chats[st.session_state.current_chat]
-
-    # Quick check to ignore audio if it's echoing previous assistant outputs
-if transcribed and transcribed.strip() != "":
-    # Check if transcription is just repeating recent assistant messages
-    last_ai_msg = next((m["content"] for m in reversed(active_chat_list) if m["role"] == "assistant"), "")
-    if transcribed in last_ai_msg or last_ai_msg in transcribed:
-        st.warning("⚠️ Audio feedback loop detected and muted!")
-        st.stop()
     
     # Auto Title Generator on First Message
     if len(active_chat_list) == 1 and active_chat_list[0].get("role") == "assistant":
@@ -546,27 +548,22 @@ if transcribed and transcribed.strip() != "":
 
     # ROUTE 4: Standard Chat with Dynamic Context & Fluid Temperature Tuning
     else:
-        # Prompt Studio Override vs Dynamic System Builder
         if use_custom_override and custom_system_override.strip():
             system_prompt = custom_system_override.strip()
         else:
             system_prompt = build_dynamic_system_prompt(final_input, personality, target_language, detected_style)
 
-        # Append File Context
         if doc_context:
             system_prompt += f"\n\n[USER ATTACHED FILE CONTEXT]:\n{doc_context[:4000]}"
 
-        # Append Memory Vault
         if st.session_state.memory_vault:
             system_prompt += "\n\n[MEMORY VAULT FACTS]:\n" + "\n".join([f"- {m}" for m in st.session_state.memory_vault])
 
-        # Message Payload Construction
         messages_payload = [{"role": "system", "content": system_prompt}]
         for m in active_chat_list:
             if isinstance(m.get("content"), str):
                 messages_payload.append({"role": m["role"], "content": m["content"]})
 
-        # Fluid Temperature Tuning based on Intent
         active_temp = 0.3 if detected_style in ["ANALYTICAL", "TECHNICAL"] else 0.7
 
         with st.spinner("Thinking..."):
