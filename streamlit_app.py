@@ -31,9 +31,9 @@ else:
     st.warning("⚠️ Missing `GROQ_API_KEY` in Streamlit secrets! Please add it to continue.")
     client = None
 
-# Initialize Multi-Chat Sessions
+# Initialize Multi-Chat Sessions (Persisted across refreshes!)
 if "chats" not in st.session_state:
-    st.session_state.chats = {"Chat 1": []}
+    st.session_state.chats = load_saved_chats()
 
 if "current_chat" not in st.session_state:
     st.session_state.current_chat = "Chat 1"
