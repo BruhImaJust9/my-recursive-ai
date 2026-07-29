@@ -141,14 +141,25 @@ def execute_free_search(query):
     try:
         encoded_query = urllib.parse.quote(query)
         url = f"https://html.duckduckgo.com/html/?q={encoded_query}"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req) as response:
+        
+        # 🕵️ Custom User-Agent to avoid bot detection blocks
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+        req = urllib.request.Request(url, headers=headers)
+        
+        # ⏱️ Set a strict 5-second timeout so it never hangs indefinitely!
+        with urllib.request.urlopen(req, timeout=5) as response:
             html = response.read().decode('utf-8')
+            
         results = re.findall(r'<a class="result__snippet[^>]*>(.*?)</a>', html, re.DOTALL)
         clean_results = [re.sub(r'<[^>]+>', '', r).strip() for r in results[:4]]
-        return "\n---\n".join(clean_results) if clean_results else "No live web results found."
+        
+        return "\n---\n".join(clean_results) if clean_results else "No live web results found for this query."
+        
     except Exception as e:
-        return f"Search Failed: {e}"
+        # Graceful fallback so the AI can still respond even if search times out
+        return f"Web Search Service Unavailable or Timed Out ({e}). Proceeding using internal model knowledge."
 
 def run_deep_research_agent(topic, groq_client, model_name):
     step1 = execute_free_search(f"{topic} overview breakdown")
