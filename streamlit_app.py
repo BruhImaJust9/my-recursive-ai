@@ -638,17 +638,20 @@ for idx, msg in enumerate(st.session_state.chats[st.session_state.current_chat])
             is_latest_msg = (idx == len(st.session_state.chats[st.session_state.current_chat]) - 1)
             st.audio(msg["audio"], format="audio/mp3", autoplay=(auto_play_voice and is_latest_msg))
 
+        # 🌐🎨 Feature #18 & #19 Status Badge
+st.caption(f"⚙️ **Active Workspace Config:** Language: `{target_language}` | Theme Preset: `{theme_choice}`")
+st.markdown("---")
+
         if msg["role"] == "assistant" and "content" in msg and msg["content"]:
             with st.expander("🛡️ Verify & Audit Response"):
                 if st.button("Run Self-Critique", key=f"audit_btn_{idx}"):
                     previous_prompt = "General query"
                     if idx > 0 and st.session_state.chats[st.session_state.current_chat][idx-1]["role"] == "user":
                         previous_prompt = st.session_state.chats[st.session_state.current_chat][idx-1]["content"]
-                    
                     with st.spinner("Analyzing response accuracy..."):
                         audit_result = audit_response(previous_prompt, msg["content"], client, selected_model)
                         st.info(audit_result)
-
+                        
 # ==========================================
 # 5. INPUT LOGIC & ROUTING
 # ==========================================
