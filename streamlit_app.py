@@ -827,7 +827,11 @@ if final_input and client:
 
     # 💬 ROUTE 4: Standard Chat
     else:
-        system_prompt = f"You are a {personality}. Help the user to the best of your ability."
+        # Check if Prompt Studio Override is active (Feature #20)
+        if 'use_custom_override' in locals() and use_custom_override and custom_system_override.strip():
+            system_prompt = custom_system_override.strip()
+        else:
+            system_prompt = f"You are a {personality}. Help the user to the best of your ability."
         
         # 🌐 Feature #18: Inject Target Language Rule
         if 'target_language' in locals() and target_language != "English":
