@@ -392,6 +392,14 @@ with st.sidebar:
         st.session_state.current_chat = selected_chat
         st.rerun()
 
+    # 🌐 Feature #18: Multi-Language Output Toggle
+    st.markdown("---")
+    st.header("🌐 Response Language")
+    target_language = st.selectbox(
+        "Select Output Language:",
+        ["English", "Spanish", "French", "German", "Mandarin", "Japanese", "Portuguese", "Italian"]
+    )
+
     # 📦 Feature #15: Workspace Export Engine
     st.markdown("---")
     with st.expander("📦 Session Export & Backup"):
