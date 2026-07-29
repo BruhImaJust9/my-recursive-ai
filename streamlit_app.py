@@ -462,6 +462,14 @@ if audio_bytes and client:
 
 if final_input and client:
     active_chat_list = st.session_state.chats[st.session_state.current_chat]
+
+    # Quick check to ignore audio if it's echoing previous assistant outputs
+if transcribed and transcribed.strip() != "":
+    # Check if transcription is just repeating recent assistant messages
+    last_ai_msg = next((m["content"] for m in reversed(active_chat_list) if m["role"] == "assistant"), "")
+    if transcribed in last_ai_msg or last_ai_msg in transcribed:
+        st.warning("⚠️ Audio feedback loop detected and muted!")
+        st.stop()
     
     # Auto Title Generator on First Message
     if len(active_chat_list) == 1 and active_chat_list[0].get("role") == "assistant":
