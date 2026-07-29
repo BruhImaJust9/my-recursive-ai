@@ -280,6 +280,10 @@ with st.sidebar:
     uploaded_img = st.file_uploader("Upload Image for Analysis", type=["png", "jpg", "jpeg"])
     image_to_analyze = Image.open(uploaded_img) if uploaded_img else None
 
+    with st.sidebar:
+        st.subheader("🎙️ Voice Input")
+        audio_bytes = audio_recorder(text="Record", recording_color="#e84c3d", neutral_color="#6aa84f")
+
 # ==========================================
 # 4. CHAT HISTORY DISPLAY
 # ==========================================
