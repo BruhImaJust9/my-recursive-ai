@@ -685,9 +685,9 @@ response = client.chat.completions.create(
 # 4. CHAT HISTORY DISPLAY
 # ==========================================
 
-# 🌐🎨 Feature #18 & #19 Status Badge (Placed ONCE at the top of Section 4)
+# 🌐🎨 Feature #18 & #19 Status Badge
 st.caption(f"⚙️ **Active Workspace Config:** Language: `{target_language}` | Theme Preset: `{theme_choice}`")
-st.markdown("---")
+st.markdown("---")  # <-- NO SPACES BEFORE THIS LINE!
 
 for idx, msg in enumerate(st.session_state.chats[st.session_state.current_chat]):
     with st.chat_message(msg["role"]):
