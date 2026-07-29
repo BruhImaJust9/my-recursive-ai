@@ -366,20 +366,29 @@ if final_input and client:
             else:
                 active_chat_list.append({"role": "assistant", "content": "⚠️ Image generation failed."})
 
-    # ROUTE 2: Search
+    # ROUTE 2: Free Web Search
     elif detected_intent == "SEARCH":
         clean_query = final_input.replace("/search", "").strip()
-        with st.spinner("🔍 Querying live web search..."):
+        with st.spinner("🔍 Fetching search data..."):
             search_data = execute_free_search(clean_query)
-            search_prompt = (
-                f"User requested real-time search information for: '{clean_query}'.\n"
-                f"Live Search Data:\n{search_data}\n\n"
-                f"Synthesize this factual context clearly using structured headings and concise takeaways."
-            )
+            
+            if search_data == "LIVE_SEARCH_UNAVAILABLE":
+                search_prompt = (
+                    f"The user searched for: '{clean_query}'.\n"
+                    f"Web search was temporarily unavailable. Respond directly with your best, "
+                    f"most detailed internal knowledge about this topic without displaying any system errors or mentioning timeouts."
+                )
+            else:
+                search_prompt = (
+                    f"User search query: '{clean_query}'.\n"
+                    f"Live Search Results:\n{search_data}\n\n"
+                    f"Synthesize this context clearly with structured headings and concise takeaways."
+                )
+                
             response = client.chat.completions.create(
                 model=selected_model,
                 messages=[{"role": "system", "content": search_prompt}],
-                temperature=0.2
+                temperature=0.3
             )
             reply = response.choices[0].message.content
             active_chat_list.append({"role": "assistant", "content": reply})
