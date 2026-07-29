@@ -726,6 +726,8 @@ if final_input and client:
             "2. Use bullet points and relevant emojis to make data scan-friendly.\n"
             "3. If scores or match results are present, create a clean mini-table or formatted summary block.\n"
             "4. If there are conflicting search results, explicitly note the discrepancy."
+            if target_language != "English":
+            search_system_prompt += f"\n5. Write your complete response in {target_language}."
         )
         
         with st.spinner("🔍 Searching live web data..."):
