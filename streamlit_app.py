@@ -673,6 +673,7 @@ if final_input and client:
             user_data["uploaded_img"] = active_image
         active_chat_list.append(user_data)
 
+    # 🏷️ Auto-Rename Chat Thread on First User Message
     if len(active_chat_list) == 1 and st.session_state.current_chat.startswith("Chat "):
         new_title = safe_execute(
             lambda: generate_chat_title(final_input, client),
@@ -693,6 +694,7 @@ if final_input and client:
     elif not active_image:
         detected_intent = classify_user_intent(final_input, client, selected_model)
 
+    # 🎨 ROUTE 1: Image Generation
     if detected_intent == "GENERATE":
         prompt = re.sub(r'^/generate', '', final_input, flags=re.IGNORECASE).strip()
         with st.spinner("🎨 Creating your image safely..."):
@@ -709,6 +711,7 @@ if final_input and client:
                 "image_url": img_bytes
             })
 
+    # 🔍 ROUTE 2: Web Search
     elif detected_intent == "SEARCH":
         cleaned_query = clean_search_query(final_input)
         optimized_query = optimize_search_query(cleaned_query)
@@ -726,9 +729,11 @@ if final_input and client:
             "2. Use bullet points and relevant emojis to make data scan-friendly.\n"
             "3. If scores or match results are present, create a clean mini-table or formatted summary block.\n"
             "4. If there are conflicting search results, explicitly note the discrepancy."
-            if target_language != "English":
-            search_system_prompt += f"\n5. Write your complete response in {target_language}."
         )
+        
+        # 🌐 Feature #18: Inject Target Language Instruction
+        if 'target_language' in locals() and target_language != "English":
+            search_system_prompt += f"\n5. Write your complete response natively in {target_language}."
         
         with st.spinner("🔍 Searching live web data..."):
             res = client.chat.completions.create(
@@ -740,23 +745,24 @@ if final_input and client:
             )
             active_chat_list.append({"role": "assistant", "content": res.choices[0].message.content})
 
+    # 🔬 ROUTE 3: Deep Research
     elif detected_intent == "RESEARCH":
         with st.spinner("🔬 Running Deep Research Agent..."):
             research_res = run_deep_research_agent(final_input, client, selected_model)
             active_chat_list.append({"role": "assistant", "content": research_res})
 
+    # 💬 ROUTE 4: Standard Chat
     else:
         system_prompt = f"You are a {personality}. Help the user to the best of your ability."
+        
+        # 🌐 Feature #18: Inject Target Language Rule
+        if 'target_language' in locals() and target_language != "English":
+            system_prompt += f"\n\nCRITICAL LANGUAGE RULE: Respond entirely in {target_language}."
+            
         if st.session_state.memory_vault:
             system_prompt += "\nSaved User Information:\n" + "\n".join([f"- {m}" for m in st.session_state.memory_vault])
         if doc_context:
             system_prompt += f"\n\nAttached Document Content:\n{doc_context[:4000]}"
-            
-            # Language instruction snippet
-        lang_instruction = f"\n\nCRITICAL LANGUAGE RULE: Respond entirely in {target_language}." if target_language != "English" else ""
-
-        # Update General Chat system prompt:
-        system_prompt = f"You are a {personality}. Help the user to the best of your ability.{lang_instruction}"
 
         messages_payload = [{"role": "system", "content": system_prompt}]
         for m in active_chat_list:
