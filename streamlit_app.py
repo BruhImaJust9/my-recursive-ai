@@ -610,6 +610,37 @@ with st.sidebar:
         st.write(f"**Total Messages:** {msg_count}")
         st.write(f"**Total Characters:** {char_count:,}")
 
+# 🛠️📦 Feature #20: Prompt Studio & Session Exporter
+    st.markdown("---")
+    st.header("🛠️ Prompt Studio & Export")
+    
+    # 1. Custom Prompt Override
+    use_custom_override = st.toggle("Enable Prompt Studio Override", value=False)
+    custom_system_override = ""
+    if use_custom_override:
+        custom_system_override = st.text_area(
+            "Studio System Prompt:",
+            value="You are an elite expert analyst. Break down complex topics into actionable bullet points.",
+            height=100
+        )
+
+    # 2. Export Conversation Session
+    active_chat_data = st.session_state.chats.get(st.session_state.current_chat, [])
+    if active_chat_data:
+        # Convert active session to markdown format
+        md_export = f"# Chat Session: {st.session_state.current_chat}\n\n"
+        for msg in active_chat_data:
+            role_name = "User" if msg['role'] == 'user' else "AI Assistant"
+            md_export += f"### 👤 {role_name}\n{msg.get('content', '')}\n\n---\n\n"
+            
+        st.download_button(
+            label="📥 Export Chat as Markdown",
+            data=md_export,
+            file_name=f"{st.session_state.current_chat.replace(' ', '_').lower()}_export.md",
+            mime="text/markdown",
+            use_container_width=True
+        )
+
 # ==========================================
 # 4. CHAT HISTORY DISPLAY
 # ==========================================
