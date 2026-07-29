@@ -626,5 +626,6 @@ if final_input and client:
             assistant_reply = response.choices[0].message.content
             audio_data = generate_speech_audio(assistant_reply)
             active_chat_list.append({"role": "assistant", "content": assistant_reply, "audio": audio_data})
-
+            
+    save_chats_to_disk()
     st.rerun()
