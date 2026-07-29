@@ -16,6 +16,62 @@ from gtts import gTTS
 from audio_recorder_streamlit import audio_recorder
 
 # ==========================================
+# 0. PERSISTENCE HELPERS & CSS FIX
+# ==========================================
+CHAT_STORAGE_FILE = "persistent_chats.json"
+
+def load_saved_chats():
+    """Loads chat history from disk if it exists."""
+    if os.path.exists(CHAT_STORAGE_FILE):
+        try:
+            with open(CHAT_STORAGE_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"Chat 1": []}
+
+def save_chats_to_disk():
+    """Saves active session state chats to disk automatically."""
+    try:
+        clean_chats = {}
+        for session_name, msg_list in st.session_state.chats.items():
+            clean_chats[session_name] = []
+            for msg in msg_list:
+                clean_msg = {k: v for k, v in msg.items() if k not in ["audio", "image_url"]}
+                clean_chats[session_name].append(clean_msg)
+                
+        with open(CHAT_STORAGE_FILE, "w") as f:
+            json.dump(clean_chats, f, indent=2)
+    except Exception:
+        pass
+
+# 🎨 CSS FIX: Force audio recorder container background to be transparent (removes white box!)
+st.markdown(
+    """
+    <style>
+        iframe[title="audio_recorder_streamlit.audio_recorder"] {
+            border: none !important;
+            outline: none !important;
+            background-color: transparent !important;
+        }
+        div[data-testid="stCustomComponentV1"] {
+            background-color: transparent !important;
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# Initialize Multi-Chat Sessions (Loads from disk!)
+if "chats" not in st.session_state:
+    st.session_state.chats = load_saved_chats()
+
+if "current_chat" not in st.session_state:
+    st.session_state.current_chat = list(st.session_state.chats.keys())[0]
+
+# ==========================================
 # 1. PAGE SETUP & CONFIG
 # ==========================================
 st.set_page_config(page_title="AI Workspace", page_icon="🤖", layout="wide")
