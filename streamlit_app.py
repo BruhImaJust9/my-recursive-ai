@@ -555,10 +555,10 @@ if final_input and client:
         with st.spinner("🔍 Querying live web search..."):
             search_data = execute_free_search(clean_query)
             search_prompt = (
-                f"User requested real-time search information for: '{clean_query}'.\n"
-                f"Live Search Data:\n{search_data}\n\n"
-                f"Synthesize this factual context clearly using structured headings and concise takeaways."
-            )
+    f"User search query: '{clean_query}'.\n"
+    f"Live Search Data:\n{search_data}\n\n"
+    f"Synthesize the factual results. If any part of the user's query wasn't found in the search results (like made-up words or jokes), playfully acknowledge it!"
+)
             response = client.chat.completions.create(
                 model=selected_model,
                 messages=[{"role": "system", "content": search_prompt}],
