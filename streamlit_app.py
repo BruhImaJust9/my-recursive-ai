@@ -442,6 +442,45 @@ with st.sidebar:
         else:
             st.info("Start a chat session to enable export options.")
 
+    # 🎨 Feature #19: Custom UI Themes
+    st.markdown("---")
+    st.header("🎨 Visual Theme")
+    theme_choice = st.selectbox(
+        "Select Accent Preset:",
+        ["Default Streamlit", "Neon Cyberpunk", "Midnight Blue", "Emerald Hacker", "Sunset Warmth"]
+    )
+    
+    # Apply Custom CSS Injection based on theme selection
+    theme_styles = {
+        "Neon Cyberpunk": """
+            <style>
+                .stApp { background-color: #0d0f18; color: #00ffcc; }
+                .stButton>button { background-color: #ff007f; color: white; border-radius: 8px; }
+            </style>
+        """,
+        "Midnight Blue": """
+            <style>
+                .stApp { background-color: #0b132b; color: #e0e1dd; }
+                .stButton>button { background-color: #1c2541; color: #48cae4; border: 1px solid #48cae4; }
+            </style>
+        """,
+        "Emerald Hacker": """
+            <style>
+                .stApp { background-color: #051923; color: #00a896; }
+                .stButton>button { background-color: #028090; color: #f0f3f4; }
+            </style>
+        """,
+        "Sunset Warmth": """
+            <style>
+                .stApp { background-color: #2b1e1e; color: #f4a261; }
+                .stButton>button { background-color: #e76f51; color: white; }
+            </style>
+        """
+    }
+
+    if theme_choice in theme_styles:
+        st.markdown(theme_styles[theme_choice], unsafe_allow_html=True)
+
     # 🔖 Feature #17: Saved Bookmarks & Snippets
     st.markdown("---")
     with st.expander("🔖 Saved Snippets & Bookmarks"):
