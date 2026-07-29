@@ -52,7 +52,7 @@ if "bookmarks" not in st.session_state:
 if not current_messages:
     current_messages.append({
         "role": "assistant", 
-        "content": "Hey there! I'm powered by Groq. Ask me anything, upload an image to analyze, try `/search <topic>`, `/generate <prompt>`, or speak using the ➕ menu!"
+        "content": "Hey there! I'm powered by Groq. Ask me anything, upload an image to analyze, try `/search <topic>`, `/generate <prompt>`, or speak using the voice recorder!"
     })
 
 # ==========================================
@@ -85,31 +85,28 @@ def execute_free_search(query: str) -> str:
     except Exception as e:
         return f"Search error: {str(e)}"
 
-def build_dynamic_system_prompt(user_input, base_personality, language):
-    # Base core instructions
+def build_dynamic_system_prompt(user_input, base_personality, language, detected_style="GENERAL"):
+    """Dynamically shapes system prompt instructions tailored to intent and domain context."""
     prompt = f"You are an adaptable AI workspace assistant acting as a {base_personality}."
     
-    # 🏎️ Auto-detect domain context (e.g., Sports / Complex Analytics)
-    sports_keywords = ["nascar", "nfl", "nba", "prediction", "stats", "race", "game"]
-    if any(kw in user_input.lower() for kw in sports_keywords):
+    # Sports / Data Analytics
+    if detected_style == "ANALYTICAL":
         prompt += (
             "\n\n[MODE: ANALYTICAL SPORTS EXPERT]"
             "\n- Provide zero generic fluff."
             "\n- Use structured confidence scores (%) and tactical 'Why' bullet points."
             "\n- Use team-colored visual markers/emojis for readability."
         )
-    
-    # 💻 Auto-detect coding context
-    elif any(kw in user_input.lower() for kw in ["code", "python", "error", "streamlit", "function"]):
+    # Coding / Technical
+    elif detected_style == "TECHNICAL":
         prompt += (
             "\n\n[MODE: SENIOR SOFTWARE ENGINEER]"
             "\n- Diagnoses root causes clearly before offering code."
             "\n- Write clean, production-ready code blocks without unnecessary intro prose."
         )
 
-    # 🌐 Append global settings (Feature #18)
     if language != "English":
-        prompt += f"\n\nCRITICAL: Respond entirely in {language}."
+        prompt += f"\n\nCRITICAL RULE: Respond entirely in {language}."
 
     return prompt
 
@@ -184,7 +181,7 @@ def render_data_canvas(response_text: str):
             pass
 
 def audit_response(original_prompt: str, ai_response: str, client, model_name: str) -> str:
-    """Uses a secondary model pass to evaluate the accuracy and logic of a response."""
+    """Uses a secondary model pass to evaluate accuracy and logic."""
     audit_system_prompt = (
         "You are an impartial AI auditor. Review the user's prompt and the assistant's response. "
         "Provide: 1) A Confidence Rating (e.g., 95/100), 2) A brief check for accuracy/logic, "
@@ -204,12 +201,12 @@ def audit_response(original_prompt: str, ai_response: str, client, model_name: s
         return f"Audit Error: {str(e)}"
 
 def generate_chat_title(first_prompt: str, client) -> str:
-    """Generates a concise 3-4 word title for a new chat session."""
+    """Generates a concise 2-4 word title for a chat session."""
     try:
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[
-                {"role": "system", "content": "Create a 2-4 word title for this user prompt. Do not use quotes or punctuation. Return ONLY the title text."},
+                {"role": "system", "content": "Create a 2-4 word title for this prompt. No quotes or punctuation. Return ONLY the title text."},
                 {"role": "user", "content": first_prompt}
             ],
             max_tokens=10,
@@ -220,28 +217,16 @@ def generate_chat_title(first_prompt: str, client) -> str:
     except Exception:
         return "New Session"
 
-def safe_execute(func, default_return=None, error_msg="Feature temporarily unavailable."):
-    """Executes any app feature safely, catching errors without breaking the UI."""
-    try:
-        return func()
-    except Exception as e:
-        st.warning(f"⚠️ {error_msg}")
-        with st.expander("🔧 View Error Diagnostic"):
-            st.code(str(e), language="python")
-        return default_return
-
 def classify_user_intent(user_prompt: str, client, selected_model: str) -> str:
-    """Uses a fast model pass to automatically route prompts to the correct feature."""
+    """Classifies prompt intent for dynamic execution routing."""
     classification_system_prompt = (
-        "You are an intent classifier for an AI workspace. "
-        "Analyze the user's input and respond with EXACTLY ONE word from this list:\n"
-        "- GENERATE (if they want to create/draw an image)\n"
-        "- SEARCH (if they ask for real-time news, sports, weather, or recent facts)\n"
-        "- RESEARCH (if they ask for an in-depth report, deep dive, or multi-source investigation)\n"
-        "- CHAT (for standard questions, coding, conversation, or math)\n\n"
+        "You are an intent classifier. Analyze input and respond with EXACTLY ONE word:\n"
+        "- GENERATE (if requesting to draw/create an image)\n"
+        "- SEARCH (if asking for real-time news, stats, sports, weather, facts)\n"
+        "- RESEARCH (if asking for an in-depth report or multi-source report)\n"
+        "- CHAT (standard query, coding, general conversation)\n"
         "Output ONLY the single classification keyword."
     )
-    
     try:
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant",
@@ -258,10 +243,7 @@ def classify_user_intent(user_prompt: str, client, selected_model: str) -> str:
         return "CHAT"
 
 def generate_markdown_export(chat_list, memory_vault) -> str:
-    """Formats active chat messages and memory vault into a clean Markdown document."""
-    md = "# 🚀 AI Workspace Export\n"
-    md += f"**Export Date:** Active Session\n\n"
-    
+    md = "# 🚀 AI Workspace Export\n\n"
     if memory_vault:
         md += "## 🧠 Memory Vault Facts\n"
         for mem in memory_vault:
@@ -269,66 +251,20 @@ def generate_markdown_export(chat_list, memory_vault) -> str:
         md += "\n---\n"
 
     md += "## 💬 Chat Transcript\n\n"
-    for idx, msg in enumerate(chat_list, 1):
+    for msg in chat_list:
         role = msg.get("role", "user").capitalize()
         content = msg.get("content", "")
         md += f"### {role}\n{content}\n\n"
-        if "image_url" in msg:
-            md += "*[Image Generated]*\n\n"
-    
     return md
-
-def optimize_search_query(user_prompt: str, category: str = "general") -> str:
-    cleaned = user_prompt.lower().replace("search", "").replace("what are", "").strip()
-
-    if "world cup" in cleaned or "super bowl" in cleaned:
-        return f'"{cleaned}" final score champions match recap -betting -odds'
-    
-    if "movie" in cleaned or "grossing" in cleaned or "box office" in cleaned:
-        return f'"{cleaned}" box office worldwide stats'
-    elif "standings" in cleaned:
-        return f'"{cleaned}" scores standings results'
-        
-    return cleaned
-
-def clean_search_query(user_query: str) -> str:
-    query = user_query.lower().replace("/search", "").strip().strip("!? ")
-    
-    stop_phrases = ["the ", "a ", "an ", "who won ", "what is ", "tell me about "]
-    for phrase in stop_phrases:
-        if query.startswith(phrase):
-            query = query[len(phrase):].strip()
-            
-    if " " in query and not ('"' in query or "'" in query):
-        return f'"{query}"'
-        
-    return query
-
-def generate_action_cards(response_text: str):
-    suggestions = []
-    if "```" in response_text:
-        suggestions.append("🔍 Explain this code step-by-step")
-        suggestions.append("⚡ Optimize this code for speed")
-    elif any(term in response_text.lower() for term in ["equation", "formula", "calculate", "math"]):
-        suggestions.append("🧮 Show alternative solution method")
-        suggestions.append("📝 Give me a practice problem on this")
-    else:
-        suggestions.append("💡 Give me 3 real-world examples")
-        suggestions.append("📌 Summarize this in 2 bullet points")
-        suggestions.append("❓ What are the main criticisms of this?")
-    return suggestions
 
 def get_image_url(prompt: str):
     try:
         encoded_prompt = urllib.parse.quote(prompt.strip())
-        url = f"[https://image.pollinations.ai/prompt/](https://image.pollinations.ai/prompt/){encoded_prompt}?width=800&height=800&nologo=true"
-        req = urllib.request.Request(
-            url, 
-            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-        )
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=800&nologo=true"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=15) as response:
             return response.read()
-    except Exception as e:
+    except Exception:
         return None
 
 def encode_image_to_base64(image: Image.Image) -> str:
@@ -373,7 +309,7 @@ def extract_file_content(uploaded_file) -> str:
         try:
             return uploaded_file.read().decode("utf-8", errors="ignore")
         except Exception as e:
-            return f"[Error reading text file: {str(e)}]"
+            return f"[Error reading file: {str(e)}]"
     elif file_name.endswith(".pdf"):
         try:
             import pypdf
@@ -384,8 +320,6 @@ def extract_file_content(uploaded_file) -> str:
                 if extracted:
                     text += extracted + "\n"
             return text
-        except ImportError:
-            return "[Error: `pypdf` library is not installed. Install it via `pip install pypdf` to analyze PDFs!]"
         except Exception as e:
             return f"[Error reading PDF: {str(e)}]"
     return ""
@@ -411,7 +345,6 @@ with st.sidebar:
     st.header("⚙️ Workspace Controls")
     st.markdown("---")
     
-    # 🗂️ Multi-Chat Session Controls
     st.header("💬 Chat Sessions")
     chat_names = list(st.session_state.chats.keys())
     selected_chat = st.selectbox("Select Thread:", chat_names, index=chat_names.index(st.session_state.current_chat))
@@ -420,7 +353,12 @@ with st.sidebar:
         st.session_state.current_chat = selected_chat
         st.rerun()
 
-    # 🌐 Feature #18: Multi-Language Output Toggle
+    if st.button("➕ New Chat Session", use_container_width=True):
+        new_chat_name = f"Chat {len(st.session_state.chats) + 1}"
+        st.session_state.chats[new_chat_name] = []
+        st.session_state.current_chat = new_chat_name
+        st.rerun()
+
     st.markdown("---")
     st.header("🌐 Response Language")
     target_language = st.selectbox(
@@ -428,234 +366,14 @@ with st.sidebar:
         ["English", "Spanish", "French", "German", "Mandarin", "Japanese", "Portuguese", "Italian"]
     )
 
-    # 📦 Feature #15: Workspace Export Engine
     st.markdown("---")
-    with st.expander("📦 Session Export & Backup"):
-        st.caption("Download your active chat history and memory vault facts.")
-        
-        active_chats = st.session_state.chats.get(st.session_state.current_chat, [])
-        
-        if active_chats:
-            md_data = generate_markdown_export(active_chats, st.session_state.memory_vault)
-            st.download_button(
-                label="📄 Export as Markdown (.md)",
-                data=md_data,
-                file_name="workspace_chat_export.md",
-                mime="text/markdown",
-                use_container_width=True
-            )
-
-            sanitized_chats = []
-            for msg in active_chats:
-                clean_msg = {
-                    "role": msg.get("role", "user"),
-                    "content": msg.get("content", "")
-                }
-                if "image_url" in msg and isinstance(msg["image_url"], str):
-                    clean_msg["image_url"] = msg["image_url"]
-                sanitized_chats.append(clean_msg)
-
-            json_data = json.dumps({
-                "memory_vault": st.session_state.memory_vault,
-                "chat_history": sanitized_chats
-            }, indent=2)
-            
-            st.download_button(
-                label="💾 Export Raw Backup (.json)",
-                data=json_data,
-                file_name="workspace_backup.json",
-                mime="application/json",
-                use_container_width=True
-            )
-        else:
-            st.info("Start a chat session to enable export options.")
-
-    # 🎨 Feature #19: Custom UI Themes
-    st.markdown("---")
-    st.header("🎨 Visual Theme")
-    theme_choice = st.selectbox(
-        "Select Accent Preset:",
-        ["Default Streamlit", "Neon Cyberpunk", "Midnight Blue", "Emerald Hacker", "Sunset Warmth"]
-    )
-    
-    # Apply Custom CSS Injection based on theme selection
-    theme_styles = {
-        "Neon Cyberpunk": """
-            <style>
-                .stApp { background-color: #0d0f18; color: #00ffcc; }
-                .stButton>button { background-color: #ff007f; color: white; border-radius: 8px; }
-            </style>
-        """,
-        "Midnight Blue": """
-            <style>
-                .stApp { background-color: #0b132b; color: #e0e1dd; }
-                .stButton>button { background-color: #1c2541; color: #48cae4; border: 1px solid #48cae4; }
-            </style>
-        """,
-        "Emerald Hacker": """
-            <style>
-                .stApp { background-color: #051923; color: #00a896; }
-                .stButton>button { background-color: #028090; color: #f0f3f4; }
-            </style>
-        """,
-        "Sunset Warmth": """
-            <style>
-                .stApp { background-color: #2b1e1e; color: #f4a261; }
-                .stButton>button { background-color: #e76f51; color: white; }
-            </style>
-        """
-    }
-
-    if theme_choice in theme_styles:
-        st.markdown(theme_styles[theme_choice], unsafe_allow_html=True)
-
-    # 🔖 Feature #17: Saved Bookmarks & Snippets
-    st.markdown("---")
-    with st.expander("🔖 Saved Snippets & Bookmarks"):
-        st.caption("Quickly view or copy your pinned responses!")
-        if st.session_state.bookmarks:
-            for b_idx, bookmark in enumerate(st.session_state.bookmarks):
-                st.markdown(f"**Snippet #{b_idx + 1}**")
-                st.text_area(
-                    label=f"Bookmark {b_idx + 1}",
-                    value=bookmark,
-                    height=100,
-                    key=f"bm_val_{b_idx}",
-                    label_visibility="collapsed"
-                )
-                if st.button("🗑️ Remove", key=f"del_bm_{b_idx}", use_container_width=True):
-                    st.session_state.bookmarks.pop(b_idx)
-                    st.rerun()
-                st.markdown("---")
-        else:
-            st.info("No saved snippets yet. Click '🔖 Save Snippet' on any AI message!")
-
-    # 🧠 Feature #12: Global Memory Vault
-    st.markdown("---")
-    with st.expander("🧠 Persistent Memory Vault"):
-        st.caption("Information saved here is remembered across ALL chat sessions!")
-        
-        new_memory = st.text_input("Add a fact about yourself/project:", key="new_memory_input")
-        if st.button("💾 Save Memory", use_container_width=True):
-            if new_memory.strip():
-                st.session_state.memory_vault.append(new_memory.strip())
-                st.success("Saved to memory!")
-                st.rerun()
-
-        if st.session_state.memory_vault:
-            st.markdown("**Current Memories:**")
-            for m_idx, mem in enumerate(st.session_state.memory_vault):
-                st.write(f"• {mem}")
-            
-            if st.button("🗑️ Clear All Memories", use_container_width=True):
-                st.session_state.memory_vault = []
-                st.rerun()
-
-    if st.button("➕ New Chat Session", use_container_width=True):
-        new_chat_name = f"Chat {len(st.session_state.chats) + 1}"
-        st.session_state.chats[new_chat_name] = []
-        st.session_state.current_chat = new_chat_name
-        st.rerun()
-
-    auto_play_voice = st.toggle("🔊 Auto-Play Voice Answers", value=False)
+    st.header("🎭 AI Persona & Model")
+    personality = st.selectbox("Choose AI Persona:", ["Helpful Assistant", "Code Expert", "Sarcastic Buddy", "Strict Tutor"])
+    selected_model = st.selectbox("Select Model:", ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"])
 
     st.markdown("---")
-    st.header("🎭 AI Personality")
-    personality = st.selectbox(
-        "Choose AI Persona:",
-        ["Helpful Assistant", "Code Expert", "Sarcastic Buddy", "Strict Tutor"]
-    )
-
-    st.markdown("---")
-    st.header("🧠 Choose AI Model")
-    selected_model = st.selectbox(
-        "Select Model:",
-        [
-            "llama-3.3-70b-versatile",
-            "llama-3.1-8b-instant",
-            "mixtral-8x7b-32768"
-        ]
-    )
-
-    st.markdown("---")
-    st.header("📄 Document Analysis")
-    uploaded_doc = st.file_uploader(
-        "Upload Doc or Code (TXT, PDF, CSV, PY, JSON)",
-        type=["txt", "pdf", "csv", "md", "json", "py"],
-        key="doc_uploader"
-    )
-    
-    doc_context = ""
-    if uploaded_doc:
-        doc_context = extract_file_content(uploaded_doc)
-        st.success(f"📄 Attached `{uploaded_doc.name}` ({len(doc_context)} characters loaded)")
-    
-    st.markdown("---")
-    st.header("📷 Vision Image")
-    uploaded_file = st.file_uploader(
-        "Upload Image to Analyze", 
-        type=["png", "jpg", "jpeg", "webp"],
-        key="sidebar_file_uploader"
-    )
-    if uploaded_file:
-        image_to_analyze = Image.open(uploaded_file)
-        st.image(image_to_analyze, caption="Sidebar Attached Image", use_container_width=True)
-        st.success("Image attached! Ask a question in chat about it.")
-
-    st.markdown("---")
-    st.header("⚡ Shortcuts")
-    
-    sample_prompts = [
-        "/search What are the top trending space discoveries this week?",
-        "Explain quantum computing using an analogy about pizza.",
-        "/generate A futuristic neon city covered in bioluminescent plants",
-        "Give me a 5-minute productivity hack for studying."
-    ]
-    if st.button("🎲 Surprise Me!", use_container_width=True):
-        random_prompt = random.choice(sample_prompts)
-        st.session_state.chats[st.session_state.current_chat].append({"role": "user", "content": random_prompt})
-        st.rerun()
-
-    st.markdown("---")
-    if current_messages:
-        chat_text = convert_chat_to_text(current_messages)
-        st.download_button(
-            label="📥 Export Chat History",
-            data=chat_text,
-            file_name=f"{st.session_state.current_chat}_history.txt",
-            mime="text/plain",
-            use_container_width=True
-        )
-
-    if st.button("🗑️ Clear Chat", use_container_width=True):
-        st.session_state.chats[st.session_state.current_chat] = []
-        st.rerun()
-
-    with st.expander("📊 Session Analytics"):
-        active_list = st.session_state.chats[st.session_state.current_chat]
-        msg_count = len(active_list)
-        char_count = sum(len(m.get("content", "")) for m in active_list if isinstance(m.get("content"), str))
-        st.write(f"**Total Messages:** {msg_count}")
-        st.write(f"**Total Characters:** {char_count:,}")
-
-    # Dynamic temperature assignment
-if detected_intent in ["SEARCH", "RESEARCH"] or "code" in final_input.lower():
-    active_temp = 0.3  # Precision mode: factual & sharp
-else:
-    active_temp = 0.7  # Creative/Conversational mode: expressive & fluid
-
-response = client.chat.completions.create(
-    model=selected_model,
-    messages=messages_payload,
-    temperature=active_temp  # <-- Set dynamically!
-)
-
-# 🛠️📦 Feature #20: Prompt Studio & Session Exporter
-    st.markdown("---")
-    st.header("🛠️ Prompt Studio & Export")
-    
-    # 1. Custom Prompt Override
-    use_custom_override = st.toggle("Enable Prompt Studio Override", value=False)
+    st.header("🛠️ Prompt Studio Override")
+    use_custom_override = st.toggle("Enable Studio Override", value=False)
     custom_system_override = ""
     if use_custom_override:
         custom_system_override = st.text_area(
@@ -664,30 +382,49 @@ response = client.chat.completions.create(
             height=100
         )
 
-    # 2. Export Conversation Session
-    active_chat_data = st.session_state.chats.get(st.session_state.current_chat, [])
-    if active_chat_data:
-        # Convert active session to markdown format
-        md_export = f"# Chat Session: {st.session_state.current_chat}\n\n"
-        for msg in active_chat_data:
-            role_name = "User" if msg['role'] == 'user' else "AI Assistant"
-            md_export += f"### 👤 {role_name}\n{msg.get('content', '')}\n\n---\n\n"
-            
-        st.download_button(
-            label="📥 Export Chat as Markdown",
-            data=md_export,
-            file_name=f"{st.session_state.current_chat.replace(' ', '_').lower()}_export.md",
-            mime="text/markdown",
-            use_container_width=True
-        )
+    st.markdown("---")
+    st.header("📄 Document & Vision Inputs")
+    uploaded_doc = st.file_uploader("Upload Doc/Code", type=["txt", "pdf", "csv", "md", "json", "py"], key="doc_uploader")
+    doc_context = extract_file_content(uploaded_doc) if uploaded_doc else ""
+    if doc_context:
+        st.success(f"Attached `{uploaded_doc.name}`")
+
+    uploaded_file = st.file_uploader("Upload Image to Analyze", type=["png", "jpg", "jpeg", "webp"], key="sidebar_file_uploader")
+    if uploaded_file:
+        image_to_analyze = Image.open(uploaded_file)
+        st.image(image_to_analyze, caption="Sidebar Image", use_container_width=True)
+
+    st.markdown("---")
+    st.header("🧠 Memory Vault")
+    new_memory = st.text_input("Add Fact:", key="new_memory_input")
+    if st.button("💾 Save Memory", use_container_width=True):
+        if new_memory.strip():
+            st.session_state.memory_vault.append(new_memory.strip())
+            st.success("Memory Saved!")
+            st.rerun()
+
+    if st.session_state.memory_vault:
+        st.caption("Memories: " + ", ".join(st.session_state.memory_vault))
+
+    auto_play_voice = st.toggle("🔊 Auto-Play Voice Answers", value=False)
+
+    st.markdown("---")
+    theme_choice = st.selectbox("Visual Theme:", ["Default Streamlit", "Neon Cyberpunk", "Midnight Blue", "Emerald Hacker", "Sunset Warmth"])
+
+    # 🔖 Bookmarks Tab
+    with st.expander("🔖 Bookmarks"):
+        if st.session_state.bookmarks:
+            for b_idx, bookmark in enumerate(st.session_state.bookmarks):
+                st.text_area(f"Snippet {b_idx+1}", bookmark, height=80, key=f"bm_{b_idx}")
+        else:
+            st.info("No bookmarks saved yet.")
 
 # ==========================================
 # 4. CHAT HISTORY DISPLAY
 # ==========================================
 
-# 🌐🎨 Feature #18 & #19 Status Badge
-st.caption(f"⚙️ **Active Workspace Config:** Language: `{target_language}` | Theme Preset: `{theme_choice}`")
-st.markdown("---")  # <-- NO SPACES BEFORE THIS LINE!
+st.caption(f"⚙️ **Active Config:** Language: `{target_language}` | Theme: `{theme_choice}`")
+st.markdown("---")
 
 for idx, msg in enumerate(st.session_state.chats[st.session_state.current_chat]):
     with st.chat_message(msg["role"]):
@@ -701,37 +438,45 @@ for idx, msg in enumerate(st.session_state.chats[st.session_state.current_chat])
                 if st.button("🔖 Save Snippet", key=f"bookmark_btn_{idx}"):
                     if msg["content"] not in st.session_state.bookmarks:
                         st.session_state.bookmarks.append(msg["content"])
-                        st.toast("Snippet saved to your Bookmarks tab!", icon="🔖")
-                    else:
-                        st.toast("Snippet is already saved!", icon="ℹ️")
+                        st.toast("Snippet saved!", icon="🔖")
 
         if "image_url" in msg:
             st.image(msg["image_url"], use_container_width=True)
-        elif "uploaded_img" in msg:
-            st.image(msg["uploaded_img"], use_container_width=True)
         
         if "audio" in msg and msg["audio"]:
             is_latest_msg = (idx == len(st.session_state.chats[st.session_state.current_chat]) - 1)
             st.audio(msg["audio"], format="audio/mp3", autoplay=(auto_play_voice and is_latest_msg))
 
-        if msg["role"] == "assistant" and "content" in msg and msg["content"]:
-            with st.expander("🛡️ Verify & Audit Response"):
-                if st.button("Run Self-Critique", key=f"audit_btn_{idx}"):
-                    previous_prompt = "General query"
-                    if idx > 0 and st.session_state.chats[st.session_state.current_chat][idx-1]["role"] == "user":
-                        previous_prompt = st.session_state.chats[st.session_state.current_chat][idx-1]["content"]
-                    with st.spinner("Analyzing response accuracy..."):
-                        audit_result = audit_response(previous_prompt, msg["content"], client, selected_model)
-                        st.info(audit_result)
-                        
 # ==========================================
-# 5. INPUT LOGIC & ROUTING
+# 5. INPUT LOGIC & DYNAMIC ROUTING
 # ==========================================
+
+user_input = st.chat_input("Ask anything, use /search, /generate, or /research...")
+audio_bytes = audio_recorder(text="🎤 Record Voice", recording_color="#e84c3d", neutral_color="#6aa84f")
+
+final_input = user_input
+if audio_bytes and client:
+    transcribed = transcribe_audio_groq(audio_bytes, client)
+    if transcribed and not transcribed.startswith("Speech-to-Text Error"):
+        final_input = transcribed
 
 if final_input and client:
-    # ... (your chat recording and title generation logic above) ...
+    active_chat_list = st.session_state.chats[st.session_state.current_chat]
+    
+    # Auto Title Generator on First Message
+    if len(active_chat_list) == 1 and active_chat_list[0].get("role") == "assistant":
+        new_title = generate_chat_title(final_input, client)
+        if new_title != "New Session":
+            st.session_state.chats[new_title] = st.session_state.chats.pop(st.session_state.current_chat)
+            st.session_state.current_chat = new_title
+            active_chat_list = st.session_state.chats[st.session_state.current_chat]
 
-    # 1. Detect Intent
+    # Append User Input
+    active_chat_list.append({"role": "user", "content": final_input})
+    with st.chat_message("user"):
+        st.markdown(final_input)
+
+    # 1. Intent Detection Routing
     detected_intent = "CHAT"
     if final_input.lower().startswith("/generate"):
         detected_intent = "GENERATE"
@@ -739,71 +484,91 @@ if final_input and client:
         detected_intent = "SEARCH"
     elif final_input.lower().startswith("/research"):
         detected_intent = "RESEARCH"
-    elif not active_image:
+    elif not image_to_analyze:
         detected_intent = classify_user_intent(final_input, client, selected_model)
 
-    # 2. Auto-Detect Style (Prevents NameError!)
+    # 2. Dynamic Style Auto-Detection
     sports_keywords = ["nascar", "nfl", "nba", "prediction", "stats", "race", "game"]
     if any(kw in final_input.lower() for kw in sports_keywords):
         detected_style = "ANALYTICAL"
-    elif any(kw in final_input.lower() for kw in ["code", "python", "error", "streamlit"]):
+    elif any(kw in final_input.lower() for kw in ["code", "python", "error", "streamlit", "def"]):
         detected_style = "TECHNICAL"
     else:
         detected_style = "GENERAL"
 
     # ROUTE 1: Image Generation
     if detected_intent == "GENERATE":
-        # ... image logic ...
-        pass
+        clean_prompt = final_input.replace("/generate", "").strip()
+        with st.spinner("🎨 Rendering image..."):
+            img_bytes = get_image_url(clean_prompt)
+            if img_bytes:
+                img_b64 = f"data:image/png;base64,{base64.b64encode(img_bytes).decode('utf-8')}"
+                active_chat_list.append({
+                    "role": "assistant",
+                    "content": f"Here is your generated image for: **'{clean_prompt}'**",
+                    "image_url": img_b64
+                })
+            else:
+                active_chat_list.append({"role": "assistant", "content": "⚠️ Image generation failed."})
 
-    # ROUTE 2: Web Search
+    # ROUTE 2: Free Web Search
     elif detected_intent == "SEARCH":
-        # ... search logic ...
-        pass
+        clean_query = final_input.replace("/search", "").strip()
+        with st.spinner("🔍 Querying live web search..."):
+            search_data = execute_free_search(clean_query)
+            search_prompt = (
+                f"User requested real-time search information for: '{clean_query}'.\n"
+                f"Live Search Data:\n{search_data}\n\n"
+                f"Synthesize this factual context clearly using structured headings and concise takeaways."
+            )
+            response = client.chat.completions.create(
+                model=selected_model,
+                messages=[{"role": "system", "content": search_prompt}],
+                temperature=0.2
+            )
+            reply = response.choices[0].message.content
+            active_chat_list.append({"role": "assistant", "content": reply})
 
-    # ROUTE 3: Deep Research
+    # ROUTE 3: Deep Research Agent
     elif detected_intent == "RESEARCH":
-        # ... research logic ...
-        pass
+        clean_topic = final_input.replace("/research", "").strip()
+        with st.spinner("🕵️ Agent performing multi-step deep research..."):
+            brief = run_deep_research_agent(clean_topic, client, selected_model)
+            active_chat_list.append({"role": "assistant", "content": brief})
 
-    # ROUTE 4: Standard Dynamic Chat
+    # ROUTE 4: Standard Chat with Dynamic Context & Fluid Temperature Tuning
     else:
-        # Check Feature #20 Override first
-        if 'use_custom_override' in locals() and use_custom_override and custom_system_override.strip():
+        # Prompt Studio Override vs Dynamic System Builder
+        if use_custom_override and custom_system_override.strip():
             system_prompt = custom_system_override.strip()
         else:
-            system_prompt = f"You are a {personality}. Help the user to the best of your ability."
+            system_prompt = build_dynamic_system_prompt(final_input, personality, target_language, detected_style)
 
-        # Dynamically inject style instructions based on detected_style
-        if detected_style == "ANALYTICAL":
-            system_prompt += (
-                "\n\n[ANALYTICAL MODE ACTIVE]"
-                "\n- Provide zero generic fluff."
-                "\n- Use structured confidence scores (%) and tactical 'Why' bullet points."
-                "\n- Use colored visual indicators/emojis for team/data readability."
-            )
-        elif detected_style == "TECHNICAL":
-            system_prompt += "\n\n[TECHNICAL MODE ACTIVE]\n- Diagnose root causes clearly and provide clean code blocks."
+        # Append File Context
+        if doc_context:
+            system_prompt += f"\n\n[USER ATTACHED FILE CONTEXT]:\n{doc_context[:4000]}"
 
-        # Feature #18 Language Injection
-        if 'target_language' in locals() and target_language != "English":
-            system_prompt += f"\n\nCRITICAL LANGUAGE RULE: Respond entirely in {target_language}."
-
+        # Append Memory Vault
         if st.session_state.memory_vault:
-            system_prompt += "\nSaved User Information:\n" + "\n".join([f"- {m}" for m in st.session_state.memory_vault])
+            system_prompt += "\n\n[MEMORY VAULT FACTS]:\n" + "\n".join([f"- {m}" for m in st.session_state.memory_vault])
 
+        # Message Payload Construction
         messages_payload = [{"role": "system", "content": system_prompt}]
         for m in active_chat_list:
             if isinstance(m.get("content"), str):
                 messages_payload.append({"role": m["role"], "content": m["content"]})
 
+        # Fluid Temperature Tuning based on Intent
+        active_temp = 0.3 if detected_style in ["ANALYTICAL", "TECHNICAL"] else 0.7
+
         with st.spinner("Thinking..."):
             response = client.chat.completions.create(
                 model=selected_model,
                 messages=messages_payload,
-                temperature=0.4 if detected_style == "ANALYTICAL" else 0.7
+                temperature=active_temp
             )
             assistant_reply = response.choices[0].message.content
-            active_chat_list.append({"role": "assistant", "content": assistant_reply})
+            audio_data = generate_speech_audio(assistant_reply)
+            active_chat_list.append({"role": "assistant", "content": assistant_reply, "audio": audio_data})
 
     st.rerun()
