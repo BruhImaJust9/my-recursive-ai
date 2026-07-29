@@ -749,6 +749,12 @@ if final_input and client:
             system_prompt += "\nSaved User Information:\n" + "\n".join([f"- {m}" for m in st.session_state.memory_vault])
         if doc_context:
             system_prompt += f"\n\nAttached Document Content:\n{doc_context[:4000]}"
+            
+            # Language instruction snippet
+        lang_instruction = f"\n\nCRITICAL LANGUAGE RULE: Respond entirely in {target_language}." if target_language != "English" else ""
+
+        # Update General Chat system prompt:
+        system_prompt = f"You are a {personality}. Help the user to the best of your ability.{lang_instruction}"
 
         messages_payload = [{"role": "system", "content": system_prompt}]
         for m in active_chat_list:
