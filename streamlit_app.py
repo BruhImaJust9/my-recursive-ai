@@ -469,6 +469,19 @@ with st.sidebar:
     st.markdown("---")
     theme_choice = st.selectbox("Visual Theme:", ["Default Streamlit", "Neon Cyberpunk", "Midnight Blue", "Emerald Hacker", "Sunset Warmth"])
 
+    # Add this snippet near your theme styling or top of the app
+st.markdown(
+    """
+    <style>
+        iframe[title="audio_recorder_streamlit.audio_recorder"] {
+            border: none !important;
+            outline: none !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
     # 🔖 Bookmarks Tab
     with st.expander("🔖 Bookmarks"):
         if st.session_state.bookmarks:
