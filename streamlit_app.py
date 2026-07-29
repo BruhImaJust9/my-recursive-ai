@@ -50,17 +50,19 @@ def save_chats_to_disk():
 # ==========================================
 st.set_page_config(page_title="AI Workspace", page_icon="🤖", layout="wide")
 
-# 🎨 CSS FIX: Removes the white rectangle/outline around the audio recorder iframe
+# 🎨 CSS FIX: Force audio recorder iframe and wrapper to be transparent
 st.markdown(
     """
     <style>
         iframe[title="audio_recorder_streamlit.audio_recorder"] {
             border: none !important;
             outline: none !important;
-            box-shadow: none !important;
+            background-color: transparent !important;
         }
-        div[data-testid="stHorizontalBlock"] > div {
-            border: none !important;
+        div[data-testid="stCustomComponentV1"] {
+            background-color: transparent !important;
+            display: flex;
+            justify-content: center;
         }
     </style>
     """,
