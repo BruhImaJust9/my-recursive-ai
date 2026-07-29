@@ -619,7 +619,7 @@ if final_input and client:
             brief = run_deep_research_agent(clean_topic, client, selected_model)
             active_chat_list.append({"role": "assistant", "content": brief})
 
-    # ROUTE 4: Standard Chat with Dynamic Context & Fluid Temperature Tuning
+    # ROUTE 4: Standard Chat with Dynamic Context & Fluid Temperature Tuning (STREAMING ENABLED! 🚀)
     else:
         # Prompt Studio Override vs Dynamic System Builder
         if use_custom_override and custom_system_override.strip():
@@ -641,18 +641,29 @@ if final_input and client:
             if isinstance(m.get("content"), str):
                 messages_payload.append({"role": m["role"], "content": m["content"]})
 
-        # Fluid Temperature Tuning based on Intent
         active_temp = 0.3 if detected_style in ["ANALYTICAL", "TECHNICAL"] else 0.7
 
-        with st.spinner("Thinking..."):
-            response = client.chat.completions.create(
+        with st.chat_message("assistant"):
+            # 1. Initiate Streaming Completion from Groq
+            stream = client.chat.completions.create(
                 model=selected_model,
                 messages=messages_payload,
-                temperature=active_temp
+                temperature=active_temp,
+                stream=True  # 👈 Enables streaming tokens!
             )
-            assistant_reply = response.choices[0].message.content
-            audio_data = generate_speech_audio(assistant_reply)
-            active_chat_list.append({"role": "assistant", "content": assistant_reply, "audio": audio_data})
             
+            # 2. Helper generator to yield chunks to Streamlit in real-time
+            def stream_generator():
+                for chunk in stream:
+                    if chunk.choices[0].delta.content:
+                        yield chunk.choices[0].delta.content
+
+            # 3. Stream text directly into the UI live as it generates!
+            assistant_reply = st.write_stream(stream_generator)
+
+        # 4. Generate audio and append final reply to chat history
+        audio_data = generate_speech_audio(assistant_reply)
+        active_chat_list.append({"role": "assistant", "content": assistant_reply, "audio": audio_data})
+
     save_chats_to_disk()
     st.rerun()
