@@ -528,6 +528,31 @@ for idx, msg in enumerate(st.session_state.chats[st.session_state.current_chat])
             is_latest_msg = (idx == len(st.session_state.chats[st.session_state.current_chat]) - 1)
             st.audio(msg["audio"], format="audio/mp3", autoplay=(auto_play_voice and is_latest_msg))
 
+active_chat_list = st.session_state.chats[st.session_state.current_chat]
+
+# Only show control buttons if there is conversation history
+if len(active_chat_list) > 1:
+    col_regen, col_undo, _ = st.columns([2, 2, 6])
+    
+    with col_regen:
+        if st.button("🔄 Regenerate Response", use_container_width=True):
+            # Remove the last assistant message if it exists
+            if active_chat_list[-1]["role"] == "assistant":
+                active_chat_list.pop()
+                save_chats_to_disk()
+                st.rerun()
+
+    with col_undo:
+        if st.button("✏️ Edit Last Prompt", use_container_width=True):
+            # Remove both last assistant reply and user prompt to re-trigger
+            if active_chat_list[-1]["role"] == "assistant":
+                active_chat_list.pop()
+            if active_chat_list and active_chat_list[-1]["role"] == "user":
+                last_user_prompt = active_chat_list.pop()["content"]
+                st.session_state["edit_prompt_buffer"] = last_user_prompt
+                save_chats_to_disk()
+                st.rerun()
+
 # ==========================================
 # 5. INPUT LOGIC & DYNAMIC ROUTING
 # ==========================================
