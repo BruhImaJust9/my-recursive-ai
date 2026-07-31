@@ -532,25 +532,17 @@ for idx, msg in enumerate(st.session_state.chats[st.session_state.current_chat])
 # 5. INPUT LOGIC & DYNAMIC ROUTING
 # ==========================================
 
-# 1. Single layout container for chat input & audio recorder
-col_input, col_voice = st.columns([8, 1])
-
-with col_input:
-    user_input = st.chat_input("Ask anything, use /search, /generate, or /research...", key="main_chat_input")
-
-with col_voice:
-    audio_bytes = audio_recorder(text="", recording_color="#e84c3d", neutral_color="#6aa84f", key="main_audio_recorder")
-
-final_input = user_input
-
+# Root-level chat input (Always stays responsive!)
 user_input = st.chat_input("Ask anything, use /search, /generate, or /research...")
-audio_bytes = audio_recorder(text="🎤 Record Voice", recording_color="#e84c3d", neutral_color="#6aa84f")
 
+# Check sidebar for voice recording (if recorded there)
 final_input = user_input
-if audio_bytes and client:
-    transcribed = transcribe_audio_groq(audio_bytes, client)
+if "sidebar_audio_bytes" in st.session_state and st.session_state.sidebar_audio_bytes:
+    transcribed = transcribe_audio_groq(st.session_state.sidebar_audio_bytes, client)
     if transcribed and not transcribed.startswith("Speech-to-Text Error"):
         final_input = transcribed
+        # Clear after reading
+        st.session_state.sidebar_audio_bytes = None
 
 if final_input and 'client' in globals() and client is not None:
     active_chat_list = st.session_state.chats[st.session_state.current_chat]
@@ -628,23 +620,19 @@ if final_input and 'client' in globals() and client is not None:
             brief = run_deep_research_agent(clean_topic, client, selected_model)
             active_chat_list.append({"role": "assistant", "content": brief})
 
-    # ROUTE 4: Standard Chat with Dynamic Context & Fluid Temperature Tuning (STREAMING ENABLED! 🚀)
+    # ROUTE 4: Standard Chat with Streaming 🚀
     else:
-        # Prompt Studio Override vs Dynamic System Builder
         if use_custom_override and custom_system_override.strip():
             system_prompt = custom_system_override.strip()
         else:
             system_prompt = build_dynamic_system_prompt(final_input, personality, target_language, detected_style)
 
-        # Append File Context
         if doc_context:
             system_prompt += f"\n\n[USER ATTACHED FILE CONTEXT]:\n{doc_context[:4000]}"
 
-        # Append Memory Vault
         if st.session_state.memory_vault:
             system_prompt += "\n\n[MEMORY VAULT FACTS]:\n" + "\n".join([f"- {m}" for m in st.session_state.memory_vault])
 
-        # Message Payload Construction
         messages_payload = [{"role": "system", "content": system_prompt}]
         for m in active_chat_list:
             if isinstance(m.get("content"), str):
@@ -653,24 +641,20 @@ if final_input and 'client' in globals() and client is not None:
         active_temp = 0.3 if detected_style in ["ANALYTICAL", "TECHNICAL"] else 0.7
 
         with st.chat_message("assistant"):
-            # 1. Initiate Streaming Completion from Groq
             stream = client.chat.completions.create(
                 model=selected_model,
                 messages=messages_payload,
                 temperature=active_temp,
-                stream=True  # 👈 Enables streaming tokens!
+                stream=True
             )
             
-            # 2. Helper generator to yield chunks to Streamlit in real-time
             def stream_generator():
                 for chunk in stream:
                     if chunk.choices[0].delta.content:
                         yield chunk.choices[0].delta.content
 
-            # 3. Stream text directly into the UI live as it generates!
             assistant_reply = st.write_stream(stream_generator)
 
-        # 4. Generate audio and append final reply to chat history
         audio_data = generate_speech_audio(assistant_reply)
         active_chat_list.append({"role": "assistant", "content": assistant_reply, "audio": audio_data})
 
