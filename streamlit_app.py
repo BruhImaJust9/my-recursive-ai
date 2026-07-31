@@ -433,6 +433,10 @@ with st.sidebar:
         )
 
     st.markdown("---")
+    st.header("🎤 Voice Controls")
+    audio_bytes = audio_recorder(text="Record Voice", recording_color="#e84c3d", neutral_color="#6aa84f")
+
+    st.markdown("---")
     st.header("📄 Document & Vision Inputs")
     uploaded_doc = st.file_uploader("Upload Doc/Code", type=["txt", "pdf", "csv", "md", "json", "py"], key="doc_uploader")
     doc_context = extract_file_content(uploaded_doc) if uploaded_doc else ""
