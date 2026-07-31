@@ -52,21 +52,16 @@ if "chats" not in st.session_state:
 if "current_chat" not in st.session_state:
     st.session_state.current_chat = list(st.session_state.chats.keys())[0]
 
+# Initializing Edit Buffer for Upgrade #23
+if "input_buffer" not in st.session_state:
+    st.session_state.input_buffer = ""
+
 # ==========================================
 # 1. PAGE SETUP & CONFIG
 # ==========================================
 st.set_page_config(page_title="AI Workspace", page_icon="🤖", layout="wide")
 
-# Initialize Groq Client Globally
-GROQ_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
-
-if GROQ_KEY:
-    client = Groq(api_key=GROQ_KEY)
-else:
-    client = None
-    st.warning("⚠️ Missing `GROQ_API_KEY` in Streamlit secrets! Please add it to continue.")
-
-# 🎨 CSS FIX: Injected directly after set_page_config to ensure full override
+# 🎨 NUCLEAR CSS FIX & SUBTLE BUTTON STYLING (Upgrade #24)
 st.markdown(
     """
     <style>
@@ -98,6 +93,21 @@ st.markdown(
         iframe {
             border: 0px none transparent !important;
         }
+
+        /* 5. Upgrade #24: Subtle, minimalistic micro-action buttons */
+        div[data-testid="column"] button {
+            border: none !important;
+            background: transparent !important;
+            color: #888888 !important;
+            font-size: 0.8rem !important;
+            padding: 2px 8px !important;
+            border-radius: 6px !important;
+            transition: all 0.2s ease-in-out;
+        }
+        div[data-testid="column"] button:hover {
+            background-color: rgba(255, 255, 255, 0.08) !important;
+            color: #ffffff !important;
+        }
     </style>
     """,
     unsafe_allow_html=True
@@ -105,6 +115,33 @@ st.markdown(
 
 st.title("🤖 Intelligent AI Workspace")
 st.caption("Powered by Groq Llama 3, Free Web Search, Image Generation & Voice")
+
+# Initialize Groq Client
+GROQ_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
+
+if GROQ_KEY:
+    client = Groq(api_key=GROQ_KEY)
+else:
+    client = None
+    st.warning("⚠️ Missing `GROQ_API_KEY` in Streamlit secrets! Please add it to continue.")
+
+# Helper reference for current active message list
+current_messages = st.session_state.chats[st.session_state.current_chat]
+
+# Initialize Persistent Memory Vault
+if "memory_vault" not in st.session_state:
+    st.session_state.memory_vault = []
+
+# Initialize Bookmarks Storage
+if "bookmarks" not in st.session_state:
+    st.session_state.bookmarks = []
+
+if not current_messages:
+    current_messages.append({
+        "role": "assistant", 
+        "content": "Hey there! I'm powered by Groq. Ask me anything, upload an image to analyze, try `/search <topic>`, `/generate <prompt>`, or speak using the voice recorder!"
+    })
+
 # ==========================================
 # 2. HELPER FUNCTIONS
 # ==========================================
@@ -399,7 +436,6 @@ with st.sidebar:
     chat_names = list(st.session_state.chats.keys())
     selected_chat = st.selectbox("Select Thread:", chat_names, index=chat_names.index(st.session_state.current_chat))
 
-    # 🚀 Upgrade #22: Export & Management
     active_chat_export = st.session_state.chats[st.session_state.current_chat]
     if active_chat_export:
         md_data = generate_markdown_export(active_chat_export, st.session_state.memory_vault)
@@ -460,10 +496,6 @@ with st.sidebar:
         )
 
     st.markdown("---")
-    st.header("🎤 Voice Controls")
-    audio_bytes = audio_recorder(text="Record Voice", recording_color="#e84c3d", neutral_color="#6aa84f")
-
-    st.markdown("---")
     st.header("📄 Document & Vision Inputs")
     uploaded_doc = st.file_uploader("Upload Doc/Code", type=["txt", "pdf", "csv", "md", "json", "py"], key="doc_uploader")
     doc_context = extract_file_content(uploaded_doc) if uploaded_doc else ""
@@ -474,6 +506,10 @@ with st.sidebar:
     if uploaded_file:
         image_to_analyze = Image.open(uploaded_file)
         st.image(image_to_analyze, caption="Sidebar Image", use_container_width=True)
+
+    st.markdown("---")
+    st.header("🎤 Voice Controls")
+    st.session_state.sidebar_audio_bytes = audio_recorder(text="Record Voice", recording_color="#e84c3d", neutral_color="#6aa84f")
 
     st.markdown("---")
     st.header("🧠 Memory Vault")
@@ -492,7 +528,6 @@ with st.sidebar:
     st.markdown("---")
     theme_choice = st.selectbox("Visual Theme:", ["Default Streamlit", "Neon Cyberpunk", "Midnight Blue", "Emerald Hacker", "Sunset Warmth"])
 
-    # 🔖 Bookmarks Tab
     with st.expander("🔖 Bookmarks"):
         if st.session_state.bookmarks:
             for b_idx, bookmark in enumerate(st.session_state.bookmarks):
@@ -501,13 +536,15 @@ with st.sidebar:
             st.info("No bookmarks saved yet.")
 
 # ==========================================
-# 4. CHAT HISTORY DISPLAY
+# 4. CHAT HISTORY DISPLAY & SUBTLE ACTION BUTTONS (UPGRADES #23 & #24)
 # ==========================================
 
 st.caption(f"⚙️ **Active Config:** Language: `{target_language}` | Theme: `{theme_choice}`")
 st.markdown("---")
 
-for idx, msg in enumerate(st.session_state.chats[st.session_state.current_chat]):
+active_chat_list = st.session_state.chats[st.session_state.current_chat]
+
+for idx, msg in enumerate(active_chat_list):
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
         
@@ -516,7 +553,7 @@ for idx, msg in enumerate(st.session_state.chats[st.session_state.current_chat])
 
             col_bm, _ = st.columns([1, 4])
             with col_bm:
-                if st.button("🔖 Save Snippet", key=f"bookmark_btn_{idx}"):
+                if st.button("🔖 Save", key=f"bookmark_btn_{idx}"):
                     if msg["content"] not in st.session_state.bookmarks:
                         st.session_state.bookmarks.append(msg["content"])
                         st.toast("Snippet saved!", icon="🔖")
@@ -525,53 +562,57 @@ for idx, msg in enumerate(st.session_state.chats[st.session_state.current_chat])
             st.image(msg["image_url"], use_container_width=True)
         
         if "audio" in msg and msg["audio"]:
-            is_latest_msg = (idx == len(st.session_state.chats[st.session_state.current_chat]) - 1)
+            is_latest_msg = (idx == len(active_chat_list) - 1)
             st.audio(msg["audio"], format="audio/mp3", autoplay=(auto_play_voice and is_latest_msg))
 
-active_chat_list = st.session_state.chats[st.session_state.current_chat]
+# 🚀 Upgrade #23 & #24: Subtle Quick Action Toolbar
+trigger_re_execution = False
 
-# Only show control buttons if there is conversation history
-if len(active_chat_list) > 1:
-    col_regen, col_undo, _ = st.columns([2, 2, 6])
+if len(active_chat_list) > 1 and active_chat_list[-1]["role"] == "assistant":
+    col_reg, col_ed, _ = st.columns([1.2, 1.2, 7.6])
     
-    with col_regen:
-        if st.button("🔄 Regenerate Response", use_container_width=True):
-            # Remove the last assistant message if it exists
-            if active_chat_list[-1]["role"] == "assistant":
-                active_chat_list.pop()
-                save_chats_to_disk()
-                st.rerun()
-
-    with col_undo:
-        if st.button("✏️ Edit Last Prompt", use_container_width=True):
-            # Remove both last assistant reply and user prompt to re-trigger
-            if active_chat_list[-1]["role"] == "assistant":
-                active_chat_list.pop()
+    with col_reg:
+        if st.button("🔄 Regenerate", key="btn_subtle_regen"):
+            # Remove the last assistant response to re-generate it cleanly
+            active_chat_list.pop()
+            save_chats_to_disk()
+            trigger_re_execution = True
+            
+    with col_ed:
+        if st.button("✏️ Edit Prompt", key="btn_subtle_edit"):
+            # Pop last assistant response and last user prompt, fill input buffer
+            active_chat_list.pop() # remove assistant reply
             if active_chat_list and active_chat_list[-1]["role"] == "user":
-                last_user_prompt = active_chat_list.pop()["content"]
-                st.session_state["edit_prompt_buffer"] = last_user_prompt
-                save_chats_to_disk()
-                st.rerun()
+                last_user_msg = active_chat_list.pop()
+                st.session_state.input_buffer = last_user_msg["content"]
+            save_chats_to_disk()
+            st.rerun()
 
 # ==========================================
 # 5. INPUT LOGIC & DYNAMIC ROUTING
 # ==========================================
 
-# Root-level chat input (Always stays responsive!)
+# Pre-fill chat input if editing last prompt
+default_prompt = st.session_state.input_buffer if st.session_state.input_buffer else ""
 user_input = st.chat_input("Ask anything, use /search, /generate, or /research...")
 
-# Check sidebar for voice recording (if recorded there)
+# Clear edit buffer after widget loads
+if st.session_state.input_buffer:
+    st.session_state.input_buffer = ""
+
+# Handle voice prompt if recorded in sidebar
 final_input = user_input
 if "sidebar_audio_bytes" in st.session_state and st.session_state.sidebar_audio_bytes:
     transcribed = transcribe_audio_groq(st.session_state.sidebar_audio_bytes, client)
     if transcribed and not transcribed.startswith("Speech-to-Text Error"):
         final_input = transcribed
-        # Clear after reading
         st.session_state.sidebar_audio_bytes = None
 
+# Re-trigger automatically if user clicked Regenerate!
+if trigger_re_execution and active_chat_list and active_chat_list[-1]["role"] == "user":
+    final_input = active_chat_list[-1]["content"]
+
 if final_input and 'client' in globals() and client is not None:
-    active_chat_list = st.session_state.chats[st.session_state.current_chat]
-    
     # Auto Title Generator on First Message
     if len(active_chat_list) == 1 and active_chat_list[0].get("role") == "assistant":
         new_title = generate_chat_title(final_input, client)
@@ -580,10 +621,11 @@ if final_input and 'client' in globals() and client is not None:
             st.session_state.current_chat = new_title
             active_chat_list = st.session_state.chats[st.session_state.current_chat]
 
-    # Append User Input
-    active_chat_list.append({"role": "user", "content": final_input})
-    with st.chat_message("user"):
-        st.markdown(final_input)
+    # Append User Input if it's not a re-executed regeneration
+    if not trigger_re_execution:
+        active_chat_list.append({"role": "user", "content": final_input})
+        with st.chat_message("user"):
+            st.markdown(final_input)
 
     # 1. Intent Detection Routing
     detected_intent = "CHAT"
@@ -645,7 +687,7 @@ if final_input and 'client' in globals() and client is not None:
             brief = run_deep_research_agent(clean_topic, client, selected_model)
             active_chat_list.append({"role": "assistant", "content": brief})
 
-    # ROUTE 4: Standard Chat with Streaming 🚀
+    # ROUTE 4: Standard Chat with Live Response Streaming 🚀
     else:
         if use_custom_override and custom_system_override.strip():
             system_prompt = custom_system_override.strip()
