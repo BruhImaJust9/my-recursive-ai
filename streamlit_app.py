@@ -16,7 +16,7 @@ from gtts import gTTS
 from audio_recorder_streamlit import audio_recorder
 
 # ==========================================
-# 0. PERSISTENCE HELPERS & CSS FIX
+# 0. PERSISTENCE HELPERS
 # ==========================================
 CHAT_STORAGE_FILE = "persistent_chats.json"
 
@@ -45,25 +45,6 @@ def save_chats_to_disk():
     except Exception:
         pass
 
-# 🎨 CSS FIX: Force audio recorder container background to be transparent (removes white box!)
-st.markdown(
-    """
-    <style>
-        iframe[title="audio_recorder_streamlit.audio_recorder"] {
-            border: none !important;
-            outline: none !important;
-            background-color: transparent !important;
-        }
-        div[data-testid="stCustomComponentV1"] {
-            background-color: transparent !important;
-            display: flex;
-            justify-content: center;
-        }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
 # Initialize Multi-Chat Sessions (Loads from disk!)
 if "chats" not in st.session_state:
     st.session_state.chats = load_saved_chats()
@@ -75,42 +56,28 @@ if "current_chat" not in st.session_state:
 # 1. PAGE SETUP & CONFIG
 # ==========================================
 st.set_page_config(page_title="AI Workspace", page_icon="🤖", layout="wide")
+
+# 🎨 CSS FIX: Injected directly after set_page_config to ensure full override
+st.markdown(
+    """
+    <style>
+        /* Target audio recorder iframe and all component containers */
+        iframe[title*="audio_recorder"],
+        div[data-testid="stCustomComponentV1"],
+        div[data-testid="stCustomComponentV1"] > iframe {
+            background-color: transparent !important;
+            background: transparent !important;
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 st.title("🤖 Intelligent AI Workspace")
 st.caption("Powered by Groq Llama 3, Free Web Search, Image Generation & Voice")
-
-# Initialize Groq Client
-GROQ_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
-
-if GROQ_KEY:
-    client = Groq(api_key=GROQ_KEY)
-else:
-    st.warning("⚠️ Missing `GROQ_API_KEY` in Streamlit secrets! Please add it to continue.")
-    client = None
-
-# Initialize Multi-Chat Sessions
-if "chats" not in st.session_state:
-    st.session_state.chats = {"Chat 1": []}
-
-if "current_chat" not in st.session_state:
-    st.session_state.current_chat = "Chat 1"
-
-# Helper reference for current active message list
-current_messages = st.session_state.chats[st.session_state.current_chat]
-
-# Initialize Persistent Memory Vault
-if "memory_vault" not in st.session_state:
-    st.session_state.memory_vault = []
-
-# Initialize Bookmarks Storage
-if "bookmarks" not in st.session_state:
-    st.session_state.bookmarks = []
-
-if not current_messages:
-    current_messages.append({
-        "role": "assistant", 
-        "content": "Hey there! I'm powered by Groq. Ask me anything, upload an image to analyze, try `/search <topic>`, `/generate <prompt>`, or speak using the voice recorder!"
-    })
-
 # ==========================================
 # 2. HELPER FUNCTIONS
 # ==========================================
