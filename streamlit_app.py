@@ -22,7 +22,6 @@ from audio_recorder_streamlit import audio_recorder
 CHAT_STORAGE_FILE = "persistent_chats.json"
 
 def load_saved_chats():
-    """Loads chat history from disk if it exists."""
     if os.path.exists(CHAT_STORAGE_FILE):
         try:
             with open(CHAT_STORAGE_FILE, "r") as f:
@@ -32,7 +31,6 @@ def load_saved_chats():
     return {"Chat 1": []}
 
 def save_chats_to_disk():
-    """Saves active session state chats to disk automatically."""
     try:
         clean_chats = {}
         for session_name, msg_list in st.session_state.chats.items():
@@ -46,14 +44,12 @@ def save_chats_to_disk():
     except Exception:
         pass
 
-# Initialize Multi-Chat Sessions (Loads from disk!)
 if "chats" not in st.session_state:
     st.session_state.chats = load_saved_chats()
 
 if "current_chat" not in st.session_state:
     st.session_state.current_chat = list(st.session_state.chats.keys())[0]
 
-# Initializing Buffers
 if "input_buffer" not in st.session_state:
     st.session_state.input_buffer = ""
 
@@ -62,11 +58,9 @@ if "input_buffer" not in st.session_state:
 # ==========================================
 st.set_page_config(page_title="AI Workspace", page_icon="🤖", layout="wide")
 
-# 🎨 CSS OVERRIDES & POPULAR CHATBOT UI ENHANCEMENTS (Upgrades #24-#30)
 st.markdown(
     """
     <style>
-        /* 1. Target Audio Recorder iframe directly */
         iframe[title*="audio_recorder"],
         iframe[src*="audio_recorder"] {
             background-color: transparent !important;
@@ -75,7 +69,6 @@ st.markdown(
             box-shadow: none !important;
         }
 
-        /* 2. Target Streamlit Custom Component Wrapper */
         div[data-testid="stCustomComponentV1"] {
             background-color: transparent !important;
             border: none !important;
@@ -84,18 +77,15 @@ st.markdown(
             margin: 0px !important;
         }
 
-        /* 3. Strip lines/borders from element wrappers */
         div[data-testid="stVerticalBlock"] > div {
             border: none !important;
             background: transparent !important;
         }
 
-        /* 4. Remove default iframe border lines */
         iframe {
             border: 0px none transparent !important;
         }
 
-        /* 5. Subtle micro-action buttons */
         div[data-testid="column"] button {
             border: none !important;
             background: transparent !important;
@@ -110,21 +100,6 @@ st.markdown(
             color: #ffffff !important;
         }
 
-        /* Upgrade #26: ChatGPT-style Quick Starter Prompt Cards */
-        .starter-card {
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 16px;
-            background: rgba(255, 255, 255, 0.03);
-            transition: transform 0.2s, border-color 0.2s;
-            cursor: pointer;
-        }
-        .starter-card:hover {
-            border-color: rgba(255, 255, 255, 0.3);
-            transform: translateY(-2px);
-        }
-
-        /* Upgrade #30: Model Badge styling */
         .model-badge {
             background: rgba(255, 255, 255, 0.08);
             padding: 4px 10px;
@@ -141,7 +116,6 @@ st.markdown(
 st.title("🤖 Intelligent AI Workspace")
 st.caption("Powered by Groq Llama 3, Free Web Search, Image Generation & Voice")
 
-# Initialize Groq Client
 GROQ_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
 
 if GROQ_KEY:
@@ -150,25 +124,21 @@ else:
     client = None
     st.warning("⚠️ Missing `GROQ_API_KEY` in Streamlit secrets! Please add it to continue.")
 
-# Helper reference for current active message list
 current_messages = st.session_state.chats[st.session_state.current_chat]
 
-# Initialize Persistent Memory Vault
 if "memory_vault" not in st.session_state:
     st.session_state.memory_vault = []
 
-# Initialize Bookmarks Storage
 if "bookmarks" not in st.session_state:
     st.session_state.bookmarks = []
 
 # ==========================================
-# 2. HELPER FUNCTIONS
+# 2. ENHANCED HELPER FUNCTIONS
 # ==========================================
 
 TAVILY_KEY = st.secrets.get("TAVILY_API_KEY", os.getenv("TAVILY_API_KEY", ""))
 
 def execute_free_search(query: str) -> str:
-    """Bulletproof web search using Tavily API."""
     if not TAVILY_KEY:
         return "⚠️ Missing `TAVILY_API_KEY` in Streamlit secrets!"
 
@@ -192,21 +162,30 @@ def execute_free_search(query: str) -> str:
         return f"Search error: {str(e)}"
 
 def build_dynamic_system_prompt(user_input, base_personality, language, detected_style="GENERAL"):
-    """Dynamically shapes system prompt instructions tailored to intent and domain context."""
-    prompt = f"You are an adaptable AI workspace assistant acting as a {base_personality}."
+    """
+    UPGRADED CHATGPT-LEVEL ENGINE:
+    Forces strict logic, concrete benchmarks, exact math, and structured frameworks across all domains.
+    """
+    prompt = (
+        f"You are an elite, highly intelligent AI assistant acting as a {base_personality}.\n"
+        "Follow these structural excellence rules for ALL responses:\n"
+        "1. GROUNDED REASONING: Before answering complex, speculative, or analytical queries, establish the underlying framework, theory, or core trade-offs.\n"
+        "2. CONCRETE BENCHMARKS: Avoid vague descriptions. Always use specific real-world anchors, concrete dates, historical eras, or exact metrics.\n"
+        "3. MATHEMATICAL & LOGICAL RIGOR: If giving numerical breakdowns or probabilities, ensure exact discrete totals (e.g. exactly 100%) rather than overlapping ranges.\n"
+        "4. ZERO META-FLUFF: Never reference internal prompt mechanics, missing search results, or web tool artifacts. Deliver clear, direct answers."
+    )
     
     if detected_style == "ANALYTICAL":
         prompt += (
-            "\n\n[MODE: ANALYTICAL SPORTS EXPERT]"
-            "\n- Provide zero generic fluff."
-            "\n- Use structured confidence scores (%) and tactical 'Why' bullet points."
-            "\n- Use team-colored visual markers/emojis for readability."
+            "\n\n[MODE: DEEP ANALYTICS]"
+            "\n- Provide structured confidence ratings and tactical bullet points."
+            "\n- Anchor findings with specific comparative metrics."
         )
     elif detected_style == "TECHNICAL":
         prompt += (
             "\n\n[MODE: SENIOR SOFTWARE ENGINEER]"
-            "\n- Diagnoses root causes clearly before offering code."
-            "\n- Write clean, production-ready code blocks without unnecessary intro prose."
+            "\n- Diagnose architectural root causes cleanly."
+            "\n- Provide production-ready, typed code with inline complexity analysis."
         )
 
     if language != "English":
@@ -215,13 +194,12 @@ def build_dynamic_system_prompt(user_input, base_personality, language, detected
     return prompt
 
 def run_deep_research_agent(topic: str, client, selected_model) -> str:
-    """Autonomous agent that plans sub-queries, executes multiple searches, and compiles a research brief."""
     if not TAVILY_KEY:
         return "⚠️ Missing `TAVILY_API_KEY` for Deep Research!"
 
     tavily = TavilyClient(api_key=TAVILY_KEY)
     
-    plan_prompt = f"Break down this research topic into 3 distinct, specific search queries to get comprehensive coverage: '{topic}'. Output ONLY 3 queries, one per line."
+    plan_prompt = f"Break down this research topic into 3 distinct, specific search queries: '{topic}'. Output ONLY 3 queries, one per line."
     try:
         plan_res = client.chat.completions.create(
             model=selected_model,
@@ -244,7 +222,7 @@ def run_deep_research_agent(topic: str, client, selected_model) -> str:
         return "No deep research findings could be retrieved."
 
     synthesis_prompt = (
-        f"You are a Lead Intelligence Analyst. Based on the following information, produce a research brief on: '{topic}'.\n\n"
+        f"You are a Lead Intelligence Analyst. Produce a structured research brief on: '{topic}'.\n\n"
         f"Information:\n" + "\n\n".join(compiled_findings[:8])
     )
 
@@ -255,9 +233,7 @@ def run_deep_research_agent(topic: str, client, selected_model) -> str:
     return summary_res.choices[0].message.content
 
 def render_data_canvas(response_text: str):
-    """Detects Markdown tables or CSV structures and renders interactive charts."""
     lines = [line.strip() for line in response_text.split("\n") if "|" in line]
-    
     if len(lines) >= 3:
         try:
             cleaned_lines = [re.sub(r'^\||\|$', '', line) for line in lines if not re.match(r'^[\vert{}\s:-]+$', line)]
@@ -282,12 +258,11 @@ def render_data_canvas(response_text: str):
             pass
 
 def generate_chat_title(first_prompt: str, client) -> str:
-    """Generates a concise 2-4 word title for a chat session."""
     try:
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[
-                {"role": "system", "content": "Create a 2-4 word title for this prompt. No quotes or punctuation. Return ONLY the title text."},
+                {"role": "system", "content": "Create a 2-4 word title for this prompt. Return ONLY the title text."},
                 {"role": "user", "content": first_prompt}
             ],
             max_tokens=10,
@@ -299,13 +274,12 @@ def generate_chat_title(first_prompt: str, client) -> str:
         return "New Session"
 
 def classify_user_intent(user_prompt: str, client, selected_model: str) -> str:
-    """Classifies prompt intent for dynamic execution routing."""
     classification_system_prompt = (
         "You are an intent classifier. Analyze input and respond with EXACTLY ONE word:\n"
-        "- GENERATE (if requesting to draw/create an image)\n"
-        "- SEARCH (if asking for real-time news, stats, sports, weather, facts)\n"
-        "- RESEARCH (if asking for an in-depth report or multi-source report)\n"
-        "- CHAT (standard query, coding, general conversation)\n"
+        "- GENERATE (if explicitly asking to generate or draw an image)\n"
+        "- SEARCH (if asking for live current events, weather, stock prices, or specific live stats)\n"
+        "- RESEARCH (if asking for an in-depth multi-source report)\n"
+        "- CHAT (for standard questions, thought experiments, coding, writing, or analysis)\n"
         "Output ONLY the single classification keyword."
     )
     try:
@@ -346,7 +320,7 @@ def get_image_url(prompt: str):
         with urllib.request.urlopen(req, timeout=15) as response:
             return response.read()
     except Exception:
-        return None
+        None
 
 def extract_file_content(uploaded_file) -> str:
     if uploaded_file is None:
@@ -514,12 +488,11 @@ with st.sidebar:
             st.info("No bookmarks saved yet.")
 
 # ==========================================
-# 4. CHAT DISPLAY & POPULAR CHATBOT UI (UPGRADES #26-#30)
+# 4. CHAT DISPLAY & TOOLBAR
 # ==========================================
 
 active_chat_list = st.session_state.chats[st.session_state.current_chat]
 
-# Upgrade #29 & #30: Header Thread Status & Model Badges
 col_hdr1, col_hdr2 = st.columns([6, 4])
 with col_hdr1:
     st.markdown(f"### 💬 {st.session_state.current_chat}")
@@ -528,7 +501,6 @@ with col_hdr2:
 
 st.markdown("---")
 
-# Upgrade #26: Quick Starter Prompt Cards on Empty Chat
 if not active_chat_list:
     st.markdown("#### What would you like to explore today?")
     sc1, sc2 = st.columns(2)
@@ -554,7 +526,6 @@ for idx, msg in enumerate(active_chat_list):
         if msg["role"] == "assistant" and "content" in msg and msg["content"]:
             render_data_canvas(msg["content"])
 
-            # Upgrade #27 & #28: Token Stats + Copy Button
             col_bm, col_stats, _ = st.columns([1, 3, 5])
             with col_bm:
                 if st.button("🔖 Save", key=f"bookmark_btn_{idx}"):
@@ -573,7 +544,6 @@ for idx, msg in enumerate(active_chat_list):
             is_latest_msg = (idx == len(active_chat_list) - 1)
             st.audio(msg["audio"], format="audio/mp3", autoplay=(auto_play_voice and is_latest_msg))
 
-# Upgrade #23 & #24: Subtle Toolbar
 trigger_re_execution = False
 
 if len(active_chat_list) > 1 and active_chat_list[-1]["role"] == "assistant":
@@ -627,7 +597,6 @@ if final_input and 'client' in globals() and client is not None:
         with st.chat_message("user"):
             st.markdown(final_input)
 
-    # 1. Intent Detection
     detected_intent = "CHAT"
     if final_input.lower().startswith("/generate"):
         detected_intent = "GENERATE"
@@ -638,9 +607,8 @@ if final_input and 'client' in globals() and client is not None:
     elif not image_to_analyze:
         detected_intent = classify_user_intent(final_input, client, selected_model)
 
-    detected_style = "ANALYTICAL" if any(kw in final_input.lower() for kw in ["nascar", "nfl", "nba", "prediction", "stats"]) else "GENERAL"
+    detected_style = "ANALYTICAL" if any(kw in final_input.lower() for kw in ["stats", "prediction", "compare", "percent", "rate", "code"]) else "GENERAL"
 
-    # ROUTE 1: Image Generation
     if detected_intent == "GENERATE":
         clean_prompt = final_input.replace("/generate", "").strip()
         with st.spinner("🎨 Rendering image..."):
@@ -655,7 +623,6 @@ if final_input and 'client' in globals() and client is not None:
             else:
                 active_chat_list.append({"role": "assistant", "content": "⚠️ Image generation failed."})
 
-    # ROUTE 2: Web Search
     elif detected_intent == "SEARCH":
         clean_query = final_input.replace("/search", "").strip()
         with st.spinner("🔍 Querying live web search..."):
@@ -669,14 +636,12 @@ if final_input and 'client' in globals() and client is not None:
             reply = response.choices[0].message.content
             active_chat_list.append({"role": "assistant", "content": reply})
 
-    # ROUTE 3: Deep Research Agent
     elif detected_intent == "RESEARCH":
         clean_topic = final_input.replace("/research", "").strip()
         with st.spinner("🕵️ Agent performing multi-step deep research..."):
             brief = run_deep_research_agent(clean_topic, client, selected_model)
             active_chat_list.append({"role": "assistant", "content": brief})
 
-    # ROUTE 4: Standard Chat + Upgrade #27 Token Speedometer 🚀
     else:
         system_prompt = build_dynamic_system_prompt(final_input, personality, target_language, detected_style)
         if doc_context:
