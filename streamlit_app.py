@@ -61,12 +61,12 @@ if "bookmarks" not in st.session_state:
     st.session_state.bookmarks = []
 
 # ==========================================
-# 1. UPGRADE #33: LATEX & SYNTAX AUTO-REPAIR
+# 1. UPGRADE #33: LATEX & SYNTAX AUTO-REPAIR ENGINE
 # ==========================================
 def sanitize_and_repair_formatting(text: str) -> str:
     """
-    UPGRADE #33: Automatically normalizes LaTeX math syntax and markdown fences.
-    Converts improper LaTeX to clean inline ($...$) or display ($$...$$) math.
+    UPGRADE #33: Automatically fixes LaTeX math syntax and normalizes markdown.
+    Converts improper LaTeX syntax to clean inline ($...$) or display ($$...$$) format.
     """
     if not text:
         return ""
@@ -77,10 +77,21 @@ def sanitize_and_repair_formatting(text: str) -> str:
     # Fix inline math syntax: \( ... \) -> $ ... $
     text = re.sub(r'\\\(\s*(.*?)\s*\\\)', r'$\1$', text, flags=re.DOTALL)
     
-    # Clean redundant search artifact text
+    # Remove awkward search artifact disclaimers if present
     text = re.sub(r'The provided search results do not directly address.*?\n', '', text, flags=re.IGNORECASE)
     
     return text.strip()
+
+# Helper for TTS Generation
+def generate_tts_audio(text: str) -> str:
+    try:
+        clean_text = re.sub(r'[*_#`$]', '', text)[:300]
+        tts = gTTS(text=clean_text, lang='en')
+        fp = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
+        tts.save(fp.name)
+        return fp.name
+    except Exception:
+        return None
 
 # ==========================================
 # 2. UPGRADE #32 & #34: MULTI-ANGLE SEARCH & FACT ENGINE
@@ -97,7 +108,7 @@ def execute_deconstructed_multi_search(query: str, client, selected_model: str) 
 
     tavily = TavilyClient(api_key=TAVILY_KEY)
     
-    # 1. Generate 3 complementary sub-queries
+    # 1. Generate 3 complementary sub-queries for multi-angle synthesis
     sub_query_prompt = (
         f"Deconstruct this query into 3 distinct search sub-queries to capture different angles (e.g. core facts, counter-evidence, latest consensus):\n"
         f"Query: '{query}'\n"
@@ -114,7 +125,7 @@ def execute_deconstructed_multi_search(query: str, client, selected_model: str) 
     except Exception:
         queries = [query]
 
-    # 2. Concurrently retrieve facts across sub-queries
+    # 2. Concurrently retrieve facts across queries
     aggregated_sources = []
     source_counter = 1
     
@@ -149,7 +160,7 @@ def execute_deconstructed_multi_search(query: str, client, selected_model: str) 
     return synthesis_res.choices[0].message.content
 
 # ==========================================
-# 3. UPGRADE #31 & #36: LOGIC ENGINE & META-PROMPTING
+# 3. UPGRADE #31 & #36: LOGIC ENGINE & FIRST-PRINCIPLES META-PROMPT
 # ==========================================
 def build_dynamic_system_prompt(user_input, base_personality, language, detected_style="GENERAL"):
     """
@@ -191,7 +202,7 @@ def build_dynamic_system_prompt(user_input, base_personality, language, detected
     return prompt
 
 # ==========================================
-# 4. UPGRADE #35: DYNAMIC VISUAL CANVAS
+# 4. UPGRADE #35: DYNAMIC VISUAL CANVAS AUTO-RENDERER
 # ==========================================
 def render_data_canvas(response_text: str):
     """
@@ -222,7 +233,7 @@ def render_data_canvas(response_text: str):
             pass
 
 # ==========================================
-# 5. UI CONFIG & STYLING
+# 5. UI CONFIG & MAIN APP LOOP
 # ==========================================
 st.set_page_config(page_title="AI Workspace", page_icon="🤖", layout="wide")
 
@@ -275,13 +286,13 @@ else:
     client = None
     st.warning("⚠️ Missing `GROQ_API_KEY` in Streamlit secrets!")
 
-# ==========================================
-# 6. SIDEBAR & TOOLS
-# ==========================================
+# Sidebar Controls
 with st.sidebar:
     st.header("⚙️ Workspace Controls")
+    st.markdown("---")
     
     # Thread Controls
+    st.header("💬 Chat Sessions")
     chat_names = list(st.session_state.chats.keys())
     selected_chat = st.selectbox("Select Thread:", chat_names, index=chat_names.index(st.session_state.current_chat))
     
@@ -296,8 +307,6 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("---")
-    
-    # Model & Personality Settings
     target_language = st.selectbox("Response Language:", ["English", "Spanish", "French", "German", "Mandarin", "Japanese"])
     personality = st.selectbox("AI Persona:", ["Helpful Assistant", "Code Expert", "Strict Tutor", "Executive Analyst"])
     selected_model = st.selectbox("Model Engine:", ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"])
@@ -315,9 +324,19 @@ with st.sidebar:
 
     st.markdown("---")
     st.header("🧠 Memory Vault Facts")
+    new_memory_fact = st.text_input("Add Persistent Fact:", key="memory_input")
+    if st.button("Save Memory Fact") and new_memory_fact:
+        st.session_state.memory_vault.append(new_memory_fact)
+        st.success(f"Remembered: '{new_memory_fact}'")
+        st.rerun()
+
     if st.session_state.memory_vault:
         for idx, fact in enumerate(st.session_state.memory_vault):
-            st.caption(f"- {fact}")
+            col_m1, col_m2 = st.columns([8, 2])
+            col_m1.caption(f"- {fact}")
+            if col_m2.button("❌", key=f"del_mem_{idx}"):
+                st.session_state.memory_vault.pop(idx)
+                st.rerun()
     else:
         st.caption("No custom memory facts saved yet.")
 
@@ -333,21 +352,27 @@ with col_hdr2:
 
 st.markdown("---")
 
-# ==========================================
-# 7. RENDER CHAT HISTORY
-# ==========================================
+# Render Message History with Auto-Repair Formatting (Upgrade #33)
 for idx, msg in enumerate(active_chat_list):
     with st.chat_message(msg["role"]):
         repaired_content = sanitize_and_repair_formatting(msg.get("content", ""))
         st.markdown(repaired_content)
         
-        # Audio playback if present
-        if "audio" in msg and msg["audio"]:
-            st.audio(msg["audio"], format="audio/mp3")
+        if msg["role"] == "assistant":
+            # Action Toolbar
+            col_a1, col_a2, col_a3, _ = st.columns([1, 1, 1, 7])
+            if col_a1.button("📌", key=f"bm_{idx}", help="Bookmark Response"):
+                st.session_state.bookmarks.append(repaired_content)
+                st.toast("Bookmarked response!")
+            
+            if col_a2.button("🔊", key=f"tts_{idx}", help="Generate Speech"):
+                audio_file = generate_tts_audio(repaired_content)
+                if audio_file:
+                    st.audio(audio_file, format="audio/mp3")
 
-        # Dynamic visual canvas auto-renderer
-        if msg["role"] == "assistant" and repaired_content:
-            render_data_canvas(repaired_content)
+            # Render Visual Canvas if data is present
+            if repaired_content:
+                render_data_canvas(repaired_content)
 
 # Voice Audio Recorder Control
 col_v1, col_v2 = st.columns([1, 11])
@@ -373,21 +398,18 @@ if audio_bytes and client:
         except Exception as e:
             st.error(f"Voice transcription error: {e}")
 
-# Main Chat Input
-user_input = st.chat_input("Ask anything, use /search, /image, or click mic...")
+# Input Execution Pipeline
+user_input = st.chat_input("Ask anything, use /search or /image...")
 if st.session_state.input_buffer and not user_input:
     user_input = st.session_state.input_buffer
     st.session_state.input_buffer = ""
 
-# ==========================================
-# 8. EXECUTION PIPELINE
-# ==========================================
 if user_input and client:
     active_chat_list.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    # Style Detection for Dynamic Temperature Engine
+    # Detect style to set active temperature dynamically
     detected_style = "ANALYTICAL" if any(kw in user_input.lower() for kw in ["compare", "vs", "probability", "percent", "rate", "code", "architecture"]) else "GENERAL"
     active_temperature = 0.2 if detected_style == "ANALYTICAL" else 0.7
 
@@ -400,7 +422,7 @@ if user_input and client:
                 img_url = f"https://pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1,99999)}"
                 st.image(img_url, caption=f"Prompt: {clean_prompt}", use_column_width=True)
                 active_chat_list.append({"role": "assistant", "content": f"🎨 Generated Image for: '{clean_prompt}'\n![Image]({img_url})"})
-        
+
         # ROUTE 2: Deconstructed Multi-Angle Search Route
         elif user_input.lower().startswith("/search"):
             clean_query = user_input.replace("/search", "").strip()
