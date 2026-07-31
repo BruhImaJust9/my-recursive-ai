@@ -70,15 +70,33 @@ else:
 st.markdown(
     """
     <style>
-        /* Target audio recorder iframe and all component containers */
+        /* 1. Target Audio Recorder iframe directly */
         iframe[title*="audio_recorder"],
-        div[data-testid="stCustomComponentV1"],
-        div[data-testid="stCustomComponentV1"] > iframe {
+        iframe[src*="audio_recorder"] {
             background-color: transparent !important;
-            background: transparent !important;
             border: none !important;
             outline: none !important;
             box-shadow: none !important;
+        }
+
+        /* 2. Target Streamlit Custom Component Wrapper */
+        div[data-testid="stCustomComponentV1"] {
+            background-color: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0px !important;
+            margin: 0px !important;
+        }
+
+        /* 3. Strip lines/borders from element wrappers */
+        div[data-testid="stVerticalBlock"] > div {
+            border: none !important;
+            background: transparent !important;
+        }
+
+        /* 4. Remove default iframe border lines */
+        iframe {
+            border: 0px none transparent !important;
         }
     </style>
     """,
