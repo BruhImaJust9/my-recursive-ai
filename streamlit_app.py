@@ -523,7 +523,7 @@ if audio_bytes and client:
     if transcribed and not transcribed.startswith("Speech-to-Text Error"):
         final_input = transcribed
 
-if final_input and client:
+if final_input and 'client' in globals() and client is not None:
     active_chat_list = st.session_state.chats[st.session_state.current_chat]
     
     # Auto Title Generator on First Message
