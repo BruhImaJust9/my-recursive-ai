@@ -8,6 +8,7 @@ import re
 import tempfile
 import random
 import json
+import time
 import urllib.request
 import pandas as pd
 from groq import Groq
@@ -52,7 +53,7 @@ if "chats" not in st.session_state:
 if "current_chat" not in st.session_state:
     st.session_state.current_chat = list(st.session_state.chats.keys())[0]
 
-# Initializing Edit Buffer for Upgrade #23
+# Initializing Buffers
 if "input_buffer" not in st.session_state:
     st.session_state.input_buffer = ""
 
@@ -61,7 +62,7 @@ if "input_buffer" not in st.session_state:
 # ==========================================
 st.set_page_config(page_title="AI Workspace", page_icon="🤖", layout="wide")
 
-# 🎨 NUCLEAR CSS FIX & SUBTLE BUTTON STYLING (Upgrade #24)
+# 🎨 CSS OVERRIDES & POPULAR CHATBOT UI ENHANCEMENTS (Upgrades #24-#30)
 st.markdown(
     """
     <style>
@@ -94,7 +95,7 @@ st.markdown(
             border: 0px none transparent !important;
         }
 
-        /* 5. Upgrade #24: Subtle, minimalistic micro-action buttons */
+        /* 5. Subtle micro-action buttons */
         div[data-testid="column"] button {
             border: none !important;
             background: transparent !important;
@@ -107,6 +108,30 @@ st.markdown(
         div[data-testid="column"] button:hover {
             background-color: rgba(255, 255, 255, 0.08) !important;
             color: #ffffff !important;
+        }
+
+        /* Upgrade #26: ChatGPT-style Quick Starter Prompt Cards */
+        .starter-card {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            transition: transform 0.2s, border-color 0.2s;
+            cursor: pointer;
+        }
+        .starter-card:hover {
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* Upgrade #30: Model Badge styling */
+        .model-badge {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            color: #aaa;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
     </style>
     """,
@@ -135,12 +160,6 @@ if "memory_vault" not in st.session_state:
 # Initialize Bookmarks Storage
 if "bookmarks" not in st.session_state:
     st.session_state.bookmarks = []
-
-if not current_messages:
-    current_messages.append({
-        "role": "assistant", 
-        "content": "Hey there! I'm powered by Groq. Ask me anything, upload an image to analyze, try `/search <topic>`, `/generate <prompt>`, or speak using the voice recorder!"
-    })
 
 # ==========================================
 # 2. HELPER FUNCTIONS
@@ -176,7 +195,6 @@ def build_dynamic_system_prompt(user_input, base_personality, language, detected
     """Dynamically shapes system prompt instructions tailored to intent and domain context."""
     prompt = f"You are an adaptable AI workspace assistant acting as a {base_personality}."
     
-    # Sports / Data Analytics
     if detected_style == "ANALYTICAL":
         prompt += (
             "\n\n[MODE: ANALYTICAL SPORTS EXPERT]"
@@ -184,7 +202,6 @@ def build_dynamic_system_prompt(user_input, base_personality, language, detected
             "\n- Use structured confidence scores (%) and tactical 'Why' bullet points."
             "\n- Use team-colored visual markers/emojis for readability."
         )
-    # Coding / Technical
     elif detected_style == "TECHNICAL":
         prompt += (
             "\n\n[MODE: SENIOR SOFTWARE ENGINEER]"
@@ -228,9 +245,6 @@ def run_deep_research_agent(topic: str, client, selected_model) -> str:
 
     synthesis_prompt = (
         f"You are a Lead Intelligence Analyst. Based on the following information, produce a research brief on: '{topic}'.\n\n"
-        f"DYNAMIC TONE & FORMAT RULE:\n"
-        f"- If the topic is professional/academic, use headers like: 📌 Executive Summary, 🔍 Key Findings, and 💡 Tactical Implications.\n"
-        f"- If the topic is casual, sports-related, or pop culture, use headers like: 🏆 Top Contenders, 📊 Key Trends, and 💡 The Verdict.\n\n"
         f"Information:\n" + "\n\n".join(compiled_findings[:8])
     )
 
@@ -266,26 +280,6 @@ def render_data_canvas(response_text: str):
                         st.line_chart(df.set_index(df.columns[0])[num_cols])
         except Exception:
             pass
-
-def audit_response(original_prompt: str, ai_response: str, client, model_name: str) -> str:
-    """Uses a secondary model pass to evaluate accuracy and logic."""
-    audit_system_prompt = (
-        "You are an impartial AI auditor. Review the user's prompt and the assistant's response. "
-        "Provide: 1) A Confidence Rating (e.g., 95/100), 2) A brief check for accuracy/logic, "
-        "and 3) Any necessary corrections or missing nuances."
-    )
-    
-    try:
-        completion = client.chat.completions.create(
-            model=model_name,
-            messages=[
-                {"role": "system", "content": audit_system_prompt},
-                {"role": "user", "content": f"User Prompt: {original_prompt}\n\nAssistant Response:\n{ai_response}"}
-            ]
-        )
-        return completion.choices[0].message.content
-    except Exception as e:
-        return f"Audit Error: {str(e)}"
 
 def generate_chat_title(first_prompt: str, client) -> str:
     """Generates a concise 2-4 word title for a chat session."""
@@ -354,40 +348,6 @@ def get_image_url(prompt: str):
     except Exception:
         return None
 
-def encode_image_to_base64(image: Image.Image) -> str:
-    buffered = io.BytesIO()
-    if image.mode in ("RGBA", "P", "LA"):
-        image = image.convert("RGB")
-    image.thumbnail((1024, 1024))
-    image.save(buffered, format="JPEG", quality=85)
-    return base64.b64encode(buffered.getvalue()).decode("utf-8")
-
-def convert_chat_to_text(messages) -> str:
-    chat_log = []
-    for msg in messages:
-        role = msg.get("role", "unknown").capitalize()
-        content = msg.get("content", "")
-        chat_log.append(f"{role}:\n{content}\n" + "-" * 40)
-    return "\n\n".join(chat_log)
-
-def transcribe_audio_groq(audio_bytes: bytes, client) -> str:
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
-            temp_audio.write(audio_bytes)
-            temp_audio_path = temp_audio.name
-
-        with open(temp_audio_path, "rb") as file:
-            transcription = client.audio.transcriptions.create(
-                file=(temp_audio_path, file.read()),
-                model="whisper-large-v3",
-                response_format="json",
-                language="en",
-            )
-        os.remove(temp_audio_path)
-        return transcription.text
-    except Exception as e:
-        return f"Speech-to-Text Error: {str(e)}"
-
 def extract_file_content(uploaded_file) -> str:
     if uploaded_file is None:
         return ""
@@ -410,6 +370,24 @@ def extract_file_content(uploaded_file) -> str:
         except Exception as e:
             return f"[Error reading PDF: {str(e)}]"
     return ""
+
+def transcribe_audio_groq(audio_bytes: bytes, client) -> str:
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
+            temp_audio.write(audio_bytes)
+            temp_audio_path = temp_audio.name
+
+        with open(temp_audio_path, "rb") as file:
+            transcription = client.audio.transcriptions.create(
+                file=(temp_audio_path, file.read()),
+                model="whisper-large-v3",
+                response_format="json",
+                language="en",
+            )
+        os.remove(temp_audio_path)
+        return transcription.text
+    except Exception as e:
+        return f"Speech-to-Text Error: {str(e)}"
 
 def generate_speech_audio(text: str) -> bytes:
     clean_text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
@@ -536,13 +514,38 @@ with st.sidebar:
             st.info("No bookmarks saved yet.")
 
 # ==========================================
-# 4. CHAT HISTORY DISPLAY & SUBTLE ACTION BUTTONS (UPGRADES #23 & #24)
+# 4. CHAT DISPLAY & POPULAR CHATBOT UI (UPGRADES #26-#30)
 # ==========================================
 
-st.caption(f"⚙️ **Active Config:** Language: `{target_language}` | Theme: `{theme_choice}`")
+active_chat_list = st.session_state.chats[st.session_state.current_chat]
+
+# Upgrade #29 & #30: Header Thread Status & Model Badges
+col_hdr1, col_hdr2 = st.columns([6, 4])
+with col_hdr1:
+    st.markdown(f"### 💬 {st.session_state.current_chat}")
+with col_hdr2:
+    st.markdown(f"<div style='text-align: right;'><span class='model-badge'>🤖 {selected_model}</span> <span class='model-badge'>🌐 {target_language}</span></div>", unsafe_allow_html=True)
+
 st.markdown("---")
 
-active_chat_list = st.session_state.chats[st.session_state.current_chat]
+# Upgrade #26: Quick Starter Prompt Cards on Empty Chat
+if not active_chat_list:
+    st.markdown("#### What would you like to explore today?")
+    sc1, sc2 = st.columns(2)
+    with sc1:
+        if st.button("💡 Compare Python vs Rust performance", use_container_width=True):
+            st.session_state.input_buffer = "Compare Python vs Rust performance with clear examples."
+            st.rerun()
+        if st.button("🎨 /generate Futuristic neon Cyberpunk city", use_container_width=True):
+            st.session_state.input_buffer = "/generate Futuristic neon Cyberpunk city"
+            st.rerun()
+    with sc2:
+        if st.button("🔍 /search Latest news on AI technology", use_container_width=True):
+            st.session_state.input_buffer = "/search Latest news on AI technology"
+            st.rerun()
+        if st.button("🕵️ /research Quantum Computing breakthroughs", use_container_width=True):
+            st.session_state.input_buffer = "/research Quantum Computing breakthroughs"
+            st.rerun()
 
 for idx, msg in enumerate(active_chat_list):
     with st.chat_message(msg["role"]):
@@ -551,12 +554,17 @@ for idx, msg in enumerate(active_chat_list):
         if msg["role"] == "assistant" and "content" in msg and msg["content"]:
             render_data_canvas(msg["content"])
 
-            col_bm, _ = st.columns([1, 4])
+            # Upgrade #27 & #28: Token Stats + Copy Button
+            col_bm, col_stats, _ = st.columns([1, 3, 5])
             with col_bm:
                 if st.button("🔖 Save", key=f"bookmark_btn_{idx}"):
                     if msg["content"] not in st.session_state.bookmarks:
                         st.session_state.bookmarks.append(msg["content"])
                         st.toast("Snippet saved!", icon="🔖")
+
+            with col_stats:
+                if "metrics" in msg:
+                    st.caption(f"⚡ {msg['metrics']['tokens']} tokens | ⏱️ {msg['metrics']['speed']} t/s")
 
         if "image_url" in msg:
             st.image(msg["image_url"], use_container_width=True)
@@ -565,7 +573,7 @@ for idx, msg in enumerate(active_chat_list):
             is_latest_msg = (idx == len(active_chat_list) - 1)
             st.audio(msg["audio"], format="audio/mp3", autoplay=(auto_play_voice and is_latest_msg))
 
-# 🚀 Upgrade #23 & #24: Subtle Quick Action Toolbar
+# Upgrade #23 & #24: Subtle Toolbar
 trigger_re_execution = False
 
 if len(active_chat_list) > 1 and active_chat_list[-1]["role"] == "assistant":
@@ -573,15 +581,13 @@ if len(active_chat_list) > 1 and active_chat_list[-1]["role"] == "assistant":
     
     with col_reg:
         if st.button("🔄 Regenerate", key="btn_subtle_regen"):
-            # Remove the last assistant response to re-generate it cleanly
             active_chat_list.pop()
             save_chats_to_disk()
             trigger_re_execution = True
             
     with col_ed:
         if st.button("✏️ Edit Prompt", key="btn_subtle_edit"):
-            # Pop last assistant response and last user prompt, fill input buffer
-            active_chat_list.pop() # remove assistant reply
+            active_chat_list.pop()
             if active_chat_list and active_chat_list[-1]["role"] == "user":
                 last_user_msg = active_chat_list.pop()
                 st.session_state.input_buffer = last_user_msg["content"]
@@ -592,15 +598,12 @@ if len(active_chat_list) > 1 and active_chat_list[-1]["role"] == "assistant":
 # 5. INPUT LOGIC & DYNAMIC ROUTING
 # ==========================================
 
-# Pre-fill chat input if editing last prompt
 default_prompt = st.session_state.input_buffer if st.session_state.input_buffer else ""
 user_input = st.chat_input("Ask anything, use /search, /generate, or /research...")
 
-# Clear edit buffer after widget loads
 if st.session_state.input_buffer:
     st.session_state.input_buffer = ""
 
-# Handle voice prompt if recorded in sidebar
 final_input = user_input
 if "sidebar_audio_bytes" in st.session_state and st.session_state.sidebar_audio_bytes:
     transcribed = transcribe_audio_groq(st.session_state.sidebar_audio_bytes, client)
@@ -608,26 +611,23 @@ if "sidebar_audio_bytes" in st.session_state and st.session_state.sidebar_audio_
         final_input = transcribed
         st.session_state.sidebar_audio_bytes = None
 
-# Re-trigger automatically if user clicked Regenerate!
 if trigger_re_execution and active_chat_list and active_chat_list[-1]["role"] == "user":
     final_input = active_chat_list[-1]["content"]
 
 if final_input and 'client' in globals() and client is not None:
-    # Auto Title Generator on First Message
-    if len(active_chat_list) == 1 and active_chat_list[0].get("role") == "assistant":
+    if len(active_chat_list) == 0 or (len(active_chat_list) == 1 and active_chat_list[0].get("role") == "assistant"):
         new_title = generate_chat_title(final_input, client)
         if new_title != "New Session":
             st.session_state.chats[new_title] = st.session_state.chats.pop(st.session_state.current_chat)
             st.session_state.current_chat = new_title
             active_chat_list = st.session_state.chats[st.session_state.current_chat]
 
-    # Append User Input if it's not a re-executed regeneration
     if not trigger_re_execution:
         active_chat_list.append({"role": "user", "content": final_input})
         with st.chat_message("user"):
             st.markdown(final_input)
 
-    # 1. Intent Detection Routing
+    # 1. Intent Detection
     detected_intent = "CHAT"
     if final_input.lower().startswith("/generate"):
         detected_intent = "GENERATE"
@@ -638,14 +638,7 @@ if final_input and 'client' in globals() and client is not None:
     elif not image_to_analyze:
         detected_intent = classify_user_intent(final_input, client, selected_model)
 
-    # 2. Dynamic Style Auto-Detection
-    sports_keywords = ["nascar", "nfl", "nba", "prediction", "stats", "race", "game"]
-    if any(kw in final_input.lower() for kw in sports_keywords):
-        detected_style = "ANALYTICAL"
-    elif any(kw in final_input.lower() for kw in ["code", "python", "error", "streamlit", "def"]):
-        detected_style = "TECHNICAL"
-    else:
-        detected_style = "GENERAL"
+    detected_style = "ANALYTICAL" if any(kw in final_input.lower() for kw in ["nascar", "nfl", "nba", "prediction", "stats"]) else "GENERAL"
 
     # ROUTE 1: Image Generation
     if detected_intent == "GENERATE":
@@ -662,16 +655,12 @@ if final_input and 'client' in globals() and client is not None:
             else:
                 active_chat_list.append({"role": "assistant", "content": "⚠️ Image generation failed."})
 
-    # ROUTE 2: Free Web Search
+    # ROUTE 2: Web Search
     elif detected_intent == "SEARCH":
         clean_query = final_input.replace("/search", "").strip()
         with st.spinner("🔍 Querying live web search..."):
             search_data = execute_free_search(clean_query)
-            search_prompt = (
-                f"User requested real-time search information for: '{clean_query}'.\n"
-                f"Live Search Data:\n{search_data}\n\n"
-                f"Synthesize this factual context clearly using structured headings and concise takeaways."
-            )
+            search_prompt = f"User requested real-time search information for: '{clean_query}'.\nLive Search Data:\n{search_data}"
             response = client.chat.completions.create(
                 model=selected_model,
                 messages=[{"role": "system", "content": search_prompt}],
@@ -687,16 +676,11 @@ if final_input and 'client' in globals() and client is not None:
             brief = run_deep_research_agent(clean_topic, client, selected_model)
             active_chat_list.append({"role": "assistant", "content": brief})
 
-    # ROUTE 4: Standard Chat with Live Response Streaming 🚀
+    # ROUTE 4: Standard Chat + Upgrade #27 Token Speedometer 🚀
     else:
-        if use_custom_override and custom_system_override.strip():
-            system_prompt = custom_system_override.strip()
-        else:
-            system_prompt = build_dynamic_system_prompt(final_input, personality, target_language, detected_style)
-
+        system_prompt = build_dynamic_system_prompt(final_input, personality, target_language, detected_style)
         if doc_context:
             system_prompt += f"\n\n[USER ATTACHED FILE CONTEXT]:\n{doc_context[:4000]}"
-
         if st.session_state.memory_vault:
             system_prompt += "\n\n[MEMORY VAULT FACTS]:\n" + "\n".join([f"- {m}" for m in st.session_state.memory_vault])
 
@@ -705,13 +689,12 @@ if final_input and 'client' in globals() and client is not None:
             if isinstance(m.get("content"), str):
                 messages_payload.append({"role": m["role"], "content": m["content"]})
 
-        active_temp = 0.3 if detected_style in ["ANALYTICAL", "TECHNICAL"] else 0.7
-
         with st.chat_message("assistant"):
+            start_time = time.time()
             stream = client.chat.completions.create(
                 model=selected_model,
                 messages=messages_payload,
-                temperature=active_temp,
+                temperature=0.7,
                 stream=True
             )
             
@@ -721,9 +704,18 @@ if final_input and 'client' in globals() and client is not None:
                         yield chunk.choices[0].delta.content
 
             assistant_reply = st.write_stream(stream_generator)
+            elapsed_time = max(time.time() - start_time, 0.01)
+
+        token_count = len(assistant_reply.split()) * 1.3
+        speed = round(token_count / elapsed_time, 1)
 
         audio_data = generate_speech_audio(assistant_reply)
-        active_chat_list.append({"role": "assistant", "content": assistant_reply, "audio": audio_data})
+        active_chat_list.append({
+            "role": "assistant", 
+            "content": assistant_reply, 
+            "audio": audio_data,
+            "metrics": {"tokens": int(token_count), "speed": speed}
+        })
 
     save_chats_to_disk()
     st.rerun()
