@@ -557,6 +557,14 @@ if final_input and 'client' in globals() and client is not None:
     with st.chat_message("user"):
         st.markdown(final_input)
 
+    col_input, col_voice = st.columns([8, 1])
+
+with col_input:
+    user_input = st.chat_input("Ask anything, use /search, /generate, or /research...")
+
+with col_voice:
+    audio_bytes = audio_recorder(text="", recording_color="#e84c3d", neutral_color="#6aa84f")
+
     # 1. Intent Detection Routing
     detected_intent = "CHAT"
     if final_input.lower().startswith("/generate"):
