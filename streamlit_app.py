@@ -57,6 +57,15 @@ if "current_chat" not in st.session_state:
 # ==========================================
 st.set_page_config(page_title="AI Workspace", page_icon="🤖", layout="wide")
 
+# Initialize Groq Client Globally
+GROQ_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
+
+if GROQ_KEY:
+    client = Groq(api_key=GROQ_KEY)
+else:
+    client = None
+    st.warning("⚠️ Missing `GROQ_API_KEY` in Streamlit secrets! Please add it to continue.")
+
 # 🎨 CSS FIX: Injected directly after set_page_config to ensure full override
 st.markdown(
     """
