@@ -532,6 +532,17 @@ for idx, msg in enumerate(st.session_state.chats[st.session_state.current_chat])
 # 5. INPUT LOGIC & DYNAMIC ROUTING
 # ==========================================
 
+# 1. Single layout container for chat input & audio recorder
+col_input, col_voice = st.columns([8, 1])
+
+with col_input:
+    user_input = st.chat_input("Ask anything, use /search, /generate, or /research...", key="main_chat_input")
+
+with col_voice:
+    audio_bytes = audio_recorder(text="", recording_color="#e84c3d", neutral_color="#6aa84f", key="main_audio_recorder")
+
+final_input = user_input
+
 user_input = st.chat_input("Ask anything, use /search, /generate, or /research...")
 audio_bytes = audio_recorder(text="🎤 Record Voice", recording_color="#e84c3d", neutral_color="#6aa84f")
 
@@ -556,14 +567,6 @@ if final_input and 'client' in globals() and client is not None:
     active_chat_list.append({"role": "user", "content": final_input})
     with st.chat_message("user"):
         st.markdown(final_input)
-
-    col_input, col_voice = st.columns([8, 1])
-
-with col_input:
-    user_input = st.chat_input("Ask anything, use /search, /generate, or /research...")
-
-with col_voice:
-    audio_bytes = audio_recorder(text="", recording_color="#e84c3d", neutral_color="#6aa84f")
 
     # 1. Intent Detection Routing
     detected_intent = "CHAT"
