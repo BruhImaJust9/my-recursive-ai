@@ -44,6 +44,7 @@ def save_chats_to_disk():
     except Exception:
         pass
 
+# Initialize Session States
 if "chats" not in st.session_state:
     st.session_state.chats = load_saved_chats()
 
@@ -60,12 +61,12 @@ if "bookmarks" not in st.session_state:
     st.session_state.bookmarks = []
 
 # ==========================================
-# 1. UPGRADE #33: LATEX & SYNTAX AUTO-REPAIR ENGINE
+# 1. UPGRADE #33: LATEX & SYNTAX AUTO-REPAIR
 # ==========================================
 def sanitize_and_repair_formatting(text: str) -> str:
     """
-    UPGRADE #33: Automatically fixes LaTeX math syntax and normalizes markdown.
-    Converts improper LaTeX syntax to clean inline ($...$) or display ($$...$$) format.
+    UPGRADE #33: Automatically normalizes LaTeX math syntax and markdown fences.
+    Converts improper LaTeX to clean inline ($...$) or display ($$...$$) math.
     """
     if not text:
         return ""
@@ -76,7 +77,7 @@ def sanitize_and_repair_formatting(text: str) -> str:
     # Fix inline math syntax: \( ... \) -> $ ... $
     text = re.sub(r'\\\(\s*(.*?)\s*\\\)', r'$\1$', text, flags=re.DOTALL)
     
-    # Remove awkward search artifact disclaimers if present
+    # Clean redundant search artifact text
     text = re.sub(r'The provided search results do not directly address.*?\n', '', text, flags=re.IGNORECASE)
     
     return text.strip()
@@ -96,7 +97,7 @@ def execute_deconstructed_multi_search(query: str, client, selected_model: str) 
 
     tavily = TavilyClient(api_key=TAVILY_KEY)
     
-    # 1. Generate 3 complementary sub-queries for multi-angle synthesis
+    # 1. Generate 3 complementary sub-queries
     sub_query_prompt = (
         f"Deconstruct this query into 3 distinct search sub-queries to capture different angles (e.g. core facts, counter-evidence, latest consensus):\n"
         f"Query: '{query}'\n"
@@ -113,7 +114,7 @@ def execute_deconstructed_multi_search(query: str, client, selected_model: str) 
     except Exception:
         queries = [query]
 
-    # 2. Concurrently retrieve facts across queries
+    # 2. Concurrently retrieve facts across sub-queries
     aggregated_sources = []
     source_counter = 1
     
@@ -148,7 +149,7 @@ def execute_deconstructed_multi_search(query: str, client, selected_model: str) 
     return synthesis_res.choices[0].message.content
 
 # ==========================================
-# 3. UPGRADE #31 & #36: LOGIC ENGINE & FIRST-PRINCIPLES META-PROMPT
+# 3. UPGRADE #31 & #36: LOGIC ENGINE & META-PROMPTING
 # ==========================================
 def build_dynamic_system_prompt(user_input, base_personality, language, detected_style="GENERAL"):
     """
@@ -190,7 +191,7 @@ def build_dynamic_system_prompt(user_input, base_personality, language, detected
     return prompt
 
 # ==========================================
-# 4. UPGRADE #35: DYNAMIC VISUAL CANVAS AUTO-RENDERER
+# 4. UPGRADE #35: DYNAMIC VISUAL CANVAS
 # ==========================================
 def render_data_canvas(response_text: str):
     """
@@ -221,7 +222,7 @@ def render_data_canvas(response_text: str):
             pass
 
 # ==========================================
-# 5. UI CONFIG & MAIN APP LOOP
+# 5. UI CONFIG & STYLING
 # ==========================================
 st.set_page_config(page_title="AI Workspace", page_icon="🤖", layout="wide")
 
@@ -274,12 +275,13 @@ else:
     client = None
     st.warning("⚠️ Missing `GROQ_API_KEY` in Streamlit secrets!")
 
-# Sidebar Controls
+# ==========================================
+# 6. SIDEBAR & TOOLS
+# ==========================================
 with st.sidebar:
     st.header("⚙️ Workspace Controls")
-    st.markdown("---")
     
-    st.header("💬 Chat Sessions")
+    # Thread Controls
     chat_names = list(st.session_state.chats.keys())
     selected_chat = st.selectbox("Select Thread:", chat_names, index=chat_names.index(st.session_state.current_chat))
     
@@ -294,9 +296,30 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("---")
+    
+    # Model & Personality Settings
     target_language = st.selectbox("Response Language:", ["English", "Spanish", "French", "German", "Mandarin", "Japanese"])
     personality = st.selectbox("AI Persona:", ["Helpful Assistant", "Code Expert", "Strict Tutor", "Executive Analyst"])
     selected_model = st.selectbox("Model Engine:", ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"])
+
+    st.markdown("---")
+    st.header("📄 File Attachment Context")
+    uploaded_file = st.file_uploader("Upload TXT or Code snippet:", type=["txt", "py", "js", "md"])
+    doc_context = ""
+    if uploaded_file is not None:
+        try:
+            doc_context = uploaded_file.read().decode("utf-8")
+            st.success("File context loaded!")
+        except Exception:
+            st.error("Error reading file!")
+
+    st.markdown("---")
+    st.header("🧠 Memory Vault Facts")
+    if st.session_state.memory_vault:
+        for idx, fact in enumerate(st.session_state.memory_vault):
+            st.caption(f"- {fact}")
+    else:
+        st.caption("No custom memory facts saved yet.")
 
 # Active Chat Buffer
 active_chat_list = st.session_state.chats[st.session_state.current_chat]
@@ -310,39 +333,93 @@ with col_hdr2:
 
 st.markdown("---")
 
-# Render Message History with Auto-Repair Formatting (Upgrade #33)
+# ==========================================
+# 7. RENDER CHAT HISTORY
+# ==========================================
 for idx, msg in enumerate(active_chat_list):
     with st.chat_message(msg["role"]):
         repaired_content = sanitize_and_repair_formatting(msg.get("content", ""))
         st.markdown(repaired_content)
         
+        # Audio playback if present
+        if "audio" in msg and msg["audio"]:
+            st.audio(msg["audio"], format="audio/mp3")
+
+        # Dynamic visual canvas auto-renderer
         if msg["role"] == "assistant" and repaired_content:
             render_data_canvas(repaired_content)
 
-# Input Execution Pipeline
-user_input = st.chat_input("Ask anything, use /search or /research...")
+# Voice Audio Recorder Control
+col_v1, col_v2 = st.columns([1, 11])
+with col_v1:
+    audio_bytes = audio_recorder(text="", recording_color="#e8b62c", neutral_color="#6aa84f", icon_size="2x")
 
+if audio_bytes and client:
+    with st.spinner("🎙️ Transcribing audio input..."):
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as fp:
+                fp.write(audio_bytes)
+                tmp_path = fp.name
+            
+            with open(tmp_path, "rb") as audio_file:
+                transcription = client.audio.transcriptions.create(
+                    model="whisper-large-v3",
+                    file=audio_file,
+                    response_format="text"
+                )
+            os.remove(tmp_path)
+            if transcription.strip():
+                st.session_state.input_buffer = transcription.strip()
+        except Exception as e:
+            st.error(f"Voice transcription error: {e}")
+
+# Main Chat Input
+user_input = st.chat_input("Ask anything, use /search, /image, or click mic...")
+if st.session_state.input_buffer and not user_input:
+    user_input = st.session_state.input_buffer
+    st.session_state.input_buffer = ""
+
+# ==========================================
+# 8. EXECUTION PIPELINE
+# ==========================================
 if user_input and client:
     active_chat_list.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    # Detect style to set active temperature dynamically
+    # Style Detection for Dynamic Temperature Engine
     detected_style = "ANALYTICAL" if any(kw in user_input.lower() for kw in ["compare", "vs", "probability", "percent", "rate", "code", "architecture"]) else "GENERAL"
     active_temperature = 0.2 if detected_style == "ANALYTICAL" else 0.7
 
     with st.chat_message("assistant"):
-        if user_input.lower().startswith("/search"):
+        # ROUTE 1: Image Generation Route
+        if user_input.lower().startswith("/image"):
+            clean_prompt = user_input.replace("/image", "").strip()
+            with st.spinner("🎨 Generating image canvas..."):
+                encoded_prompt = urllib.parse.quote(clean_prompt)
+                img_url = f"https://pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1,99999)}"
+                st.image(img_url, caption=f"Prompt: {clean_prompt}", use_column_width=True)
+                active_chat_list.append({"role": "assistant", "content": f"🎨 Generated Image for: '{clean_prompt}'\n![Image]({img_url})"})
+        
+        # ROUTE 2: Deconstructed Multi-Angle Search Route
+        elif user_input.lower().startswith("/search"):
             clean_query = user_input.replace("/search", "").strip()
             with st.spinner("🔍 Deconstructing query & synthesizing multi-angle search..."):
                 reply = execute_deconstructed_multi_search(clean_query, client, selected_model)
                 reply = sanitize_and_repair_formatting(reply)
                 st.markdown(reply)
                 active_chat_list.append({"role": "assistant", "content": reply})
+
+        # ROUTE 3: Standard Chat Generation
         else:
             system_prompt = build_dynamic_system_prompt(user_input, personality, target_language, detected_style)
-            messages_payload = [{"role": "system", "content": system_prompt}]
             
+            if doc_context:
+                system_prompt += f"\n\n[USER ATTACHED FILE CONTEXT]:\n{doc_context[:4000]}"
+            if st.session_state.memory_vault:
+                system_prompt += "\n\n[MEMORY VAULT FACTS]:\n" + "\n".join([f"- {m}" for m in st.session_state.memory_vault])
+
+            messages_payload = [{"role": "system", "content": system_prompt}]
             for m in active_chat_list:
                 if isinstance(m.get("content"), str):
                     messages_payload.append({"role": m["role"], "content": m["content"]})
