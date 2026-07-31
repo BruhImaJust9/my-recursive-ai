@@ -663,6 +663,18 @@ if final_input and 'client' in globals() and client is not None:
             if isinstance(m.get("content"), str):
                 messages_payload.append({"role": m["role"], "content": m["content"]})
 
+        # Drop temperature to 0.2 for analytical/technical prompts to ensure exact math & structure
+        active_temperature = 0.2 if detected_style == "ANALYTICAL" else 0.7
+
+        with st.chat_message("assistant"):
+            start_time = time.time()
+            stream = client.chat.completions.create(
+                model=selected_model,
+                messages=messages_payload,
+                temperature=active_temperature, # 👈 Update variable here!
+                stream=True
+            )
+
         with st.chat_message("assistant"):
             start_time = time.time()
             stream = client.chat.completions.create(
