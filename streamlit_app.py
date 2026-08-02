@@ -218,8 +218,8 @@ def build_dynamic_system_prompt(user_input, base_personality, language, detected
         prompt += f"\n\nCRITICAL RULE: Respond entirely in {language}."
 
     if st.session_state.memory_vault:
-    facts_str = "\n".join([f"- {fact}" for fact in st.session_state.memory_vault])
-    system_prompt += f"\n\n[BACKGROUND USER CONTEXT]:\nUse these known facts naturally if relevant, but DO NOT mention the Memory Vault directly:\n{facts_str}"
+        facts_str = "\n".join([f"- {fact}" for fact in st.session_state.memory_vault])
+        system_prompt += f"\n\n[BACKGROUND USER CONTEXT]:\nUse these known facts naturally if relevant, but DO NOT mention the Memory Vault directly:\n{facts_str}"
 
 return prompt
 
