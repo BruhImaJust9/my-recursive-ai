@@ -160,12 +160,13 @@ def execute_deconstructed_multi_search(query: str, client, selected_model: str) 
     return synthesis_res.choices[0].message.content
 
 # ==========================================
-# 3. UPGRADE #31 & #36: LOGIC ENGINE & FIRST-PRINCIPLES META-PROMPT
+# 3. UPGRADE #31, #36 & RESPONSE STYLE ENGINE
 # ==========================================
 def build_dynamic_system_prompt(user_input, base_personality, language, detected_style="GENERAL"):
     """
-    UPGRADES #31, #33, #36:
-    Enforces First-Principles reasoning, Chain-of-Thought verification, and strict formatting.
+    UPGRADES #31, #33, #36 & HIGH-IMPACT STYLE ENGINE:
+    Enforces First-Principles reasoning, Chain-of-Thought verification,
+    high-concept naming, and fast-paced scannable formatting.
     """
     prompt = (
         f"You are a premier AI reasoning engine acting as a {base_personality}.\n\n"
@@ -176,10 +177,16 @@ def build_dynamic_system_prompt(user_input, base_personality, language, detected
         "   - Internally verify all mathematical totals, logic chains, and edge cases. Ensure probabilities sum to EXACTLY 100% with discrete allocations.\n"
         "3. REAL-WORLD BENCHMARKS & ANCHORS:\n"
         "   - Ground all comparisons using concrete dates, historical eras, Big-O complexity, or exact metrics.\n"
-        "4. SCANNABLE FORMATTING & TABLES:\n"
-        "   - Use clean Markdown tables for multi-variable trade-offs or category breakdowns.\n"
-        "5. STRICT FOCUS:\n"
-        "   - Answer directly. Do not include unrequested extra sections or search tool disclaimers."
+
+        "\n### HIGH-IMPACT STYLE & FORMATTING RULES:\n"
+        "1. HIGH-CONCEPT NAMING:\n"
+        "   - Never introduce ideas with passive phrasing (e.g., 'One idea suggests that...'). Always assign bold, memorable titles (e.g., **The Simulation Quarantine Hypothesis**, **The Treacherous Turn**).\n"
+        "2. INTELLECTUAL ANCHORS:\n"
+        "   - Ground speculative or philosophical ideas in recognized concepts (e.g., unfalsiability, game theory, computational limits, entropy).\n"
+        "3. FAST-PACED SCANNABILITY:\n"
+        "   - Use punchy bullet points, bold key terms, and short paragraphs. Skip conversational filler.\n"
+        "4. NO REPETITIVE SUMMARIES:\n"
+        "   - Avoid repeating the same information in prose and tables. Conclude with a single, memorable 'mic-drop' takeaway or extreme logical outcome instead of generic summary phrases.\n"
     )
     
     if detected_style == "ANALYTICAL":
