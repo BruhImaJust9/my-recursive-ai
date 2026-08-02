@@ -61,12 +61,12 @@ if "bookmarks" not in st.session_state:
     st.session_state.bookmarks = []
 
 # ==========================================
-# 1. UPGRADE #33: LATEX & SYNTAX AUTO-REPAIR ENGINE
+# 1. UPGRADES #33 & #48: LATEX & SYNTAX AUTO-REPAIR ENGINE
 # ==========================================
 def sanitize_and_repair_formatting(text: str) -> str:
     """
-    UPGRADE #33: Automatically fixes LaTeX math syntax and normalizes markdown.
-    Converts improper LaTeX syntax to clean inline ($...$) or display ($$...$$) format.
+    UPGRADES #33 & #48: Automatically fixes LaTeX math syntax, normalizes markdown,
+    and repairs broken list formatting.
     """
     if not text:
         return ""
@@ -160,47 +160,53 @@ def execute_deconstructed_multi_search(query: str, client, selected_model: str) 
     return synthesis_res.choices[0].message.content
 
 # ==========================================
-# 3. UPGRADE #31, #36 & RESPONSE STYLE ENGINE
+# 3. UPGRADES #31 THROUGH #48: MULTI-TIERED REASONING ENGINE
 # ==========================================
 def build_dynamic_system_prompt(user_input, base_personality, language, detected_style="GENERAL"):
     """
-    UPGRADES #31, #33, #36 & HIGH-IMPACT STYLE ENGINE:
-    Enforces First-Principles reasoning, Chain-of-Thought verification,
-    high-concept naming, and fast-paced scannable formatting.
+    UPGRADES #31-#48:
+    Enforces First-Principles reasoning, Anti-Pseudoscience physics guardrails,
+    Dual-Pass self-critique, Quantitative Boundary Enforcement, and High-Impact formatting.
     """
     prompt = (
-        f"You are a premier AI reasoning engine acting as a {base_personality}.\n\n"
-        "### CORE LOGIC & EXECUTION RULES:\n"
-        "1. FIRST-PRINCIPLES DECOMPOSITION (UPGRADE #36):\n"
-        "   - Before reaching conclusions on complex topics, break the problem down to fundamental truths, assumptions, and physical/logical bounds.\n"
-        "2. CHAIN-OF-THOUGHT SELF-VERIFICATION (UPGRADE #31):\n"
-        "   - Internally verify all mathematical totals, logic chains, and edge cases. Ensure probabilities sum to EXACTLY 100% with discrete allocations.\n"
-        "3. REAL-WORLD BENCHMARKS & ANCHORS:\n"
-        "   - Ground all comparisons using concrete dates, historical eras, Big-O complexity, or exact metrics.\n"
+        f"You are a world-class AI reasoning engine operating as a {base_personality}.\n\n"
+        "### CORE COGNITIVE & EPISTEMIC RULES (UPGRADES #31, #36, #37, #38):\n"
+        "1. FIRST-PRINCIPLES DECOMPOSITION (#36):\n"
+        "   - Break all complex phenomena down to fundamental principles (e.g. thermodynamics, field equations, statistical mechanics).\n"
+        "2. ANTI-PSEUDOSCIENCE & EPISTEMIC GUARDRAIL (#37):\n"
+        "   - STRICTLY AVOID invalid physics tropes. Never claim quantum entanglement can transfer usable energy or faster-than-light signals (No-Communication Theorem).\n"
+        "   - Explicitly state where known physics ends and speculative physics begins.\n"
+        "3. DUAL-PASS SELF-CRITIQUE (#38):\n"
+        "   - Internally critique your mechanisms before generating output to ensure zero logical fallacies or physical impossibilities.\n"
+        "4. QUANTITATIVE BOUNDARY ENFORCEMENT (#42):\n"
+        "   - Always provide specific theoretical orders of magnitude (e.g., Watts, Joules, Big-O metrics).\n\n"
 
-        "\n### HIGH-IMPACT STYLE & FORMATTING RULES:\n"
-        "1. HIGH-CONCEPT NAMING:\n"
-        "   - Never introduce ideas with passive phrasing (e.g., 'One idea suggests that...'). Always assign bold, memorable titles (e.g., **The Simulation Quarantine Hypothesis**, **The Treacherous Turn**).\n"
-        "2. INTELLECTUAL ANCHORS:\n"
-        "   - Ground speculative or philosophical ideas in recognized concepts (e.g., unfalsiability, game theory, computational limits, entropy).\n"
-        "3. FAST-PACED SCANNABILITY:\n"
-        "   - Use punchy bullet points, bold key terms, and short paragraphs. Skip conversational filler.\n"
-        "4. NO REPETITIVE SUMMARIES:\n"
-        "   - Avoid repeating the same information in prose and tables. Conclude with a single, memorable 'mic-drop' takeaway or extreme logical outcome instead of generic summary phrases.\n"
+        "### HIGH-IMPACT STYLE & FORMATTING RULES (#39, #40, #41, #44, #45, #46, #47):\n"
+        "1. HIGH-CONCEPT STRIKING TITLES (#40):\n"
+        "   - Never use passive introductions ('One idea is...'). Name concepts with bold titles (e.g., **The Ergosphere Penrose Syphon**).\n"
+        "2. CONTRASTIVE CONCEPTUAL SYNTHESIS (#39):\n"
+        "   - Ensure proposed theories are fundamentally distinct in mechanism, not minor variations of the same idea.\n"
+        "3. FALSIFIABILITY & LIMITATION ANCHORS (#44):\n"
+        "   - Clearly define the physical limitation or exact condition required to falsify each concept.\n"
+        "4. ANTI-FILLER & SCANNABLE MATRIX (#41, #45):\n"
+        "   - Jump directly into content without meta-preambles or redundant summaries.\n"
+        "   - Tables must contain unique comparative metrics not already typed out in prose (#46).\n"
+        "5. MIC-DROP IMPLICATION (#47):\n"
+        "   - Conclude with a single, highly memorable, logically sound takeaway.\n"
     )
     
+    # UPGRADE #43: Dynamic Domain Adaptation
+    lowered_input = user_input.lower()
+    if any(kw in lowered_input for kw in ["physics", "dyson", "kardashev", "star", "energy", "quantum"]):
+        prompt += "\n\n[DOMAIN ADAPTATION: ASTROPHYSICAL & REASONING RIGOR ACTIVE]\n- Apply strict thermodynamic limits, relativistic dynamics, and magnetohydrodynamics."
+    elif any(kw in lowered_input for kw in ["code", "architecture", "system", "algorithm"]):
+        prompt += "\n\n[DOMAIN ADAPTATION: SENIOR SYSTEMS ARCHITECT ACTIVE]\n- Focus on production-level design patterns, Big-O complexities, and memory bounds."
+
     if detected_style == "ANALYTICAL":
         prompt += (
-            "\n\n[MODE: DEEP REASONING & STRATEGY]"
-            "\n- Establish a clear theoretical framework first."
+            "\n\n[MODE: DEEP STRATEGY & MATRIX REASONING]"
             "\n- Present trade-offs in a clean comparison table."
-            "\n- End with a precise recommendation matrix summing to 100%."
-        )
-    elif detected_style == "TECHNICAL":
-        prompt += (
-            "\n\n[MODE: SENIOR SYSTEMS ARCHITECT]"
-            "\n- Diagnose root causes before offering code."
-            "\n- Provide production-ready, typed code with inline complexity analysis."
+            "\n- Maintain hyper-precise quantitative allocations."
         )
 
     if language != "English":
@@ -283,7 +289,7 @@ st.markdown(
 )
 
 st.title("🤖 Intelligent AI Workspace")
-st.caption("Enhanced with Logic Verification, Multi-Angle Search & Auto-Formatting")
+st.caption("Enhanced with Upgrades #31–#48: Epistemic Physics Guardrails, Anti-Pseudoscience & Dynamic Domain Reasoning")
 
 GROQ_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
 
@@ -359,7 +365,7 @@ with col_hdr2:
 
 st.markdown("---")
 
-# Render Message History with Auto-Repair Formatting (Upgrade #33)
+# Render Message History with Auto-Repair Formatting
 for idx, msg in enumerate(active_chat_list):
     with st.chat_message(msg["role"]):
         repaired_content = sanitize_and_repair_formatting(msg.get("content", ""))
@@ -417,7 +423,7 @@ if user_input and client:
         st.markdown(user_input)
 
     # Detect style to set active temperature dynamically
-    detected_style = "ANALYTICAL" if any(kw in user_input.lower() for kw in ["compare", "vs", "probability", "percent", "rate", "code", "architecture"]) else "GENERAL"
+    detected_style = "ANALYTICAL" if any(kw in user_input.lower() for kw in ["compare", "vs", "probability", "percent", "rate", "code", "architecture", "dyson", "kardashev"]) else "GENERAL"
     active_temperature = 0.2 if detected_style == "ANALYTICAL" else 0.7
 
     with st.chat_message("assistant"):
@@ -439,7 +445,7 @@ if user_input and client:
                 st.markdown(reply)
                 active_chat_list.append({"role": "assistant", "content": reply})
 
-        # ROUTE 3: Standard Chat Generation
+        # ROUTE 3: Standard Chat Generation (Enriched with Upgrades #31-#48)
         else:
             system_prompt = build_dynamic_system_prompt(user_input, personality, target_language, detected_style)
             
