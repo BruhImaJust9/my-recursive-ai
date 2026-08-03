@@ -207,6 +207,16 @@ def build_dynamic_system_prompt(user_input, base_personality, language, detected
     elif any(kw in lowered_input for kw in ["story", "creative", "fiction", "worldbuilding", "design"]):
         prompt += "\n\n[DOMAIN ADAPTATION: CREATIVE DIRECTORS ARCHITECT ACTIVE]\n- Focus on vivid sensory imagery, high-stakes narrative tension, and unconventional thematic resonance."
 
+    prompt += (
+        "\n\n### UPGRADES #50–#52: AGENTIC ARTIFACT & EXECUTION ENGINE:\n"
+        "1. EXECUTABLE CODE ARTIFACTS (#50):\n"
+        "   - Whenever writing Python code for calculations, data analysis, or plotting, wrap the code in standard triple-backtick markdown blocks. Ensure code is complete, self-contained, and ready for immediate execution.\n"
+        "2. LIVE UI & WEB WORKBENCH (#51):\n"
+        "   - If asked to design a dashboard, web tool, or UI component, provide self-contained HTML/JS/CSS or Streamlit code snippets that can be visually rendered.\n"
+        "3. DYNAMIC TOOL INTENT DETECTION (#52):\n"
+        "   - Explicitly identify when external data processing, local system calls, or multi-step tool usage is required, and structure responses so tools can parse the output programmatically.\n"
+    )
+
     if detected_style == "ANALYTICAL":
         prompt += (
             "\n\n[MODE: DEEP STRATEGY & MATRIX REASONING]"
