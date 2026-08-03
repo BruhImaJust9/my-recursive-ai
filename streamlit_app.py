@@ -265,6 +265,38 @@ def render_data_canvas(response_text: str):
             pass
 
 # ==========================================
+# UPGRADE #50: LIVE INLINE CODE EXECUTION ENGINE
+# ==========================================
+import io
+import contextlib
+
+def render_interactive_code_runner(response_text: str, msg_idx: int):
+    """
+    UPGRADE #50: Scans the response for Python code blocks and provides a 
+    live execution button directly inside the chat interface.
+    """
+    python_blocks = re.findall(r'```python\s*(.*?)\s*```', response_text, re.DOTALL)
+    if python_blocks:
+        for b_idx, code in enumerate(python_blocks):
+            with st.expander(f"⚡ Interactive Code Execution (Block {b_idx+1})", expanded=False):
+                st.code(code, language="python")
+                if st.button(f"▶️ Run Python Code", key=f"run_code_{msg_idx}_{b_idx}"):
+                    output_buffer = io.StringIO()
+                    try:
+                        with contextlib.redirect_stdout(output_buffer):
+                            # Executes code in a clean local environment
+                            exec_globals = {"st": st, "pd": pd}
+                            exec(code, exec_globals)
+                        output_text = output_buffer.getvalue()
+                        if output_text:
+                            st.success("Execution Successful:")
+                            st.code(output_text)
+                        else:
+                            st.info("Code executed successfully with no printed stdout output.")
+                    except Exception as e:
+                        st.error(f"Execution Error: {e}")
+
+# ==========================================
 # 5. UI CONFIG & MAIN APP LOOP
 # ==========================================
 st.set_page_config(page_title="AI Workspace", page_icon="🤖", layout="wide")
