@@ -438,6 +438,9 @@ for idx, msg in enumerate(active_chat_list):
             if repaired_content:
                 render_data_canvas(repaired_content)
 
+            if repaired_content:
+                render_interactive_code_runner(repaired_content, idx)
+
 # Voice Audio Recorder Control
 col_v1, col_v2 = st.columns([1, 11])
 with col_v1:
