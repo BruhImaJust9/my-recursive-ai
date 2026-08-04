@@ -431,7 +431,7 @@ st.markdown(
             border: none !important;
             background: transparent !important;
             color: #888888 !important;
-            font-size: 0.8rem !important;
+            font-size: 0.8 !important;
             padding: 2px 8px !important;
             border-radius: 6px !important;
         }
