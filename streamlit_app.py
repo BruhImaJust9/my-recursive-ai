@@ -445,7 +445,7 @@ st.markdown(
             border-radius: 12;
             font-size: 0.75;
             color: #aaa;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1 solid rgba(255, 255, 255, 0.1);
         }
     </style>
     """,
