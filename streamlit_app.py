@@ -628,26 +628,19 @@ if user_input and client:
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    # Detect style to set active temperature dynamically
-    detected_style = (
-        "ANALYTICAL"
-        if any(
-            kw in user_input.lower()
-            for kw in [
-                "compare",
-                "vs",
-                "probability",
-                "percent",
-                "rate",
-                "code",
-                "architecture",
-                "dyson",
-                "kardashev",
-            ]
-        )
-        else "GENERAL"
-    )
-    active_temperature = 0.2 if detected_style == "ANALYTICAL" else 0.7
+   lowered_input = user_input.lower().strip()
+    
+    casual_triggers = ["hi", "hello", "hey", "howdy", "sup", "how are you", "what's up", "thanks", "thank you", "cool", "nice"]
+    
+    if any(lowered_input.startswith(cw) or lowered_input == cw for cw in casual_triggers) and len(lowered_input.split()) < 8:
+        detected_style = "CASUAL"
+        active_temperature = 0.85  # Higher warmth & natural conversational flow
+    elif any(kw in lowered_input for kw in ["compare", "vs", "probability", "percent", "rate", "code", "architecture", "dyson", "kardashev"]):
+        detected_style = "ANALYTICAL"
+        active_temperature = 0.2   # Precision mode
+    else:
+        detected_style = "GENERAL"
+        active_temperature = 0.7
 
     with st.chat_message("assistant"):
         # ROUTE 1: Image Generation Route
