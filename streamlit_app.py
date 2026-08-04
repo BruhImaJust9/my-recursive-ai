@@ -189,10 +189,14 @@ def execute_deconstructed_multi_search(
 # ==========================================
 # 3. UPGRADES #31 THROUGH #49: UNIVERSAL REASONING & SYNTHESIS ENGINE
 # ==========================================
-def build_dynamic_system_prompt(
-    user_input, base_personality, language, detected_style="GENERAL"
-):
-    """UPGRADES #31-#49: Enforces First-Principles reasoning, Anti-Pseudoscience
+def build_dynamic_system_prompt(user_input, base_personality, language, detected_style="GENERAL"):
+    # CASUAL ROUTE: If the user is just engaging in casual conversation, drop the heavy framework
+    if detected_style == "CASUAL":
+        return (
+            f"You are a friendly, highly intelligent, and natural conversational assistant operating as a {base_personality}. "
+            f"Keep your responses warm, concise, engaging, and empathetic. Respond naturally like a helpful peer without using forced tables, headers, or rigid technical structures unless asked. "
+            f"Always reply in {language}."
+        )
 
     physics guardrails, Dual-Pass self-critique, Quantitative Boundary
     Enforcement, and Upgrade #49 Universal Cognitive Synthesis Engine for
