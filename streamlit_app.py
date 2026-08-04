@@ -425,7 +425,7 @@ st.markdown(
         div[data-testid="stCustomComponentV1"] {
             background-color: transparent !important;
             border: none !important;
-            padding: 0px !important;
+            padding: 0 !important;
         }
         div[data-testid="column"] button {
             border: none !important;
