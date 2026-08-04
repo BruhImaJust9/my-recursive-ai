@@ -189,7 +189,10 @@ def execute_deconstructed_multi_search(
 # ==========================================
 # 3. UPGRADES #31 THROUGH #49: UNIVERSAL REASONING & SYNTHESIS ENGINE
 # ==========================================
+
 def build_dynamic_system_prompt(user_input, base_personality, language, detected_style="GENERAL"):
+    """UPGRADE #49: Universal Cognitive Synthesis Engine for adaptive multi-angle alignment."""
+    
     # CASUAL ROUTE: If the user is just engaging in casual conversation, drop the heavy framework
     if detected_style == "CASUAL":
         return (
@@ -198,10 +201,6 @@ def build_dynamic_system_prompt(user_input, base_personality, language, detected
             f"Always reply in {language}."
         )
 
-    physics guardrails, Dual-Pass self-critique, Quantitative Boundary
-    Enforcement, and Upgrade #49 Universal Cognitive Synthesis Engine for
-    adaptive multi-angle alignment.
-    """
     prompt = (
         f"You are an elite AI reasoning engine operating as a {base_personality}.\n\n"
         "### CORE COGNITIVE & EPISTEMIC RULES (UPGRADES #31, #36, #37, #38):\n"
