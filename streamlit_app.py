@@ -415,40 +415,25 @@ def needs_automatic_search(user_text: str) -> bool:
 st.set_page_config(page_title="AI Workspace", page_icon="🤖", layout="wide")
 
 st.markdown(
-    """
-    <style>
-        iframe[title*="audio_recorder"],
-        iframe[src*="audio_recorder"] {
-            background-color: transparent !important;
-            border: none !important;
-        }
-        div[data-testid="stCustomComponentV1"] {
-            background-color: transparent !important;
-            border: none !important;
-            padding: 0 !important;
-        }
-        div[data-testid="column"] button {
-            border: none !important;
-            background: transparent !important;
-            color: #888888 !important;
-            font-size: 0.8rem !important;
-            padding: 2px 8px !important;
-            border-radius: 6px !important;
-        }
-        div[data-testid="column"] button:hover {
-            background-color: rgba(255, 255, 255, 0.08) !important;
-            color: #ffffff !important;
-        }
-        .model-badge {
-            background: rgba(255, 255, 255, 0.08);
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            color: #aaa;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-    </style>
-    """,
+    "<style>"
+    "iframe[title*='audio_recorder'], iframe[src*='audio_recorder'] {"
+    "background-color: transparent !important; border: none !important;"
+    "}"
+    "div[data-testid='stCustomComponentV1'] {"
+    "background-color: transparent !important; border: none !important; padding: 0 !important;"
+    "}"
+    "div[data-testid='column'] button {"
+    "border: none !important; background: transparent !important; color: #888888 !important;"
+    "font-size: 0.8rem !important; padding: 2px 8px !important; border-radius: 6px !important;"
+    "}"
+    "div[data-testid='column'] button:hover {"
+    "background-color: rgba(255, 255, 255, 0.08) !important; color: #ffffff !important;"
+    "}"
+    ".model-badge {"
+    "background: rgba(255, 255, 255, 0.08); padding: 4px 10px; border-radius: 12px;"
+    "font-size: 0.75rem; color: #aaa; border: 1px solid rgba(255, 255, 255, 0.1);"
+    "}"
+    "</style>",
     unsafe_allow_html=True,
 )
 
