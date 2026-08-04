@@ -431,9 +431,9 @@ st.markdown(
             border: none !important;
             background: transparent !important;
             color: #888888 !important;
-            font-size: 0.8 !important;
-            padding: 2 8 !important;
-            border-radius: 6 !important;
+            font-size: 0.8rem !important;
+            padding: 2px 8px !important;
+            border-radius: 6px !important;
         }
         div[data-testid="column"] button:hover {
             background-color: rgba(255, 255, 255, 0.08) !important;
@@ -441,11 +441,11 @@ st.markdown(
         }
         .model-badge {
             background: rgba(255, 255, 255, 0.08);
-            padding: 4 10;
-            border-radius: 12;
-            font-size: 0.75;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
             color: #aaa;
-            border: 1 solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
     </style>
     """,
