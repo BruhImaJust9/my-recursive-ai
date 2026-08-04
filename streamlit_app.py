@@ -471,6 +471,22 @@ if st.session_state.input_buffer and not user_input:
     user_input = st.session_state.input_buffer
     st.session_state.input_buffer = ""
 
+# ==========================================
+# UPGRADE #53: AUTO-SEARCH INTENT ROUTER
+# ==========================================
+
+# Define trigger keywords for automatic search routing
+REALTIME_KEYWORDS = [
+    "news", "latest", "today", "yesterday", "current", "weather", 
+    "score", "results", "winner", "stock", "price", "2026", "who won",
+    "schedule", "upcoming", "event", "standing", "release date"
+]
+
+def needs_automatic_search(user_text: str) -> bool:
+    """Detects if the prompt requires real-time information."""
+    lowered = user_text.lower()
+    return any(keyword in lowered for keyword in REALTIME_KEYWORDS)
+
 if user_input and client:
     active_chat_list.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
