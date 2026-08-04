@@ -441,9 +441,9 @@ st.markdown(
         }
         .model-badge {
             background: rgba(255, 255, 255, 0.08);
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 0.75rem;
+            padding: 4 10;
+            border-radius: 12;
+            font-size: 0.75;
             color: #aaa;
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
