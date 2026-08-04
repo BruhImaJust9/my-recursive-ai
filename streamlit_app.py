@@ -404,7 +404,7 @@ REALTIME_KEYWORDS = [
 
 
 def needs_automatic_search(user_text: str) -> bool:
-    """Detects if the prompt requires real-time information."""
+"""Detects if the prompt requires real-time information."""
     lowered = user_text.lower()
     return any(keyword in lowered for keyword in REALTIME_KEYWORDS)
 
