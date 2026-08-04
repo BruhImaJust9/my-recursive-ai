@@ -432,8 +432,8 @@ st.markdown(
             background: transparent !important;
             color: #888888 !important;
             font-size: 0.8 !important;
-            padding: 2px 8px !important;
-            border-radius: 6px !important;
+            padding: 2 8 !important;
+            border-radius: 6 !important;
         }
         div[data-testid="column"] button:hover {
             background-color: rgba(255, 255, 255, 0.08) !important;
