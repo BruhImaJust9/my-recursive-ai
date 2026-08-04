@@ -611,7 +611,7 @@ if user_input and client:
     with st.chat_message("user"):
         st.markdown(user_input)
 
-   lowered_input = user_input.lower().strip()
+    lowered_input = user_input.lower().strip()
     
     casual_triggers = ["hi", "hello", "hey", "howdy", "sup", "how are you", "what's up", "thanks", "thank you", "cool", "nice"]
     
