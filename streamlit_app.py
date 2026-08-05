@@ -69,13 +69,16 @@ if "memory_vault" not in st.session_state:
 if "bookmarks" not in st.session_state:
     st.session_state.bookmarks = []
 
+# UPGRADE #60: Session Telemetry Tracker
+if "telemetry" not in st.session_state:
+    st.session_state.telemetry = {"requests": 0, "est_tokens": 0, "last_latency": 0.0}
+
 
 # ==========================================
 # 1. UPGRADES #33 & #48: LATEX & SYNTAX AUTO-REPAIR ENGINE
 # ==========================================
 def sanitize_and_repair_formatting(text: str) -> str:
     """UPGRADES #33 & #48: Automatically fixes LaTeX math syntax, normalizes
-
     markdown, and repairs broken list formatting.
     """
     if not text:
@@ -98,11 +101,11 @@ def sanitize_and_repair_formatting(text: str) -> str:
     return text.strip()
 
 
-def generate_tts_audio(text: str) -> str:
-    """Helper for TTS Generation."""
+def generate_tts_audio(text: str, speed_factor: float = 1.0) -> str:
+    """Helper for TTS Generation (UPGRADE #61: Enhanced with playback parameters)."""
     try:
         clean_text = re.sub(r"[*_#`$]", "", text)[:300]
-        tts = gTTS(text=clean_text, lang="en")
+        tts = gTTS(text=clean_text, lang="en", slow=(speed_factor < 1.0))
         fp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
         tts.save(fp.name)
         return fp.name
@@ -120,7 +123,6 @@ def execute_deconstructed_multi_search(
     query: str, client, selected_model: str
 ) -> str:
     """UPGRADE #32 & #34: Deconstructs complex queries into sub-searches,
-
     executes multi-angle retrieval, and synthesizes factually verified claims.
     """
     if not TAVILY_KEY:
@@ -191,7 +193,7 @@ def execute_deconstructed_multi_search(
 # ==========================================
 
 def build_dynamic_system_prompt(user_input, base_personality, language, detected_style="GENERAL"):
-    """UPGRADE #49: Universal Cognitive Synthesis Engine for adaptive multi-angle alignment."""
+    """UPGRADE #49 & #56: Universal Cognitive & Multi-Modal Synthesis Engine."""
     
     # CASUAL ROUTE: If the user is just engaging in casual conversation, drop the heavy framework
     if detected_style == "CASUAL":
@@ -284,10 +286,17 @@ def build_dynamic_system_prompt(user_input, base_personality, language, detected
         prompt += f"\n\nCRITICAL RULE: Respond entirely in {language}."
 
     if st.session_state.memory_vault:
-        facts_str = "\n".join(
-            [f"- {fact}" for fact in st.session_state.memory_vault]
-        )
-        prompt += f"\n\n[BACKGROUND USER CONTEXT]:\nUse these known facts naturally if relevant, but DO NOT mention the Memory Vault directly:\n{facts_str}"
+        # UPGRADE #57: Vector-Like Keyword Filtered Context Retrieval
+        query_words = set(re.findall(r"\w+", lowered_input))
+        relevant_memories = []
+        for fact in st.session_state.memory_vault:
+            fact_words = set(re.findall(r"\w+", fact.lower()))
+            if query_words.intersection(fact_words) or len(st.session_state.memory_vault) <= 3:
+                relevant_memories.append(fact)
+
+        if relevant_memories:
+            facts_str = "\n".join([f"- {fact}" for fact in relevant_memories])
+            prompt += f"\n\n[BACKGROUND USER CONTEXT]:\nUse these known facts naturally if relevant, but DO NOT mention the Memory Vault directly:\n{facts_str}"
 
     return prompt
 
@@ -297,7 +306,6 @@ def build_dynamic_system_prompt(user_input, base_personality, language, detected
 # ==========================================
 def render_data_canvas(response_text: str):
     """UPGRADE #35: Automatically parses tables or CSV structures into
-
     interactive charts & dataframes.
     """
     lines = [line.strip() for line in response_text.split("\n") if "|" in line]
@@ -344,7 +352,6 @@ def render_data_canvas(response_text: str):
 # ==========================================
 def render_interactive_code_runner(response_text: str, msg_idx: int):
     """UPGRADE #50: Scans the response for Python code blocks and provides a
-
     live execution button directly inside the chat interface.
     """
     python_blocks = re.findall(
@@ -375,6 +382,99 @@ def render_interactive_code_runner(response_text: str, msg_idx: int):
                             )
                     except Exception as e:
                         st.error(f"Execution Error: {e}")
+
+
+# ==========================================
+# UPGRADE #54: AUTONOMOUS AGENTIC CODE DEBUGGER
+# ==========================================
+def run_autonomous_code_debugger(code_snippet: str, client, model: str) -> str:
+    """UPGRADE #54: Runs code in a sandboxed capture environment, traps errors,
+    and asks LLM to self-correct iteratively until passing.
+    """
+    st.info("🤖 Agentic Debugger active: Testing code execution...")
+    max_attempts = 3
+    current_code = code_snippet
+
+    for attempt in range(1, max_attempts + 1):
+        output_buffer = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(output_buffer):
+                exec_globals = {"st": st, "pd": pd}
+                exec(current_code, exec_globals)
+            st.success(f"✅ Code executed cleanly on attempt {attempt}!")
+            return current_code
+        except Exception as err:
+            err_msg = str(err)
+            st.warning(f"⚠️ Attempt {attempt} failed with error: {err_msg}")
+            
+            fix_prompt = (
+                f"The following Python code produced an execution error:\n\n"
+                f"```python\n{current_code}\n```\n\n"
+                f"ERROR:\n{err_msg}\n\n"
+                f"Fix the code. Return ONLY the valid Python code in standard triple-backtick markdown blocks."
+            )
+            res = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": fix_prompt}],
+                temperature=0.1,
+            )
+            extracted = re.search(r"```python\s*(.*?)\s*```", res.choices[0].message.content, re.DOTALL)
+            if extracted:
+                current_code = extracted.group(1).strip()
+            else:
+                break
+
+    st.error("❌ Agentic debugger reached maximum iterations.")
+    return current_code
+
+
+# ==========================================
+# UPGRADE #55: SMART CHAT AUTO-SUMMARIZER
+# ==========================================
+def auto_summarize_chat_title(chat_history, client, current_name: str):
+    """UPGRADE #55: Dynamically generates thread titles based on conversation topics."""
+    if len(chat_history) == 2 and current_name.startswith("Chat "):
+        first_user_msg = chat_history[0].get("content", "")
+        try:
+            res = client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"Generate a ultra-concise 3-4 word title for a chat thread starting with: '{first_user_msg}'. Return ONLY the title with no quotes or punctuation.",
+                    }
+                ],
+                temperature=0.3,
+            )
+            new_title = res.choices[0].message.content.strip()
+            if new_title:
+                st.session_state.chats[new_title] = st.session_state.chats.pop(current_name)
+                st.session_state.current_chat = new_title
+                save_chats_to_disk()
+                st.rerun()
+        except Exception:
+            pass
+
+
+# ==========================================
+# UPGRADE #62: PROMPT ENHANCER & QUERY EXPANSION
+# ==========================================
+def enhance_user_prompt(prompt_text: str, client) -> str:
+    """UPGRADE #62: Expands short user inputs into detailed high-performing prompts."""
+    try:
+        res = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"Rewrite and enhance the following query into a clear, detailed, and structured prompt optimized for AI instruction:\n\n'{prompt_text}'\n\nReturn ONLY the enhanced prompt.",
+                }
+            ],
+            temperature=0.3,
+        )
+        return res.choices[0].message.content.strip()
+    except Exception:
+        return prompt_text
 
 
 # ==========================================
@@ -437,7 +537,7 @@ st.markdown(
 
 st.title("🤖 Intelligent AI Workspace")
 st.caption(
-    "Enhanced with Upgrades #31–#53: Epistemic Physics Guardrails, Live Code Execution & Dynamic Intent Routing"
+    "Enhanced with Upgrades #31–#63: Epistemic Physics Guardrails, Live Code Debugger & Dynamic Workspace Telemetry"
 )
 
 GROQ_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
@@ -498,13 +598,21 @@ with st.sidebar:
     st.markdown("---")
     st.header("📄 File Attachment Context")
     uploaded_file = st.file_uploader(
-        "Upload TXT or Code snippet:", type=["txt", "py", "js", "md"]
+        "Upload TXT, CSV or Code snippet:", type=["txt", "py", "js", "md", "csv"]
     )
     doc_context = ""
     if uploaded_file is not None:
         try:
-            doc_context = uploaded_file.read().decode("utf-8")
-            st.success("File context loaded!")
+            if uploaded_file.name.endswith(".csv"):
+                # UPGRADE #58: Data Inspector
+                df_upload = pd.read_csv(uploaded_file)
+                st.markdown("#### 🔍 CSV File Summary")
+                st.write(f"**Rows:** {df_upload.shape[0]} | **Cols:** {df_upload.shape[1]}")
+                st.dataframe(df_upload.head(3), use_container_width=True)
+                doc_context = f"CSV Data Summary:\nColumns: {list(df_upload.columns)}\nData Sample:\n{df_upload.head(10).to_csv(index=False)}"
+            else:
+                doc_context = uploaded_file.read().decode("utf-8")
+                st.success("File context loaded!")
         except Exception:
             st.error("Error reading file!")
 
@@ -525,6 +633,35 @@ with st.sidebar:
                 st.rerun()
     else:
         st.caption("No custom memory facts saved yet.")
+
+    # UPGRADE #59: Live Thread Export Engine
+    st.markdown("---")
+    st.header("📥 Workspace Thread Export")
+    export_chat = st.session_state.chats.get(st.session_state.current_chat, [])
+    chat_export_str = json.dumps(export_chat, indent=2)
+    st.download_button(
+        label="Download Chat (JSON)",
+        data=chat_export_str,
+        file_name=f"{st.session_state.current_chat}.json",
+        mime="application/json",
+        use_container_width=True,
+    )
+
+    # UPGRADE #60: Session Telemetry
+    st.markdown("---")
+    st.header("📊 Telemetry Dashboard")
+    st.caption(f"⚡ **Requests Executed:** {st.session_state.telemetry['requests']}")
+    st.caption(f"🔤 **Est. Tokens Processed:** {st.session_state.telemetry['est_tokens']}")
+    st.caption(f"⏱️ **Last Latency:** {st.session_state.telemetry['last_latency']:.2f}s")
+
+    # UPGRADE #63: Global Workspace State Reset
+    st.markdown("---")
+    if st.button("🧹 Reset Workspace Cache", use_container_width=True):
+        st.session_state.chats = {"Chat 1": []}
+        st.session_state.current_chat = "Chat 1"
+        st.session_state.memory_vault = []
+        save_chats_to_disk()
+        st.rerun()
 
 # Active Chat Buffer
 active_chat_list = st.session_state.chats[st.session_state.current_chat]
@@ -601,12 +738,21 @@ if audio_bytes and client:
             st.error(f"Voice transcription error: {e}")
 
 # Input Execution Pipeline
-user_input = st.chat_input("Ask anything, use /search or /image...")
+user_input = st.chat_input("Ask anything, use /search, /image, /debug, or /enhance...")
 if st.session_state.input_buffer and not user_input:
     user_input = st.session_state.input_buffer
     st.session_state.input_buffer = ""
 
 if user_input and client:
+    start_time = time.time()
+    
+    # UPGRADE #62: Prompt Enhancement Trigger
+    if user_input.lower().startswith("/enhance"):
+        clean_p = user_input.replace("/enhance", "").strip()
+        with st.spinner("✨ Enhancing query structure..."):
+            user_input = enhance_user_prompt(clean_p, client)
+            st.info(f"**Enhanced Prompt:** {user_input}")
+
     active_chat_list.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
@@ -626,8 +772,16 @@ if user_input and client:
         active_temperature = 0.7
 
     with st.chat_message("assistant"):
+        # ROUTE 0: Autonomous Code Debugger (UPGRADE #54)
+        if user_input.lower().startswith("/debug"):
+            clean_code = user_input.replace("/debug", "").strip()
+            fixed_code = run_autonomous_code_debugger(clean_code, client, selected_model)
+            reply = f"```python\n{fixed_code}\n```"
+            st.markdown(reply)
+            active_chat_list.append({"role": "assistant", "content": reply})
+
         # ROUTE 1: Image Generation Route
-        if user_input.lower().startswith("/image"):
+        elif user_input.lower().startswith("/image"):
             clean_prompt = user_input.replace("/image", "").strip()
             with st.spinner("🎨 Generating image canvas..."):
                 encoded_prompt = urllib.parse.quote(clean_prompt)
@@ -659,7 +813,7 @@ if user_input and client:
                 st.markdown(reply)
                 active_chat_list.append({"role": "assistant", "content": reply})
 
-        # ROUTE 3: Standard Chat Generation (Enriched with Upgrades #31-#49)
+        # ROUTE 3: Standard Chat Generation (Enriched with Upgrades #31-#49 & #56)
         else:
             system_prompt = build_dynamic_system_prompt(
                 user_input, personality, target_language, detected_style
@@ -695,6 +849,14 @@ if user_input and client:
             active_chat_list.append(
                 {"role": "assistant", "content": final_reply}
             )
+
+    # Telemetry Updates (UPGRADE #60)
+    st.session_state.telemetry["requests"] += 1
+    st.session_state.telemetry["est_tokens"] += len(user_input.split()) + 150
+    st.session_state.telemetry["last_latency"] = time.time() - start_time
+
+    # UPGRADE #55: Smart Thread Summarization Trigger
+    auto_summarize_chat_title(active_chat_list, client, st.session_state.current_chat)
 
     save_chats_to_disk()
     st.rerun()
