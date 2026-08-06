@@ -115,6 +115,18 @@ st.sidebar.download_button(
     mime="text/markdown"
 )
 
+def enhance_prompt(raw_prompt: str) -> str:
+    return (
+        f"Expand the following request into a clear, detailed, and structured prompt, "
+        f"specifying context, desired formatting, and constraints:\n\n'{raw_prompt}'"
+    )
+
+# Can be run via slash command or a UI button
+elif user_input.lower().startswith("/enhance "):
+    lazy_prompt = user_input.replace("/enhance ", "").strip()
+    enhanced_prompt = enhance_prompt(lazy_prompt)
+    # Send enhanced_prompt directly to your LLM generator
+
 
 def generate_tts_audio(text: str, speed_factor: float = 1.0) -> str:
     """Helper for TTS Generation (UPGRADE #61: Enhanced with playback parameters)."""
