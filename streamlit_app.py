@@ -780,16 +780,17 @@ if user_input and client:
             st.markdown(reply)
             active_chat_list.append({"role": "assistant", "content": reply})
 
-        # ROUTE 1: Image Generation Route (Real AI Art Engine)
+        # ROUTE 1: High-Quality AI Image Generation
         elif any(user_input.lower().startswith(cmd) for cmd in ["/image", "/imagine", "/draw", "/generate"]):
             clean_prompt = re.sub(r"^/(image|imagine|draw|generate)\s*", "", user_input, flags=re.IGNORECASE).strip()
             if not clean_prompt:
                 clean_prompt = "a cute dog"
                 
-            with st.spinner("🎨 Generating AI artwork..."):
+            with st.spinner("🎨 Generating high-quality AI artwork..."):
                 encoded_prompt = urllib.parse.quote(clean_prompt)
-                # Updated live Pollinations API endpoint
-                img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1,99999)}&nologo=true"
+                
+                # Added &model=flux and &enhance=true for photorealistic results
+                img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1,99999)}&model=flux&enhance=true&nologo=true"
                 
                 st.image(
                     img_url,
