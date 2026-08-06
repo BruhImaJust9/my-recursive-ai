@@ -8,4 +8,3 @@ authlib
 tavily-python
 gTTS
 audio-recorder-streamlit
-pypdf
