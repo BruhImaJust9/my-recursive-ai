@@ -8,3 +8,4 @@ authlib
 tavily-python
 gTTS
 audio-recorder-streamlit
+beautifulsoup4
