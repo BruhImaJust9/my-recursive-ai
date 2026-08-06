@@ -853,7 +853,7 @@ if user_input and client:
 from bs4 import BeautifulSoup
 
 # ROUTE: Web Scraper Route
-if user_input.lower().startswith("/read "):
+if user_input and user_input.lower().startswith("/read "):
     target_url = user_input.replace("/read ", "").strip()
     with st.spinner(f"🌐 Fetching content from {target_url}..."):
         try:
