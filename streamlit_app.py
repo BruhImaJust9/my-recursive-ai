@@ -819,6 +819,24 @@ if user_input and client:
                 st.markdown(reply)
                 active_chat_list.append({"role": "assistant", "content": reply})
 
+        import requests
+from bs4 import BeautifulSoup
+
+# ROUTE: Web Scraper Route
+elif user_input.lower().startswith("/read "):
+    target_url = user_input.replace("/read ", "").strip()
+    with st.spinner(f"🌐 Fetching content from {target_url}..."):
+        try:
+            res = requests.get(target_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=8)
+            soup = BeautifulSoup(res.text, "html.parser")
+            paragraphs = [p.get_text() for p in soup.find_all("p")]
+            page_text = " ".join(paragraphs)[:4000] # Cap text length
+            
+            prompt_with_url = f"Analyze and summarize the following content from {target_url}:\n\n{page_text}"
+            # Pass prompt_with_url directly to your LLM text engine
+        except Exception as e:
+            st.error(f"Failed to fetch web page: {e}")
+
         # ROUTE 3: Standard Chat Generation (Enriched with Upgrades #31-#49 & #56)
         else:
             system_prompt = build_dynamic_system_prompt(
