@@ -107,6 +107,9 @@ def export_chat_as_markdown(chat_list) -> str:
         md_content += f"{role}\n{msg['content']}\n\n---\n\n"
     return md_content
 
+# Grab active chat messages safely from session state (or default to empty list)
+active_chat_list = st.session_state.get("messages", [])
+
 md_data = export_chat_as_markdown(active_chat_list)
 st.sidebar.download_button(
     label="📥 Export Chat (.md)",
