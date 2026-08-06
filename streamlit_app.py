@@ -100,6 +100,21 @@ def sanitize_and_repair_formatting(text: str) -> str:
 
     return text.strip()
 
+def export_chat_as_markdown(chat_list) -> str:
+    md_content = "# Chat Session Export\n\n"
+    for msg in chat_list:
+        role = "### 👤 User" if msg["role"] == "user" else "### 🤖 Assistant"
+        md_content += f"{role}\n{msg['content']}\n\n---\n\n"
+    return md_content
+
+md_data = export_chat_as_markdown(active_chat_list)
+st.sidebar.download_button(
+    label="📥 Export Chat (.md)",
+    data=md_data,
+    file_name="chat_history.md",
+    mime="text/markdown"
+)
+
 
 def generate_tts_audio(text: str, speed_factor: float = 1.0) -> str:
     """Helper for TTS Generation (UPGRADE #61: Enhanced with playback parameters)."""
