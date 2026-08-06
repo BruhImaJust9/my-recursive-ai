@@ -123,9 +123,9 @@ def enhance_prompt(raw_prompt: str) -> str:
 
 # Can be run via slash command or a UI button
     if user_input.lower().startswith("/enhance "):
-    lazy_prompt = user_input.replace("/enhance ", "").strip()
-    enhanced_prompt = enhance_prompt(lazy_prompt)
-    # Send enhanced_prompt directly to your LLM generator
+        lazy_prompt = user_input.replace("/enhance ", "").strip()
+        enhanced_prompt = enhance_prompt(lazy_prompt)
+        # Send enhanced_prompt directly to your LLM generator
 
 
 def generate_tts_audio(text: str, speed_factor: float = 1.0) -> str:
