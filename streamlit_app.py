@@ -789,7 +789,7 @@ if user_input and client:
                 st.image(
                     img_url,
                     caption=f"Prompt: {clean_prompt}",
-                    use_column_width=True,
+                    use_container_width=True,
                 )
                 active_chat_list.append(
                     {
