@@ -849,25 +849,34 @@ if user_input and client:
                 st.markdown(reply)
                 active_chat_list.append({"role": "assistant", "content": reply})
 
-        import requests
-from bs4 import BeautifulSoup
+        # ROUTE 3: Web Scraper Route
+        elif user_input.lower().startswith("/read "):
+            target_url = user_input.replace("/read ", "").strip()
+            with st.spinner(f"🌐 Fetching content from {target_url}..."):
+                try:
+                    import requests
+                    from bs4 import BeautifulSoup
+                    
+                    res = requests.get(target_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=8)
+                    soup = BeautifulSoup(res.text, "html.parser")
+                    paragraphs = [p.get_text() for p in soup.find_all("p")]
+                    page_text = " ".join(paragraphs)[:4000] # Cap text length
+                    
+                    prompt_with_url = f"Analyze and summarize the following content from {target_url}:\n\n{page_text}"
+                    
+                    # Pass prompt_with_url to LLM
+                    response = client.chat.completions.create(
+                        model=selected_model,
+                        messages=[{"role": "user", "content": prompt_with_url}],
+                        temperature=active_temperature,
+                    )
+                    reply = response.choices[0].message.content
+                    st.markdown(reply)
+                    active_chat_list.append({"role": "assistant", "content": reply})
+                except Exception as e:
+                    st.error(f"Failed to fetch web page: {e}")
 
-# ROUTE: Web Scraper Route
-if user_input and user_input.lower().startswith("/read "):
-    target_url = user_input.replace("/read ", "").strip()
-    with st.spinner(f"🌐 Fetching content from {target_url}..."):
-        try:
-            res = requests.get(target_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=8)
-            soup = BeautifulSoup(res.text, "html.parser")
-            paragraphs = [p.get_text() for p in soup.find_all("p")]
-            page_text = " ".join(paragraphs)[:4000] # Cap text length
-            
-            prompt_with_url = f"Analyze and summarize the following content from {target_url}:\n\n{page_text}"
-            # Pass prompt_with_url directly to your LLM text engine
-        except Exception as e:
-            st.error(f"Failed to fetch web page: {e}")
-
-        # ROUTE 3: Standard Chat Generation (Enriched with Upgrades #31-#49 & #56)
+        # ROUTE 4: Standard Chat Generation (Enriched with Upgrades #31-#49 & #56)
         else:
             system_prompt = build_dynamic_system_prompt(
                 user_input, personality, target_language, detected_style
