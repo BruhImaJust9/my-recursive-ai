@@ -780,16 +780,17 @@ if user_input and client:
             st.markdown(reply)
             active_chat_list.append({"role": "assistant", "content": reply})
 
-        # ROUTE 1: Image Generation Route
-        elif user_input.lower().startswith("/image"):
-            clean_prompt = user_input.replace("/image", "").strip()
-            with st.spinner("🎨 Generating image canvas..."):
-                # We'll use a reliable placeholder image service for now to prove rendering works.
-                # In a real-world scenario, this would be replaced by a robust image generation API.
-                encoded_prompt = urllib.parse.quote(clean_prompt)
-                img_url = f"https://placehold.co/1024x1024/000000/FFFFFF.png?text=Generated:%20{encoded_prompt}"
+        # ROUTE 1: Image Generation Route (Real AI Art Engine)
+        elif any(user_input.lower().startswith(cmd) for cmd in ["/image", "/imagine", "/draw", "/generate"]):
+            clean_prompt = re.sub(r"^/(image|imagine|draw|generate)\s*", "", user_input, flags=re.IGNORECASE).strip()
+            if not clean_prompt:
+                clean_prompt = "a cute dog"
                 
-                # FIXED: Updated use_column_width -> use_container_width
+            with st.spinner("🎨 Generating AI artwork..."):
+                encoded_prompt = urllib.parse.quote(clean_prompt)
+                # Updated live Pollinations API endpoint
+                img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1,99999)}&nologo=true"
+                
                 st.image(
                     img_url,
                     caption=f"Prompt: {clean_prompt}",
