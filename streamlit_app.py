@@ -713,24 +713,6 @@ with col_hdr2:
 
 st.markdown("---")
 
-if user_input and client:
-    start_time = time.time()
-    
-    # 🔍 PRINT TO CLOUD LOGS: See what users are typing!
-    print(f"--- [USER ACTIVITY DETECTED] ---")
-    print(f"Input Received: {user_input}")
-    
-    # Check if command or standard prompt
-    if user_input.lower().startswith("/search"):
-        print("Route Triggered: /search")
-    elif user_input.lower().startswith("/image"):
-        print("Route Triggered: /image")
-    elif user_input.lower().startswith("/read"):
-        print("Route Triggered: /read")
-    else:
-        print("Route Triggered: Standard LLM Chat")
-    print(f"--------------------------------")
-
 # Render Message History with Auto-Repair Formatting
 for idx, msg in enumerate(active_chat_list):
     with st.chat_message(msg["role"]):
@@ -795,6 +777,23 @@ user_input = st.chat_input("Ask anything, use /search, /image, /debug, or /enhan
 if st.session_state.input_buffer and not user_input:
     user_input = st.session_state.input_buffer
     st.session_state.input_buffer = ""
+
+if user_input and client:
+    start_time = time.time()
+    
+    # 🔍 PRINT TO CLOUD LOGS (Placed correctly after chat_input!)
+    print(f"--- [USER ACTIVITY DETECTED] ---")
+    print(f"Input Received: {user_input}")
+    
+    if user_input.lower().startswith("/search"):
+        print("Route Triggered: /search")
+    elif user_input.lower().startswith("/image"):
+        print("Route Triggered: /image")
+    elif user_input.lower().startswith("/read"):
+        print("Route Triggered: /read")
+    else:
+        print("Route Triggered: Standard LLM Chat")
+    print(f"--------------------------------")
 
 if user_input and client:
     start_time = time.time()
