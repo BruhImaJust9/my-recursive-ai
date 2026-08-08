@@ -47,6 +47,15 @@ def save_chats_to_disk():
                 }
                 clean_chats[session_name].append(clean_msg)
 
+        # Only save persistent data if the user is logged in as Admin/Owner
+    if st.session_state.get("is_logged_in", False):
+        with open("chats.json", "w") as f:
+            json.dump(st.session_state.chats, f)
+    else:
+        
+        # Guest session: Do not save to server disk!
+        pass
+
         with open(CHAT_STORAGE_FILE, "w") as f:
             json.dump(clean_chats, f, indent=2)
     except Exception:
