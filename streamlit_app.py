@@ -909,6 +909,15 @@ if user_input and client:
                 "NEVER analyze the literal letters of the acronym unless explicitly asked to do a letter-by-letter breakdown."
             )
 
+            # UPGRADE: Anti-Hallucination & Clean Formatting Guardrails
+            system_prompt += (
+                "\n\n[STRICT FACTUALITY RULE]: Never invent or make up fake characters, scientists, or lore "
+                "for real media series, shows, or games (e.g., Five Nights at Freddy's / FNAF). "
+                "If you are unsure of the real cast or character names, state that clearly instead of inventing fake names.\n"
+                "[STREAMLIT COLOR RULE]: NEVER use raw HTML tags like <font color=...>. "
+                "ONLY use native Streamlit markdown color syntax, such as :red[text], :blue[text], :green[text], :purple[text], or :orange[text]."
+            )
+
             if doc_context:
                 system_prompt += (
                     f"\n\n[USER ATTACHED FILE CONTEXT]:\n{doc_context[:4000]}"
