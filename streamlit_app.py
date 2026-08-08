@@ -826,6 +826,53 @@ if user_input and client:
     # 🔍 PRINT TO CLOUD LOGS (Placed correctly after chat_input!)
     print(f"--- [USER ACTIVITY DETECTED] ---")
     print(f"Input Received: {user_input}")
+
+    # 🧠 GAME-CHANGER: STEP 2 GOES HERE! (Auto-Detect Intent)
+    detected_route = classify_user_intent(user_input, client, selected_model)
+    print(f"--- [AUTO-ROUTER] Selected Route: {detected_route} ---")
+
+    active_chat_list.append({"role": "user", "content": user_input})
+    with st.chat_message("user"):
+        st.markdown(user_input)
+
+    with st.chat_message("assistant"):
+        # ROUTE 0: Autonomous Code Debugger
+        if detected_route == "DEBUG":
+            st.info("🛠️ *Auto-Detected: Code Debugger Activated*")
+            clean_code = user_input.replace("/debug", "").strip()
+            fixed_code = run_autonomous_code_debugger(clean_code, client, selected_model)
+            reply = f"```python\n{fixed_code}\n```"
+            st.markdown(reply)
+            active_chat_list.append({"role": "assistant", "content": reply})
+
+        # ROUTE 1: High-Quality AI Image Generation
+        elif detected_route == "IMAGE":
+            st.info("🎨 *Auto-Detected: Image Generator Activated*")
+            clean_prompt = re.sub(r"^/(image|imagine|draw|generate)\s*", "", user_input, flags=re.IGNORECASE).strip()
+            if not clean_prompt:
+                clean_prompt = user_input # Use full prompt if no slash command used
+                
+            with st.spinner("🎨 Generating high-quality AI artwork..."):
+                encoded_prompt = urllib.parse.quote(clean_prompt)
+                img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1,99999)}&model=flux&enhance=true&nologo=true"
+                st.image(img_url, caption=f"Prompt: {clean_prompt}", use_container_width=True)
+                active_chat_list.append({"role": "assistant", "content": f"🎨 Generated Image for: '{clean_prompt}'\n![Image]({img_url})"})
+
+        # ROUTE 2: Multi-Angle Search Route
+        elif detected_route == "SEARCH":
+            st.info("🔍 *Auto-Detected: Web Search Activated*")
+            clean_query = user_input.replace("/search", "").strip()
+            with st.spinner("🔍 Deconstructing query & searching..."):
+                reply = execute_deconstructed_multi_search(clean_query, client, selected_model)
+                reply = sanitize_and_repair_formatting(reply)
+                st.markdown(reply)
+                active_chat_list.append({"role": "assistant", "content": reply})
+
+        # ROUTE 3: Standard Chat Generation (Fallback)
+        else:
+            system_prompt = build_dynamic_system_prompt(
+                user_input, personality, target_language, detected_style
+            )
     
     if user_input.lower().startswith("/search"):
         print("Route Triggered: /search")
