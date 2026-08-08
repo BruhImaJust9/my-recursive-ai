@@ -793,7 +793,7 @@ if audio_bytes and client:
 def classify_user_intent(prompt, client, model_name):
     """
     Analyzes user prompt and automatically decides which tool/route to run.
-    Returns: 'IMAGE', 'DEBUG', 'SEARCH', or 'CHAT'
+    Returns: 'IMAGE', 'DEBUG', 'SEARCH', 'READ', or 'CHAT'
     """
     lowered = prompt.lower().strip()
     
@@ -812,6 +812,9 @@ def classify_user_intent(prompt, client, model_name):
     if "error" in lowered and any(trig in lowered for trig in debug_triggers):
         return "DEBUG"
 
+    if needs_automatic_search(prompt) or any(kw in lowered for kw in REALTIME_KEYWORDS):
+        return "SEARCH"
+
     return "CHAT"
 
 # Input Execution Pipeline
@@ -823,91 +826,6 @@ if st.session_state.input_buffer and not user_input:
 if user_input and client:
     start_time = time.time()
     
-    # 🔍 PRINT TO CLOUD LOGS (Placed correctly after chat_input!)
-    print(f"--- [USER ACTIVITY DETECTED] ---")
-    print(f"Input Received: {user_input}")
-
-    # 🧠 GAME-CHANGER: STEP 2 GOES HERE! (Auto-Detect Intent)
-    detected_route = classify_user_intent(user_input, client, selected_model)
-    print(f"--- [AUTO-ROUTER] Selected Route: {detected_route} ---")
-
-    active_chat_list.append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
-        st.markdown(user_input)
-
-    with st.chat_message("assistant"):
-        # ROUTE 0: Autonomous Code Debugger
-        if detected_route == "DEBUG":
-            st.info("🛠️ *Auto-Detected: Code Debugger Activated*")
-            clean_code = user_input.replace("/debug", "").strip()
-            fixed_code = run_autonomous_code_debugger(clean_code, client, selected_model)
-            reply = f"```python\n{fixed_code}\n```"
-            st.markdown(reply)
-            active_chat_list.append({"role": "assistant", "content": reply})
-
-        # ROUTE 1: High-Quality AI Image Generation
-        elif detected_route == "IMAGE":
-            st.info("🎨 *Auto-Detected: Image Generator Activated*")
-            clean_prompt = re.sub(r"^/(image|imagine|draw|generate)\s*", "", user_input, flags=re.IGNORECASE).strip()
-            if not clean_prompt:
-                clean_prompt = user_input
-                
-            with st.spinner("🎨 Generating high-quality AI artwork..."):
-                enhanced_prompt = f"{clean_prompt}, high resolution, detailed, vivid colors"
-                encoded_prompt = urllib.parse.quote(enhanced_prompt)
-                
-                img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1, 99999)}&model=flux&enhance=true&nologo=true"
-                
-                # 1. Format the full Markdown response (text + image URL combined into ONE string)
-                full_response = f"🎨 **Generated Image for:** *'{clean_prompt}'*\n\n![AI Image]({img_url})"
-                
-                # 2. Display it cleanly using st.markdown
-                st.markdown(full_response)
-                
-                # 3. Save ONLY this single combined response into chat history
-                active_chat_list.append({
-                    "role": "assistant",
-                    "content": full_response
-                })
-                
-                # 2. CLEAN TEXT FIX: Put this exact block right here!
-                # Saves text-only to history so Streamlit doesn't render a broken icon on refresh
-                active_chat_list.append(
-                    {
-                        "role": "assistant",
-                        "content": f"🎨 Generated AI Image for prompt: *'{clean_prompt}'*",
-                    }
-                )
-
-        # ROUTE 2: Multi-Angle Search Route
-        elif detected_route == "SEARCH":
-            st.info("🔍 *Auto-Detected: Web Search Activated*")
-            clean_query = user_input.replace("/search", "").strip()
-            with st.spinner("🔍 Deconstructing query & searching..."):
-                reply = execute_deconstructed_multi_search(clean_query, client, selected_model)
-                reply = sanitize_and_repair_formatting(reply)
-                st.markdown(reply)
-                active_chat_list.append({"role": "assistant", "content": reply})
-
-        # ROUTE 3: Standard Chat Generation (Fallback)
-        else:
-            system_prompt = build_dynamic_system_prompt(
-                user_input, personality, target_language, detected_style
-            )
-    
-    if user_input.lower().startswith("/search"):
-        print("Route Triggered: /search")
-    elif user_input.lower().startswith("/image"):
-        print("Route Triggered: /image")
-    elif user_input.lower().startswith("/read"):
-        print("Route Triggered: /read")
-    else:
-        print("Route Triggered: Standard LLM Chat")
-    print(f"--------------------------------")
-
-if user_input and client:
-    start_time = time.time()
-    
     # UPGRADE #62: Prompt Enhancement Trigger
     if user_input.lower().startswith("/enhance"):
         clean_p = user_input.replace("/enhance", "").strip()
@@ -915,13 +833,19 @@ if user_input and client:
             user_input = enhance_user_prompt(clean_p, client)
             st.info(f"**Enhanced Prompt:** {user_input}")
 
+    # 🔍 PRINT TO CLOUD LOGS
+    print(f"--- [USER ACTIVITY DETECTED] ---")
+    print(f"Input Received: {user_input}")
+
+    # 🧠 Auto-Detect Intent
+    detected_route = classify_user_intent(user_input, client, selected_model)
+    print(f"--- [AUTO-ROUTER] Selected Route: {detected_route} ---")
+
     active_chat_list.append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
-        st.markdown(user_input)
 
     lowered_input = user_input.lower().strip()
 
-    # 2. UPGRADE: Fix character/word ambiguity
+    # Ambiguity handler
     processed_prompt = user_input
     if "tadc" in lowered_input and "character" in lowered_input:
         processed_prompt += " (referring to the individuals/cast in a show, not the letters of the acronym)"
@@ -930,10 +854,10 @@ if user_input and client:
     
     if any(lowered_input.startswith(cw) or lowered_input == cw for cw in casual_triggers) and len(lowered_input.split()) < 8:
         detected_style = "CASUAL"
-        active_temperature = 0.85  # Higher warmth & natural conversational flow
+        active_temperature = 0.85
     elif any(kw in lowered_input for kw in ["compare", "vs", "probability", "percent", "rate", "code", "architecture", "dyson", "kardashev"]):
         detected_style = "ANALYTICAL"
-        active_temperature = 0.2   # Precision mode
+        active_temperature = 0.2
     else:
         detected_style = "GENERAL"
         active_temperature = 0.7
@@ -946,7 +870,6 @@ if user_input and client:
             clean_code = user_input.replace("/debug", "").strip()
             fixed_code = run_autonomous_code_debugger(clean_code, client, selected_model)
             reply = f"```python\n{fixed_code}\n```"
-            st.markdown(reply)
             active_chat_list.append({"role": "assistant", "content": reply})
 
         # ROUTE 1: High-Quality AI Image Generation
@@ -961,17 +884,12 @@ if user_input and client:
                 
                 img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1, 99999)}&model=flux&enhance=true&nologo=true"
                 
-                # 1. Format the complete response string
                 full_response = f"🎨 **Generated Image for:** *'{clean_prompt}'*\n\n![AI Image]({img_url})"
                 
-                # 2. Append ONLY ONCE to active chat history
                 active_chat_list.append({
                     "role": "assistant",
                     "content": full_response
                 })
-                
-                # 3. Force a clean Streamlit rerun so history renders it cleanly!
-                st.rerun()
 
         # ROUTE 2: Deconstructed Multi-Angle Search Route
         elif detected_route == "SEARCH":
@@ -982,7 +900,6 @@ if user_input and client:
                     clean_query, client, selected_model
                 )
                 reply = sanitize_and_repair_formatting(reply)
-                st.markdown(reply)
                 active_chat_list.append({"role": "assistant", "content": reply})
 
         # ROUTE 3: Web Scraper Route
@@ -1006,10 +923,9 @@ if user_input and client:
                         temperature=active_temperature,
                     )
                     reply = response.choices[0].message.content
-                    st.markdown(reply)
                     active_chat_list.append({"role": "assistant", "content": reply})
                 except Exception as e:
-                    st.error(f"Failed to fetch web page: {e}")
+                    active_chat_list.append({"role": "assistant", "content": f"Failed to fetch web page: {e}"})
 
         # ROUTE 4: Standard Chat Generation
         else:
@@ -1017,21 +933,18 @@ if user_input and client:
                 processed_prompt, personality, target_language, detected_style
             )
 
-            # UPGRADE: Force strict topic awareness to prevent context drift
             system_prompt += (
                 "\n\n[STRICT CONTEXT RULE]: Always maintain awareness of prior topics in the chat. "
                 "If the user refers to an acronym, show, or topic mentioned earlier in the conversation, "
                 "do NOT substitute it with unrelated concepts from recent turns."
             )
 
-            # UPGRADE: Clean Streamlit-native Color Formatting Rule
             system_prompt += (
                 "\n\n[FORMATTING RULE]: When asked to color-code text or items, use Streamlit markdown syntax "
                 "like :red[text], :blue[text], :green[text], :orange[text], or :violet[text]. "
                 "DO NOT use raw HTML like <font color=...>. Keep color legends distinct, logical, and non-redundant."
             )
 
-            # Universal Disambiguation Rule in System Prompt
             system_prompt += (
                 "\n\n[WORD AMBIGUITY RULE]: If the user asks about 'characters' in the context of a show, "
                 "franchise, game, or media series (especially when referred to by an acronym like TADC, FNAF, ATLA, etc.), "
@@ -1039,7 +952,6 @@ if user_input and client:
                 "NEVER analyze the literal letters of the acronym unless explicitly asked to do a letter-by-letter breakdown."
             )
 
-            # UPGRADE: Anti-Hallucination & Clean Formatting Guardrails
             system_prompt += (
                 "\n\n[STRICT FACTUALITY RULE]: Never invent or make up fake characters, scientists, or lore "
                 "for real media series, shows, or games (e.g., Five Nights at Freddy's / FNAF). "
@@ -1048,7 +960,6 @@ if user_input and client:
                 "ONLY use native Streamlit markdown color syntax, such as :red[text], :blue[text], :green[text], :purple[text], or :orange[text]."
             )
 
-            # Strict Color & Knowledge Guardrail
             system_prompt += (
                 "\n\n[STRICT COLOR RULES]: You MAY ONLY use these valid Streamlit colors: "
                 ":red[text], :blue[text], :green[text], :orange[text], :violet[text], or :gray[text]. "
