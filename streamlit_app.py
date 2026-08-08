@@ -929,8 +929,8 @@ if user_input and client:
                 ":red[text], :blue[text], :green[text], :orange[text], :violet[text], or :gray[text]. "
                 "NEVER use unsupported colors like pink, brown, black, or raw HTML tags.\n"
                 "[NO LEGEND REPETITION]: Do NOT create a separate 'Color Code' legend at the bottom repeating the text. Keep it clean.\n"
-                "[FACTUALITY GUARD]: If you do not know the exact real characters of a show or media (e.g. TADC), "
-                "do NOT invent fake names like Dr. Zhang or Zara. Admit you need more context or search for it."
+                "[FACTUALITY GUARD]: If you do not know the exact real characters of a show or media (e.g. FNAF, anime), "
+                "do NOT invent fake names. Admit you need more context or search for it."
             )
 
             if doc_context:
