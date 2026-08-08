@@ -850,13 +850,30 @@ if user_input and client:
             st.info("🎨 *Auto-Detected: Image Generator Activated*")
             clean_prompt = re.sub(r"^/(image|imagine|draw|generate)\s*", "", user_input, flags=re.IGNORECASE).strip()
             if not clean_prompt:
-                clean_prompt = user_input # Use full prompt if no slash command used
+                clean_prompt = user_input  # Uses full prompt if no slash command was used!
                 
             with st.spinner("🎨 Generating high-quality AI artwork..."):
-                encoded_prompt = urllib.parse.quote(clean_prompt)
+                # 1. PROMPT ENHANCER: Automatically adds detail tags so cars/objects don't look warped
+                enhanced_prompt = f"{clean_prompt}, detailed, realistic lighting, centered 3D render, high resolution"
+                encoded_prompt = urllib.parse.quote(enhanced_prompt)
+                
                 img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1,99999)}&model=flux&enhance=true&nologo=true"
-                st.image(img_url, caption=f"Prompt: {clean_prompt}", use_container_width=True)
-                active_chat_list.append({"role": "assistant", "content": f"🎨 Generated Image for: '{clean_prompt}'\n![Image]({img_url})"})
+                
+                # Display the image live on screen
+                st.image(
+                    img_url,
+                    caption=f"Prompt: {clean_prompt}",
+                    use_container_width=True,
+                )
+                
+                # 2. CLEAN TEXT FIX: Put this exact block right here!
+                # Saves text-only to history so Streamlit doesn't render a broken icon on refresh
+                active_chat_list.append(
+                    {
+                        "role": "assistant",
+                        "content": f"🎨 Generated AI Image for prompt: *'{clean_prompt}'*",
+                    }
+                )
 
         # ROUTE 2: Multi-Angle Search Route
         elif detected_route == "SEARCH":
