@@ -939,6 +939,7 @@ if user_input and client:
         active_temperature = 0.7
 
     with st.chat_message("assistant"):
+        
         # ROUTE 0: Autonomous Code Debugger
         if detected_route == "DEBUG":
             st.info("🛠️ *Auto-Detected: Code Debugger Activated*")
@@ -950,27 +951,27 @@ if user_input and client:
 
         # ROUTE 1: High-Quality AI Image Generation
         elif detected_route == "IMAGE":
-            st.info("🎨 *Auto-Detected: Image Generator Activated*")
             clean_prompt = re.sub(r"^/(image|imagine|draw|generate)\s*", "", user_input, flags=re.IGNORECASE).strip()
             if not clean_prompt:
                 clean_prompt = user_input
                 
             with st.spinner("🎨 Generating high-quality AI artwork..."):
-                enhanced_prompt = f"{clean_prompt}, detailed, realistic lighting, high resolution"
+                enhanced_prompt = f"{clean_prompt}, high resolution, detailed, vivid colors"
                 encoded_prompt = urllib.parse.quote(enhanced_prompt)
                 
-                img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1,99999)}&model=flux&enhance=true&nologo=true"
+                img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1, 99999)}&model=flux&enhance=true&nologo=true"
                 
-                # Display image immediately on screen
-                st.image(img_url, caption=f"Prompt: {clean_prompt}", use_container_width=True)
+                # 1. Format the complete response string
+                full_response = f"🎨 **Generated Image for:** *'{clean_prompt}'*\n\n![AI Image]({img_url})"
                 
-                # Store BOTH text and the URL in history so Streamlit remembers to render it on reruns!
-                active_chat_list.append(
-                    {
-                        "role": "assistant",
-                        "content": f"🎨 Generated AI Image for: *'{clean_prompt}'*\n\n![Image]({img_url})",
-                    }
-                )
+                # 2. Append ONLY ONCE to active chat history
+                active_chat_list.append({
+                    "role": "assistant",
+                    "content": full_response
+                })
+                
+                # 3. Force a clean Streamlit rerun so history renders it cleanly!
+                st.rerun()
 
         # ROUTE 2: Deconstructed Multi-Angle Search Route
         elif detected_route == "SEARCH":
