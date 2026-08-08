@@ -532,10 +532,15 @@ REALTIME_KEYWORDS = [
 ]
 
 
-def needs_automatic_search(user_text: str) -> bool:
-    """Detects if the prompt requires real-time information."""
+def needs_automatic_search(user_text):
     lowered = user_text.lower()
-    return any(keyword in lowered for keyword in REALTIME_KEYWORDS)
+    media_keywords = ["character", "cast", "show", "episode", "lore", "tadc", "fnaf", "anime"]
+    
+    # Trigger web search if user asks for characters/media info to prevent fake names
+    if any(kw in lowered for kw in media_keywords):
+        return True
+        
+    return False
 
 # ==========================================
 # 5. UI CONFIG & MAIN APP LOOP
