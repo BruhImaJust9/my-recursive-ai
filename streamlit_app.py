@@ -52,6 +52,19 @@ def save_chats_to_disk():
     except Exception:
         pass
 
+# Initialize User Session State
+if "is_logged_in" not in st.session_state:
+    st.session_state.is_logged_in = False  # Default to Guest Mode
+
+if "chats" not in st.session_state:
+    if st.session_state.is_logged_in:
+        # Load real history for logged-in admin
+        st.session_state.chats = load_chats_from_disk()
+    else:
+        # Fresh, temporary workspace for guests
+        st.session_state.chats = {"New Chat": []}
+        st.session_state.current_chat = "New Chat"
+
 
 # Initialize Session States
 if "chats" not in st.session_state:
