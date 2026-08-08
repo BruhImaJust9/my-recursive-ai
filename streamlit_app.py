@@ -901,6 +901,14 @@ if user_input and client:
                 "DO NOT use raw HTML like <font color=...>. Keep color legends distinct, logical, and non-redundant."
             )
 
+            # Universal Disambiguation Rule in System Prompt
+system_prompt += (
+    "\n\n[WORD AMBIGUITY RULE]: If the user asks about 'characters' in the context of a show, "
+    "franchise, game, or media series (especially when referred to by an acronym like TADC, FNAF, ATLA, etc.), "
+    "ALWAYS interpret 'characters' as the fictional personas/cast members of that media. "
+    "NEVER analyze the literal letters of the acronym unless explicitly asked to do a letter-by-letter breakdown."
+)
+
             if doc_context:
                 system_prompt += (
                     f"\n\n[USER ATTACHED FILE CONTEXT]:\n{doc_context[:4000]}"
