@@ -876,10 +876,17 @@ if user_input and client:
                 except Exception as e:
                     st.error(f"Failed to fetch web page: {e}")
 
-        # ROUTE 4: Standard Chat Generation (Enriched with Upgrades #31-#49 & #56)
+        # ROUTE 4: Standard Chat Generation
         else:
             system_prompt = build_dynamic_system_prompt(
                 user_input, personality, target_language, detected_style
+            )
+
+            # UPGRADE: Force strict topic awareness to prevent context drift
+            system_prompt += (
+                "\n\n[STRICT CONTEXT RULE]: Always maintain awareness of prior topics in the chat. "
+                "If the user refers to an acronym, show, or topic mentioned earlier in the conversation, "
+                "do NOT substitute it with unrelated concepts from recent turns."
             )
 
             if doc_context:
@@ -893,7 +900,7 @@ if user_input and client:
                     messages_payload.append(
                         {"role": m["role"], "content": m["content"]}
                     )
-
+                    
             stream = client.chat.completions.create(
                 model=selected_model,
                 messages=messages_payload,
