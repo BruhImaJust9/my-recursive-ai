@@ -788,6 +788,11 @@ if user_input and client:
         st.markdown(user_input)
 
     lowered_input = user_input.lower().strip()
+
+    # 2. UPGRADE: Fix character/TADC word ambiguity
+    processed_prompt = user_input
+    if "tadc" in lowered_input and "character" in lowered_input:
+        processed_prompt += " (referring to the individuals/cast in The Amazing Digital Circus show, not the letters of the acronym)"
     
     casual_triggers = ["hi", "hello", "hey", "howdy", "sup", "how are you", "what's up", "thanks", "thank you", "cool", "nice"]
     
@@ -887,6 +892,13 @@ if user_input and client:
                 "\n\n[STRICT CONTEXT RULE]: Always maintain awareness of prior topics in the chat. "
                 "If the user refers to an acronym, show, or topic mentioned earlier in the conversation, "
                 "do NOT substitute it with unrelated concepts from recent turns."
+            )
+
+            # UPGRADE: Clean Streamlit-native Color Formatting Rule
+            system_prompt += (
+                "\n\n[FORMATTING RULE]: When asked to color-code text or items, use Streamlit markdown syntax "
+                "like :red[text], :blue[text], :green[text], :orange[text], or :violet[text]. "
+                "DO NOT use raw HTML like <font color=...>. Keep color legends distinct, logical, and non-redundant."
             )
 
             if doc_context:
