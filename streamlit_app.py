@@ -900,10 +900,10 @@ if user_input and client:
 
     lowered_input = user_input.lower().strip()
 
-    # 2. UPGRADE: Fix character/TADC word ambiguity
+    # 2. UPGRADE: Fix character/word ambiguity
     processed_prompt = user_input
     if "tadc" in lowered_input and "character" in lowered_input:
-        processed_prompt += " (referring to the individuals/cast in The Amazing Digital Circus show, not the letters of the acronym)"
+        processed_prompt += " (referring to the individuals/cast in a show, not the letters of the acronym)"
     
     casual_triggers = ["hi", "hello", "hey", "howdy", "sup", "how are you", "what's up", "thanks", "thank you", "cool", "nice"]
     
@@ -918,8 +918,9 @@ if user_input and client:
         active_temperature = 0.7
 
     with st.chat_message("assistant"):
-        # ROUTE 0: Autonomous Code Debugger (UPGRADE #54)
-        if user_input.lower().startswith("/debug"):
+        # ROUTE 0: Autonomous Code Debugger
+        if detected_route == "DEBUG":
+            st.info("🛠️ *Auto-Detected: Code Debugger Activated*")
             clean_code = user_input.replace("/debug", "").strip()
             fixed_code = run_autonomous_code_debugger(clean_code, client, selected_model)
             reply = f"```python\n{fixed_code}\n```"
@@ -927,15 +928,14 @@ if user_input and client:
             active_chat_list.append({"role": "assistant", "content": reply})
 
         # ROUTE 1: High-Quality AI Image Generation
-        elif any(user_input.lower().startswith(cmd) for cmd in ["/image", "/imagine", "/draw", "/generate"]):
+        elif detected_route == "IMAGE":
+            st.info("🎨 *Auto-Detected: Image Generator Activated*")
             clean_prompt = re.sub(r"^/(image|imagine|draw|generate)\s*", "", user_input, flags=re.IGNORECASE).strip()
             if not clean_prompt:
-                clean_prompt = "a cute dog"
+                clean_prompt = user_input  # Uses full prompt if no slash command was used!
                 
             with st.spinner("🎨 Generating high-quality AI artwork..."):
                 encoded_prompt = urllib.parse.quote(clean_prompt)
-                
-                # Added &model=flux and &enhance=true for photorealistic results
                 img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1,99999)}&model=flux&enhance=true&nologo=true"
                 
                 st.image(
@@ -950,14 +950,11 @@ if user_input and client:
                     }
                 )
 
-        # ROUTE 2: Deconstructed Multi-Angle Search Route (Manual /search or Automatic via Intent Router #53)
-        elif user_input.lower().startswith(
-            "/search"
-        ) or needs_automatic_search(user_input):
+        # ROUTE 2: Deconstructed Multi-Angle Search Route
+        elif detected_route == "SEARCH":
+            st.info("🔍 *Auto-Detected: Web Search Activated*")
             clean_query = user_input.replace("/search", "").strip()
-            with st.spinner(
-                "🔍 Deconstructing query & synthesizing multi-angle search..."
-            ):
+            with st.spinner("🔍 Deconstructing query & synthesizing multi-angle search..."):
                 reply = execute_deconstructed_multi_search(
                     clean_query, client, selected_model
                 )
@@ -966,7 +963,7 @@ if user_input and client:
                 active_chat_list.append({"role": "assistant", "content": reply})
 
         # ROUTE 3: Web Scraper Route
-        elif user_input.lower().startswith("/read "):
+        elif detected_route == "READ":
             target_url = user_input.replace("/read ", "").strip()
             with st.spinner(f"🌐 Fetching content from {target_url}..."):
                 try:
@@ -976,11 +973,10 @@ if user_input and client:
                     res = requests.get(target_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=8)
                     soup = BeautifulSoup(res.text, "html.parser")
                     paragraphs = [p.get_text() for p in soup.find_all("p")]
-                    page_text = " ".join(paragraphs)[:4000] # Cap text length
+                    page_text = " ".join(paragraphs)[:4000]
                     
                     prompt_with_url = f"Analyze and summarize the following content from {target_url}:\n\n{page_text}"
                     
-                    # Pass prompt_with_url to LLM
                     response = client.chat.completions.create(
                         model=selected_model,
                         messages=[{"role": "user", "content": prompt_with_url}],
