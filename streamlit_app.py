@@ -713,6 +713,24 @@ with col_hdr2:
 
 st.markdown("---")
 
+if user_input and client:
+    start_time = time.time()
+    
+    # 🔍 PRINT TO CLOUD LOGS: See what users are typing!
+    print(f"--- [USER ACTIVITY DETECTED] ---")
+    print(f"Input Received: {user_input}")
+    
+    # Check if command or standard prompt
+    if user_input.lower().startswith("/search"):
+        print("Route Triggered: /search")
+    elif user_input.lower().startswith("/image"):
+        print("Route Triggered: /image")
+    elif user_input.lower().startswith("/read"):
+        print("Route Triggered: /read")
+    else:
+        print("Route Triggered: Standard LLM Chat")
+    print(f"--------------------------------")
+
 # Render Message History with Auto-Repair Formatting
 for idx, msg in enumerate(active_chat_list):
     with st.chat_message(msg["role"]):
