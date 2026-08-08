@@ -949,21 +949,22 @@ if user_input and client:
             st.info("🎨 *Auto-Detected: Image Generator Activated*")
             clean_prompt = re.sub(r"^/(image|imagine|draw|generate)\s*", "", user_input, flags=re.IGNORECASE).strip()
             if not clean_prompt:
-                clean_prompt = user_input  # Uses full prompt if no slash command was used!
+                clean_prompt = user_input
                 
             with st.spinner("🎨 Generating high-quality AI artwork..."):
-                encoded_prompt = urllib.parse.quote(clean_prompt)
+                enhanced_prompt = f"{clean_prompt}, detailed, realistic lighting, high resolution"
+                encoded_prompt = urllib.parse.quote(enhanced_prompt)
+                
                 img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1,99999)}&model=flux&enhance=true&nologo=true"
                 
-                st.image(
-                    img_url,
-                    caption=f"Prompt: {clean_prompt}",
-                    use_container_width=True,
-                )
+                # Display image immediately on screen
+                st.image(img_url, caption=f"Prompt: {clean_prompt}", use_container_width=True)
+                
+                # Store BOTH text and the URL in history so Streamlit remembers to render it on reruns!
                 active_chat_list.append(
                     {
                         "role": "assistant",
-                        "content": f"🎨 Generated Image for: '{clean_prompt}'\n![Image]({img_url})",
+                        "content": f"🎨 Generated AI Image for: *'{clean_prompt}'*\n\n![Image]({img_url})",
                     }
                 )
 
