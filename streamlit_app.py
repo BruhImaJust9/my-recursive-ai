@@ -36,28 +36,24 @@ def load_saved_chats():
 
 def save_chats_to_disk():
     try:
-        clean_chats = {}
-        for session_name, msg_list in st.session_state.chats.items():
-            clean_chats[session_name] = []
-            for msg in msg_list:
-                clean_msg = {
-                    k: v
-                    for k, v in msg.items()
-                    if k not in ["audio", "image_url"]
-                }
-                clean_chats[session_name].append(clean_msg)
+        # Only save persistent data to server disk if logged in as Admin/Owner
+        if st.session_state.get("is_logged_in", False):
+            clean_chats = {}
+            for session_name, msg_list in st.session_state.chats.items():
+                clean_chats[session_name] = []
+                for msg in msg_list:
+                    clean_msg = {
+                        k: v
+                        for k, v in msg.items()
+                        if k not in ["audio", "image_url"]
+                    }
+                    clean_chats[session_name].append(clean_msg)
 
-        # Only save persistent data if the user is logged in as Admin/Owner
-    if st.session_state.get("is_logged_in", False):
-        with open("chats.json", "w") as f:
-            json.dump(st.session_state.chats, f)
-    else:
-        
-        # Guest session: Do not save to server disk!
-        pass
-
-        with open(CHAT_STORAGE_FILE, "w") as f:
-            json.dump(clean_chats, f, indent=2)
+            with open(CHAT_STORAGE_FILE, "w") as f:
+                json.dump(clean_chats, f, indent=2)
+        else:
+            # Guest session: Do not save anything to server disk!
+            pass
     except Exception:
         pass
 
