@@ -790,6 +790,30 @@ if audio_bytes and client:
         except Exception as e:
             st.error(f"Voice transcription error: {e}")
 
+def classify_user_intent(prompt, client, model_name):
+    """
+    Analyzes user prompt and automatically decides which tool/route to run.
+    Returns: 'IMAGE', 'DEBUG', 'SEARCH', or 'CHAT'
+    """
+    lowered = prompt.lower().strip()
+    
+    # Fast-path for explicit slash commands
+    if lowered.startswith("/image") or lowered.startswith("/draw"): return "IMAGE"
+    if lowered.startswith("/debug"): return "DEBUG"
+    if lowered.startswith("/search"): return "SEARCH"
+    if lowered.startswith("/read"): return "READ"
+
+    # Auto-detection rules
+    image_triggers = ["draw", "generate an image", "picture of", "paint", "create an image"]
+    if any(trigger in lowered for trigger in image_triggers):
+        return "IMAGE"
+
+    debug_triggers = ["traceback", "syntaxerror", "fix this code", "def ", "import "]
+    if "error" in lowered and any(trig in lowered for trig in debug_triggers):
+        return "DEBUG"
+
+    return "CHAT"
+
 # Input Execution Pipeline
 user_input = st.chat_input("Ask anything, use /search, /image, /debug, or /enhance...")
 if st.session_state.input_buffer and not user_input:
