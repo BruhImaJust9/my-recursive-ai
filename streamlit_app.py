@@ -884,7 +884,7 @@ if user_input and client:
         # ROUTE 4: Standard Chat Generation
         else:
             system_prompt = build_dynamic_system_prompt(
-                user_input, personality, target_language, detected_style
+                processed_prompt, personality, target_language, detected_style
             )
 
             # UPGRADE: Force strict topic awareness to prevent context drift
