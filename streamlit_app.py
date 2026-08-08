@@ -850,21 +850,25 @@ if user_input and client:
             st.info("🎨 *Auto-Detected: Image Generator Activated*")
             clean_prompt = re.sub(r"^/(image|imagine|draw|generate)\s*", "", user_input, flags=re.IGNORECASE).strip()
             if not clean_prompt:
-                clean_prompt = user_input  # Uses full prompt if no slash command was used!
+                clean_prompt = user_input
                 
             with st.spinner("🎨 Generating high-quality AI artwork..."):
-                # 1. PROMPT ENHANCER: Automatically adds detail tags so cars/objects don't look warped
-                enhanced_prompt = f"{clean_prompt}, detailed, realistic lighting, centered 3D render, high resolution"
+                enhanced_prompt = f"{clean_prompt}, high resolution, detailed, vivid colors"
                 encoded_prompt = urllib.parse.quote(enhanced_prompt)
                 
-                img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1,99999)}&model=flux&enhance=true&nologo=true"
+                img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1, 99999)}&model=flux&enhance=true&nologo=true"
                 
-                # Display the image live on screen
-                st.image(
-                    img_url,
-                    caption=f"Prompt: {clean_prompt}",
-                    use_container_width=True,
-                )
+                # 1. Format the full Markdown response (text + image URL combined into ONE string)
+                full_response = f"🎨 **Generated Image for:** *'{clean_prompt}'*\n\n![AI Image]({img_url})"
+                
+                # 2. Display it cleanly using st.markdown
+                st.markdown(full_response)
+                
+                # 3. Save ONLY this single combined response into chat history
+                active_chat_list.append({
+                    "role": "assistant",
+                    "content": full_response
+                })
                 
                 # 2. CLEAN TEXT FIX: Put this exact block right here!
                 # Saves text-only to history so Streamlit doesn't render a broken icon on refresh
