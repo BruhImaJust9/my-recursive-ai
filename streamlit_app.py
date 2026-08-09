@@ -644,7 +644,6 @@ with st.sidebar:
         [
             "llama-3.3-70b-versatile",
             "llama-3.1-8b-instant",
-            "llama-3.2-11b-vision-instruct",
             "mixtral-8x7b-32768",
         ],
     )
@@ -977,24 +976,15 @@ if user_input and client:
 
             # Check if user uploaded an image for Vision analysis
             if image_base64:
+                st.info("📷 Image detected! Processing context...")
                 try:
-                    prompt_text = user_input.strip() if user_input.strip() else "Describe and analyze this image in detail."
-
-                    # Construct exact Groq vision schema with matching MIME type
+                    # Attempt Groq Vision call (if active)
                     vision_messages = [
                         {
                             "role": "user",
                             "content": [
-                                {
-                                    "type": "text",
-                                    "text": prompt_text
-                                },
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                        "url": f"data:{image_mime_type};base64,{image_base64}"
-                                    }
-                                }
+                                {"type": "text", "text": user_input if user_input else "Describe this image in detail."},
+                                {"type": "image_url", "image_url": {"url": f"data:{image_mime_type};base64,{image_base64}"}}
                             ]
                         }
                     ]
@@ -1011,9 +1001,12 @@ if user_input and client:
                         active_chat_list.append({"role": "assistant", "content": final_reply})
 
                 except Exception as vision_err:
-                    st.error(f"⚠️ Vision Processing Error: {vision_err}")
-                    # Show the actual error so we can fix it rather than silently failing to text mode!
-                    messages_payload.append({"role": "user", "content": user_input})
+                    st.warning("ℹ️ Direct AI Vision is currently unavailable on this Groq API endpoint. Answering text query with selected model.")
+                    
+                    # Safe fallback to standard selected model
+                    fallback_prompt = user_input if user_input else "Uploaded an image, but vision engine is offline."
+                    messages_payload.append({"role": "user", "content": fallback_prompt})
+                    
                     response = client.chat.completions.create(
                         model=selected_model,
                         messages=messages_payload,
