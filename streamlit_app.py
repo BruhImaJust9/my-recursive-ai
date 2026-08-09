@@ -976,29 +976,42 @@ if user_input and client:
 
             # Check if user uploaded an image for Vision analysis
             if image_base64:
-                st.info("📷 Image detected! Processing context...")
                 try:
-                    # Attempt Groq Vision call (if active)
-                    vision_messages = [
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": user_input if user_input else "Describe this image in detail."},
-                                {"type": "image_url", "image_url": {"url": f"data:{image_mime_type};base64,{image_base64}"}}
-                            ]
-                        }
-                    ]
+                    import google.generativeai as genai
                     
-                    with st.spinner("👁️ Analyzing image..."):
-                        response = client.chat.completions.create(
-                            model="llama-3.2-11b-vision-instruct",
-                            messages=vision_messages,
-                            temperature=active_temperature,
-                            stream=False
-                        )
-                        final_reply = response.choices[0].message.content
+                    # Ensure you have GEMINI_API_KEY set in st.secrets or environment
+                    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    
+                    import base64
+                    image_bytes = base64.b64decode(image_base64)
+                    
+                    prompt_text = user_input if user_input.strip() else "Describe and analyze this image in detail."
+                    
+                    with st.spinner("👁️ Analyzing image with Gemini Vision..."):
+                        response = model.generate_content([
+                            prompt_text,
+                            {"mime_type": image_mime_type, "data": image_bytes}
+                        ])
+                        final_reply = response.text
                         st.markdown(final_reply)
                         active_chat_list.append({"role": "assistant", "content": final_reply})
+
+                except Exception as vision_err:
+                    st.warning("⚠️ Vision engine unavailable. Please set GEMINI_API_KEY in Streamlit secrets to enable image understanding!")
+                    
+                    # Standard text fallback
+                    fallback_prompt = f"[User attached an image file: {uploaded_file.name}]. User question: {user_input}"
+                    messages_payload.append({"role": "user", "content": fallback_prompt})
+                    
+                    response = client.chat.completions.create(
+                        model=selected_model,
+                        messages=messages_payload,
+                        temperature=active_temperature,
+                    )
+                    final_reply = response.choices[0].message.content
+                    st.markdown(final_reply)
+                    active_chat_list.append({"role": "assistant", "content": final_reply})
 
                 except Exception as vision_err:
                     st.warning("ℹ️ Direct AI Vision is currently unavailable on this Groq API endpoint. Answering text query with selected model.")
