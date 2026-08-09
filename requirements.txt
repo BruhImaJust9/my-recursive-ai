@@ -10,3 +10,4 @@ gTTS
 audio-recorder-streamlit
 beautifulsoup4
 google-generativeai
+openai
