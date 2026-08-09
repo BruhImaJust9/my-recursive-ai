@@ -168,6 +168,94 @@ def sanitize_and_repair_formatting(text: str) -> str:
     return text.strip()
 
 # ==============================================================================
+# UPGRADE #65: LIVE DYNAMIC WORKSPACE TELEMETRY & BENCHMARKER
+# ==============================================================================
+def render_telemetry_dashboard() -> None:
+    """Renders a real-time analytics and performance dashboard monitoring
+    token velocity, latency trends, and estimated API usage metrics.
+    """
+    st.markdown("### 📊 Workspace Telemetry & Health Monitor")
+
+    # Fetch live state metrics safely
+    telemetry = st.session_state.get(
+        "telemetry", {"requests": 0, "est_tokens": 0, "last_latency": 0.0}
+    )
+    
+    total_requests = telemetry.get("requests", 0)
+    total_tokens = telemetry.get("est_tokens", 0)
+    last_latency = telemetry.get("last_latency", 0.0)
+
+    # Compute derived performance indicators
+    avg_tokens_per_req = (
+        round(total_tokens / total_requests, 1) if total_requests > 0 else 0
+    )
+    # Estimated cost savings vs standard proprietary endpoints ($0.002 / 1k tokens)
+    est_cost_savings = f"${(total_tokens / 1000) * 0.002:.4f}"
+
+    # Display Top Metrics Grid
+    col_t1, col_t2, col_t3, col_t4 = st.columns(4)
+
+    with col_t1:
+        st.metric(
+            label="Total Requests",
+            value=f"{total_requests:,}",
+            delta=f"+1" if total_requests > 0 else "0",
+        )
+
+    with col_t2:
+        st.metric(
+            label="Est. Tokens Processed",
+            value=f"{total_tokens:,}",
+            delta=f"~{avg_tokens_per_req}/req",
+        )
+
+    with col_t3:
+        # Latency Health Color Indicator
+        latency_status = (
+            "⚡ Fast"
+            if last_latency < 1.5
+            else ("🟢 Normal" if last_latency < 3.5 else "🟡 Slow")
+        )
+        st.metric(
+            label="Last Latency",
+            value=f"{last_latency:.2f}s",
+            delta=latency_status,
+            delta_color="normal" if last_latency < 3.5 else "inverse",
+        )
+
+    with col_t4:
+        st.metric(
+            label="Est. Cost Saved",
+            value=est_cost_savings,
+            help="Calculated against standard cloud LLM token pricing rates.",
+        )
+
+    # Telemetry Status Bar
+    st.progress(
+        min(1.0, total_requests / 100),
+        text=f"Session Usage Velocity: {total_requests}/100 requests threshold",
+    )
+
+
+def render_sidebar_telemetry_widget() -> None:
+    """Compact telemetry card optimized for the sidebar."""
+    if "telemetry" not in st.session_state:
+        return
+
+    telemetry = st.session_state.telemetry
+    reqs = telemetry.get("requests", 0)
+    tokens = telemetry.get("est_tokens", 0)
+    latency = telemetry.get("last_latency", 0.0)
+
+    with st.sidebar.expander("📈 **Live Telemetry**", expanded=False):
+        st.caption(f"**Requests Sent:** {reqs}")
+        st.caption(f"**Tokens Consumed:** {tokens:,}")
+        st.caption(f"**Last Response Time:** {latency:.2f}s")
+        if st.button("🧹 Reset Telemetry", key="reset_telemetry_btn", use_container_width=True):
+            st.session_state.telemetry = {"requests": 0, "est_tokens": 0, "last_latency": 0.0}
+            st.rerun()
+
+# ==============================================================================
 # UPGRADE #58: DYNAMIC CHAT HISTORY & ACTION TOOLBAR RENDERER
 # ==============================================================================
 def render_chat_history_thread(active_chat_list: list, client=None) -> None:
