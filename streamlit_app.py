@@ -269,119 +269,125 @@ def execute_deconstructed_multi_search(
 
     return ai_response + references_footer
 
+# ==============================================================================
+# UPGRADE #31-#57: UNIVERSAL REASONING & SYNTHESIS ENGINE (FRONTIER PARALLEL)
+# ==============================================================================
+import re
 
-# ==========================================
-# 3. UPGRADES #31 THROUGH #49: UNIVERSAL REASONING & SYNTHESIS ENGINE
-# ==========================================
-
-def build_dynamic_system_prompt(user_input, base_personality, language, detected_style="GENERAL"):
-    """UPGRADE #49 & #56: Universal Cognitive & Multi-Modal Synthesis Engine."""
+def build_dynamic_system_prompt(
+    user_input: str, base_personality: str, language: str, detected_style: str = "GENERAL"
+) -> str:
+    """Builds a high-density, context-aware dynamic system prompt for LLMs.
     
-    # CASUAL ROUTE: If the user is just engaging in casual conversation, drop the heavy framework
+    Includes dynamic domain activation, intelligent memory retrieval, 
+    and adaptive stylistic routing (Claude/GPT-4o output tiering).
+    """
+    lowered_input = user_input.lower()
+
+    # --------------------------------------------------------------------------
+    # 1. CASUAL ROUTE: Ultra-fast, natural conversational mode
+    # --------------------------------------------------------------------------
     if detected_style == "CASUAL":
         return (
-            f"You are a friendly, highly intelligent, and natural conversational assistant operating as a {base_personality}. "
-            f"Keep your responses warm, concise, engaging, and empathetic. Respond naturally like a helpful peer without using forced tables, headers, or rigid technical structures unless asked. "
-            f"Always reply in {language}."
+            f"You are a warm, highly intelligent, and empathetic peer operating as a {base_personality}.\n"
+            f"RULES:\n"
+            f"- Speak naturally, concisely, and directly in {language}.\n"
+            f"- Avoid robotic disclaimers, rigid technical tables, or unnatural markdown headers unless requested.\n"
+            f"- Be conversational, perceptive, and helpful."
         )
 
-    prompt = (
-        f"You are an elite AI reasoning engine operating as a {base_personality}.\n\n"
-        "### CORE COGNITIVE & EPISTEMIC RULES (UPGRADES #31, #36, #37, #38):\n"
-        "1. FIRST-PRINCIPLES DECOMPOSITION (#36):\n"
-        "   - Break all complex phenomena down to fundamental truths, assumptions, physical laws, or logical axioms.\n"
-        "2. ANTI-PSEUDOSCIENCE & EPISTEMIC GUARDRAIL (#37):\n"
-        "   - Strictly avoid invalid physics tropes (e.g., quantum entanglement energy transfer, FTL communication). Distinguish between known science and speculation.\n"
-        "3. DUAL-PASS SELF-CRITIQUE (#38):\n"
-        "   - Internally critique mechanisms and code before rendering output to eliminate fallacies, bugs, or unneeded hand-waving.\n"
-        "4. QUANTITATIVE BOUNDARY ENFORCEMENT (#42):\n"
-        "   - Always provide specific metrics, theoretical orders of magnitude (e.g., Watts, Joules, Big-O metrics, discrete probabilities).\n\n"
-        "### UPGRADE #49: UNIVERSAL COGNITIVE SYNTHESIS ENGINE:\n"
-        "1. INTENT-DRIVEN ADAPTATION:\n"
-        "   - Analyze the underlying objective of the query. If technical, optimize for production readiness; if theoretical, optimize for conceptual rigor; if creative, optimize for narrative depth and original metaphors.\n"
-        "2. MULTI-ANGLE TRIANGULATION:\n"
-        "   - Evaluate complex prompts through multiple relevant domain lenses (e.g., architectural, economic, physical, human-centric) to deliver comprehensive, robust answers.\n"
-        "3. HIGH-CONCEPT NAMING & STRIKING TITLES (#40):\n"
-        "   - Eliminate passive intros ('One idea is...'). Name every major concept or model with a bold, memorable title.\n"
-        "4. CONTRASTIVE CONCEPTUAL SYNTHESIS (#39):\n"
-        "   - Ensure proposed theories, solutions, or architectures are fundamentally distinct rather than minor reskins.\n"
-        "5. FALSIFIABILITY & LIMITATION ANCHORS (#44):\n"
-        "   - Define explicit physical bounds, failure modes, or falsiability conditions for every claim or proposed system.\n"
-        "6. ANTI-FILLER & SCANNABLE MATRIX (#41, #45, #46):\n"
-        "   - Skip meta-preambles and redundant summaries. Use tables only for distinct, multi-variable comparative metrics that aren't already written out in prose.\n"
-        "7. MIC-DROP IMPLICATION (#47):\n"
-        "   - End with a single, highly memorable, logically sound takeaway that leaves a lasting impact.\n"
-    )
+    # --------------------------------------------------------------------------
+    # 2. CORE REASONING FRAMEWORK (Frontier Cognitive System Prompt)
+    # --------------------------------------------------------------------------
+    prompt = [
+        f"You are an elite, highly competent AI assistant operating as a {base_personality}.",
+        "",
+        "### 🧠 CORE COGNITIVE & EPISTEMIC DIRECTIVES:",
+        "1. **First-Principles Decomposition:** Strip problems down to fundamental physical, mathematical, or logical axioms.",
+        "2. **Rigorous Epistemics:** Distinguish empirical facts from theoretical models and speculation. Avoid pseudoscience tropes.",
+        "3. **Dual-Pass Verification:** Internally audit code, calculations, and logical chains for edge cases before outputting.",
+        "4. **Quantitative Precision:** Provide concrete units, Big-O metrics, probabilities, or orders of magnitude where applicable.",
+        "",
+        "### ⚡ SYNTHESIS & FORMATTING GUIDELINES:",
+        "- **Zero Fluff:** Skip meta-preambles ('Sure, here is...') and self-congratulatory summaries. Start directly with the answer.",
+        "- **High-Concept Structure:** Use bold conceptual titles, clear hierarchy, and clean scannable bullet points.",
+        "- **Contrastive Clarity:** Make proposed solutions fundamentally distinct rather than minor variations.",
+        "- **Falsiability & Bounds:** Explicitly identify failure modes, assumptions, and physical/system limits.",
+        "- **Code & UI Artifacts:** Provide complete, production-ready, self-contained code blocks with explicit syntax highlighting.",
+        "- **Impactful Conclusion:** End complex topics with a sharp, memorable core takeaway."
+    ]
 
-    # Dynamic Domain & Intent Adaptation (Upgrade #43 & #49)
-    lowered_input = user_input.lower()
-    if any(
-        kw in lowered_input
-        for kw in [
-            "physics",
-            "dyson",
-            "kardashev",
-            "star",
-            "energy",
-            "quantum",
-            "space",
-        ]
-    ):
-        prompt += "\n\n[DOMAIN ADAPTATION: ASTROPHYSICAL & HARD SCIENCE RIGOR ACTIVE]\n- Apply strict thermodynamic limits, relativistic dynamics, and field equations."
-    elif any(
-        kw in lowered_input
-        for kw in [
-            "code",
-            "architecture",
-            "system",
-            "algorithm",
-            "python",
-            "bug",
-            "refactor",
-        ]
-    ):
-        prompt += "\n\n[DOMAIN ADAPTATION: SENIOR SYSTEMS ARCHITECT ACTIVE]\n- Focus on modularity, production-level edge cases, typed signatures, and runtime complexities."
-    elif any(
-        kw in lowered_input
-        for kw in ["story", "creative", "fiction", "worldbuilding", "design"]
-    ):
-        prompt += "\n\n[DOMAIN ADAPTATION: CREATIVE DIRECTORS ARCHITECT ACTIVE]\n- Focus on vivid sensory imagery, high-stakes narrative tension, and unconventional thematic resonance."
+    # --------------------------------------------------------------------------
+    # 3. DYNAMIC DOMAIN ADAPTATION (Keyword Matching)
+    # --------------------------------------------------------------------------
+    domain_rules = {
+        ("physics", "dyson", "kardashev", "quantum", "relativity", "thermodynamics", "space", "astronomy"): (
+            "\n[DOMAIN ACTIVATED: ASTROPHYSICS & HARD SCIENCE]\n"
+            "- Apply strict relativistic mechanics, quantum field concepts, and thermodynamic limits."
+        ),
+        ("code", "architecture", "algorithm", "python", "javascript", "refactor", "bug", "api", "database"): (
+            "\n[DOMAIN ACTIVATED: PRINCIPAL SYSTEMS ARCHITECT]\n"
+            "- Prioritize production modularity, edge-case safety, typed signatures, and execution efficiency."
+        ),
+        ("data", "dataframe", "pandas", "plot", "csv", "statistics", "machine learning", "regression"): (
+            "\n[DOMAIN ACTIVATED: SENIOR DATA SCIENTIST]\n"
+            "- Focus on statistical validity, data pipeline hygiene, vectorization, and actionable visualizations."
+        ),
+        ("story", "creative", "fiction", "worldbuilding", "narrative", "character", "dialogue"): (
+            "\n[DOMAIN ACTIVATED: CREATIVE DIRECTOR & WORLD-BUILDER]\n"
+            "- Focus on sensory immersion, high-stakes conflict, distinct character voice, and original metaphors."
+        )
+    }
 
-    prompt += (
-        "\n\n### UPGRADES #50–#52: AGENTIC ARTIFACT & EXECUTION ENGINE:\n"
-        "1. EXECUTABLE CODE ARTIFACTS (#50):\n"
-        "   - Whenever writing Python code for calculations, data analysis, or plotting, wrap the code in standard triple-backtick markdown blocks. Ensure code is complete, self-contained, and ready for immediate execution.\n"
-        "2. LIVE UI & WEB WORKBENCH (#51):\n"
-        "   - If asked to design a dashboard, web tool, or UI component, provide self-contained HTML/JS/CSS or Streamlit code snippets that can be visually rendered.\n"
-        "3. DYNAMIC TOOL INTENT DETECTION (#52):\n"
-        "   - Explicitly identify when external data processing, local system calls, or multi-step tool usage is required, and structure responses so tools can parse the output programmatically.\n"
-    )
+    for keywords, adaptation_prompt in domain_rules.items():
+        if any(kw in lowered_input for kw in keywords):
+            prompt.append(adaptation_prompt)
+            break
 
+    # --------------------------------------------------------------------------
+    # 4. MODE MODIFIERS
+    # --------------------------------------------------------------------------
     if detected_style == "ANALYTICAL":
-        prompt += (
-            "\n\n[MODE: DEEP STRATEGY & MATRIX REASONING]"
-            "\n- Present multi-variable trade-offs in a clean comparison table."
-            "\n- Maintain hyper-precise quantitative allocations."
+        prompt.append(
+            "\n[MODE: DEEP MATRIX REASONING]\n"
+            "- Present multi-variable trade-offs in clean markdown tables.\n"
+            "- Enforce precise quantitative metrics and resource allocations."
         )
 
-    if language != "English":
-        prompt += f"\n\nCRITICAL RULE: Respond entirely in {language}."
+    if language and language.lower() != "english":
+        prompt.append(f"\nCRITICAL LANGUAGE DIRECTIVE: You MUST respond entirely in {language}.")
 
-    if st.session_state.memory_vault:
-        # UPGRADE #57: Vector-Like Keyword Filtered Context Retrieval
-        query_words = set(re.findall(r"\w+", lowered_input))
-        relevant_memories = []
-        for fact in st.session_state.memory_vault:
-            fact_words = set(re.findall(r"\w+", fact.lower()))
-            if query_words.intersection(fact_words) or len(st.session_state.memory_vault) <= 3:
-                relevant_memories.append(fact)
+    # --------------------------------------------------------------------------
+    # 5. SMART VECTOR-LIKE MEMORY VAULT RETRIEVAL (Jaccard Ranker)
+    # --------------------------------------------------------------------------
+    memory_vault = getattr(st.session_state, "memory_vault", [])
+    if memory_vault:
+        user_tokens = set(re.findall(r"\w+", lowered_input))
+        scored_memories = []
 
-        if relevant_memories:
-            facts_str = "\n".join([f"- {fact}" for fact in relevant_memories])
-            prompt += f"\n\n[BACKGROUND USER CONTEXT]:\nUse these known facts naturally if relevant, but DO NOT mention the Memory Vault directly:\n{facts_str}"
+        for fact in memory_vault:
+            fact_tokens = set(re.findall(r"\w+", fact.lower()))
+            intersection = user_tokens.intersection(fact_tokens)
+            
+            # Simple relevance scoring based on token overlap
+            score = len(intersection) / float(len(user_tokens.union(fact_tokens)) + 1e-5)
+            scored_memories.append((score, fact))
 
-    return prompt
+        # Sort by relevance score, descending
+        scored_memories.sort(key=lambda x: x[0], reverse=True)
+        
+        # Pull top relevant facts or fallback to top 3
+        top_memories = [m[1] for m in scored_memories[:3] if m[0] > 0.05] or memory_vault[:3]
 
+        if top_memories:
+            memory_block = "\n".join([f"- {m}" for m in top_memories])
+            prompt.append(
+                f"\n[RELEVANT USER CONTEXT]:\n"
+                f"Incorporate these facts naturally where relevant without explicitly mentioning 'Memory Vault':\n"
+                f"{memory_block}"
+            )
+
+    return "\n".join(prompt)
 
 # ==========================================
 # 4. UPGRADE #35: DYNAMIC VISUAL CANVAS AUTO-RENDERER
