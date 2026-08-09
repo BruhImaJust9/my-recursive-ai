@@ -510,51 +510,132 @@ def run_autonomous_code_debugger(code_snippet: str, client, model: str) -> str:
     return current_code
 
 
-# ==========================================
-# UPGRADE #55: SMART CHAT AUTO-SUMMARIZER
-# ==========================================
-def auto_summarize_chat_title(chat_history, client, current_name: str):
-    """UPGRADE #55: Dynamically generates thread titles based on conversation topics."""
-    if len(chat_history) == 2 and current_name.startswith("Chat "):
-        first_user_msg = chat_history[0].get("content", "")
-        try:
-            res = client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[
-                    {
-                        "role": "user",
-                        "content": f"Generate a ultra-concise 3-4 word title for a chat thread starting with: '{first_user_msg}'. Return ONLY the title with no quotes or punctuation.",
-                    }
-                ],
-                temperature=0.3,
-            )
-            new_title = res.choices[0].message.content.strip()
-            if new_title:
-                st.session_state.chats[new_title] = st.session_state.chats.pop(current_name)
-                st.session_state.current_chat = new_title
-                save_chats_to_disk()
-                st.rerun()
-        except Exception:
-            pass
+# ==============================================================================
+# UPGRADE #55: SMART CHAT AUTO-SUMMARIZER (FRONTIER PARALLEL)
+# ==============================================================================
+import re
 
+def auto_summarize_chat_title(chat_history, client, current_name: str) -> None:
+    """Dynamically generates clean, human-like chat titles based on early message intent.
+    
+    Robust against dictionary key collisions, markdown formatting leaks, and API failures.
+    """
+    # Find the first non-empty user text message in history
+    first_user_msg = None
+    for msg in chat_history:
+        if msg.get("role") == "user" and isinstance(msg.get("content"), str) and msg.get("content").strip():
+            first_user_msg = msg.get("content").strip()
+            break
 
-# ==========================================
-# UPGRADE #62: PROMPT ENHANCER & QUERY EXPANSION
-# ==========================================
-def enhance_user_prompt(prompt_text: str, client) -> str:
-    """UPGRADE #62: Expands short user inputs into detailed high-performing prompts."""
+    # Only attempt renaming on default thread names when user text exists
+    if not first_user_msg or not (current_name.startswith("Chat ") or current_name == "New Chat"):
+        return
+
+    # System instruction tailored for precise naming without chatter
+    system_instruction = (
+        "You are an expert title generator for an AI platform. "
+        "Create a concise, highly relevant title (2 to 5 words maximum) summarizing the user's topic or intent.\n"
+        "STRICT CONSTRAINTS:\n"
+        "- Return ONLY the plain text title.\n"
+        "- Do NOT use quotes, punctuation, emojis, or markdown.\n"
+        "- Do NOT prefix with 'Title:' or similar phrases.\n"
+        "- Capitalize like a standard headline (Title Case)."
+    )
+
     try:
         res = client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[
-                {
-                    "role": "user",
-                    "content": f"Rewrite and enhance the following query into a clear, detailed, and structured prompt optimized for AI instruction:\n\n'{prompt_text}'\n\nReturn ONLY the enhanced prompt.",
-                }
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": f"Topic query: '{first_user_msg[:500]}'"}
+            ],
+            temperature=0.2,
+            max_tokens=15,
+        )
+        
+        raw_title = res.choices[0].message.content.strip()
+        
+        # 1. Clean sanitization pass (strip quotes, symbols, extra spaces)
+        cleaned_title = re.sub(r'[^a-zA-Z0-9\s-]', '', raw_title).strip()
+        cleaned_title = " ".join(cleaned_title.split()).title()
+
+        # Fallback if AI returns blank or ultra-short junk
+        if not cleaned_title or len(cleaned_title) < 2:
+            cleaned_title = " ".join(first_user_msg.split()[:4]).title()
+
+        # Limit absolute length
+        if len(cleaned_title) > 35:
+            cleaned_title = cleaned_title[:32].rstrip() + "..."
+
+        # 2. Prevent Dictionary Collision (e.g., if "Python Basics" already exists)
+        final_title = cleaned_title
+        counter = 1
+        while final_title in st.session_state.get("chats", {}):
+            final_title = f"{cleaned_title} ({counter})"
+            counter += 1
+
+        # 3. Safe State Mutation
+        if current_name in st.session_state.chats:
+            chat_data = st.session_state.chats.pop(current_name)
+            st.session_state.chats[final_title] = chat_data
+            st.session_state.current_chat = final_title
+            
+            # Helper safely handles disk sync if function exists
+            if "save_chats_to_disk" in globals():
+                save_chats_to_disk()
+                
+            st.rerun()
+
+    except Exception:
+        # Fail silently without breaking the UI flow
+        pass
+
+
+# ==============================================================================
+# UPGRADE #62: PROMPT ENHANCER & QUERY EXPANSION (GPT/CLAUDE STYLE)
+# ==============================================================================
+def enhance_user_prompt(prompt_text: str, client) -> str:
+    """Transforms raw user input into a rich, structured, frontier-grade AI instruction.
+    
+    Uses strict prompt engineering to force objective prompt refinement without answering.
+    """
+    cleaned_input = prompt_text.strip()
+    
+    # Don't waste API calls on ultra-short commands or already-detailed prompts
+    if not cleaned_input or len(cleaned_input) < 3:
+        return prompt_text
+
+    system_instruction = (
+        "You are an expert Prompt Engineer for frontier AI models (Claude 3.5, GPT-4o).\n"
+        "Your task is to take a raw user input and transform it into a structured, highly effective system prompt.\n\n"
+        "GUIDELINES:\n"
+        "1. Clarify intent, context, objective, and output constraints.\n"
+        "2. Add structural formatting guidelines (e.g., step-by-step, bullet points, code-first) if beneficial.\n"
+        "3. Preserve the core meaning, domain, and language of the original query.\n"
+        "4. DO NOT answer the user's query or fulfill the request. ONLY rewrite the prompt itself.\n"
+        "5. Output ONLY the improved prompt text. No preamble, no postscript, no commentary."
+    )
+
+    try:
+        res = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": f"Raw User Query: '{cleaned_input}'"}
             ],
             temperature=0.3,
+            max_tokens=600,
         )
-        return res.choices[0].message.content.strip()
+        
+        enhanced = res.choices[0].message.content.strip()
+        
+        # Strip accidental conversational framing (e.g., "Here is the enhanced prompt:")
+        if enhanced.startswith("Here is") or enhanced.startswith("Enhanced Prompt:"):
+            enhanced = re.sub(r'^(Here is[^\n]*\n|Enhanced Prompt:\s*)', '', enhanced, flags=re.IGNORECASE).strip()
+
+        # Security check: If AI fails and returns empty, fall back safely
+        return enhanced if len(enhanced) > len(cleaned_input) else prompt_text
+
     except Exception:
         return prompt_text
 
