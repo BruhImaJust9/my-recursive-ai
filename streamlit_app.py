@@ -1103,21 +1103,34 @@ if user_input and client:
                         }
                     ]
                     
+                    # List of active free vision endpoints on OpenRouter
+                    vision_models = [
+                        "openrouter/auto",  # OpenRouter automatically routes to available free/working models
+                        "google/gemma-3-12b-it:free",
+                        "qwen/qwen-2.5-vl-72b-instruct:free"
+                    ]
+                    
+                    success = False
                     with st.spinner("👁️ Analyzing image with OpenRouter Vision..."):
-                        try:
-                            # Using currently active free vision model endpoint
-                            response = openrouter_client.chat.completions.create(
-                                model="meta-llama/llama-3.2-11b-vision-instruct:free",
-                                messages=vision_messages,
-                                temperature=active_temperature,
-                            )
-                            final_reply = response.choices[0].message.content
-                            st.markdown(final_reply)
-                            active_chat_list.append({"role": "assistant", "content": final_reply})
-                        except Exception as v_err:
-                            st.error(f"⚠️ OpenRouter Vision Error: {v_err}")
-                            st.info("💡 Trying alternative model if endpoints shifted...")
-                            st.stop()  # Prevents code from leaking down to stream_generator
+                        for model_slug in vision_models:
+                            try:
+                                response = openrouter_client.chat.completions.create(
+                                    model=model_slug,
+                                    messages=vision_messages,
+                                    temperature=active_temperature,
+                                )
+                                final_reply = response.choices[0].message.content
+                                st.markdown(final_reply)
+                                active_chat_list.append({"role": "assistant", "content": final_reply})
+                                success = True
+                                break
+                            except Exception:
+                                continue
+                                
+                        if not success:
+                            st.error("⚠️ Free vision models are temporarily unavailable on OpenRouter.")
+                            st.info("💡 Try again in a few minutes or use text mode.")
+                            st.stop()
                             
                 def stream_generator():
                     for chunk in stream:
