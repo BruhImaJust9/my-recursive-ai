@@ -989,6 +989,25 @@ if user_input and client:
                     messages_payload.append(
                         {"role": m["role"], "content": m["content"]}
                     )
+
+            # Check if user uploaded an image for Vision analysis
+            if image_base64:
+                # Force vision model if not already selected
+                vision_model = "llama-3.2-11b-vision-preview"
+                messages_payload.append({
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": user_input},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}
+                        }
+                    ]
+                })
+                model_to_use = vision_model
+            else:
+                messages_payload.append({"role": "user", "content": user_input})
+                model_to_use = selected_model
                     
             stream = client.chat.completions.create(
                 model=selected_model,
