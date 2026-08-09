@@ -1445,13 +1445,39 @@ if user_input and client:
                 final_reply = sanitize_and_repair_formatting(raw_reply)
                 active_chat_list.append({"role": "assistant", "content": final_reply})
 
-    # Telemetry Updates (UPGRADE #60)
+    # ==============================================================================
+    # TELEMETRY, SUMMARIZATION & STATE WRAP-UP (UPGRADES #55 & #60)
+    # ==============================================================================
+    
+    # 1. Calculate Request Execution Time
+    latency_seconds = round(time.time() - start_time, 2)
+    
+    # 2. Estimate Token Usage (Input Words + Assistant Words * 1.33)
+    input_word_count = len(user_input.split())
+    output_word_count = len(final_reply.split()) if "final_reply" in locals() else 100
+    estimated_request_tokens = int((input_word_count + output_word_count) * 1.33)
+
+    # 3. Update Session Telemetry
+    if "telemetry" not in st.session_state:
+        st.session_state.telemetry = {"requests": 0, "est_tokens": 0, "last_latency": 0.0}
+
     st.session_state.telemetry["requests"] += 1
-    st.session_state.telemetry["est_tokens"] += len(user_input.split()) + 150
-    st.session_state.telemetry["last_latency"] = time.time() - start_time
+    st.session_state.telemetry["est_tokens"] += estimated_request_tokens
+    st.session_state.telemetry["last_latency"] = latency_seconds
 
-    # UPGRADE #55: Smart Thread Summarization Trigger
-    auto_summarize_chat_title(active_chat_list, client, st.session_state.current_chat)
+    # 4. Trigger Smart Thread Summarization (Auto-rename thread if brand new)
+    if "auto_summarize_chat_title" in globals() and client:
+        try:
+            auto_summarize_chat_title(
+                chat_history=active_chat_list, 
+                client=client, 
+                current_name=st.session_state.current_chat
+            )
+        except Exception as err:
+            print(f"⚠️ [SUMMARIZER WARN] Thread renaming skipped: {err}")
 
-    save_chats_to_disk()
+    # 5. Persist State & Sync UI View
+    if "save_chats_to_disk" in globals():
+        save_chats_to_disk()
+
     st.rerun()
