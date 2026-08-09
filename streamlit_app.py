@@ -1125,35 +1125,54 @@ def classify_user_intent(prompt, client, model_name):
     return "CHAT"
 
 # ==============================================================================
-# FEATURE #3: DOCUMENT CANVAS UI PANEL
+# FEATURE #3: DOCUMENT CANVAS & RAG INSPECTOR
 # ==============================================================================
-if doc_context:
+if doc_context and doc_context.strip():
     with st.expander("📄 **Document Canvas & RAG Inspector**", expanded=True):
         col_canvas1, col_canvas2 = st.columns([3, 1])
         
+        # Calculate key Document Metrics
+        word_count = len(doc_context.split())
+        char_count = len(doc_context)
+        est_read_time = max(1, round(word_count / 200))  # Standard 200 WPM
+
         with col_canvas1:
             st.markdown("### 📝 Loaded Document Context")
-            # Scrollable code/text canvas viewer
+            
+            # Interactive Toggle for Full View vs Truncated Preview
+            full_view = st.checkbox("Show full document content", value=False, key="toggle_doc_full_view")
+            
+            display_text = doc_context if full_view or len(doc_context) <= 2000 else doc_context[:2000] + "\n\n... [Truncated for Preview]"
+            
             st.text_area(
                 label="Document Content Preview",
-                value=doc_context[:2000] + ("..." if len(doc_context) > 2000 else ""),
-                height=180,
+                value=display_text,
+                height=200 if not full_view else 400,
                 disabled=True,
                 label_visibility="collapsed"
             )
             
         with col_canvas2:
-            st.markdown("### 📊 Metrics")
-            word_count = len(doc_context.split())
-            char_count = len(doc_context)
-            
+            st.markdown("### 📊 Document Metrics")
             st.metric("Total Words", f"{word_count:,}")
             st.metric("Total Characters", f"{char_count:,}")
+            st.metric("Est. Read Time", f"~{est_read_time} min")
             
-            if st.button("🧹 Clear Document Context"):
+            st.markdown("---")
+            
+            # Safe Context Reset Action
+            if st.button("🧹 Clear Canvas", use_container_width=True, key="clear_doc_canvas_btn"):
+                # Clear all persistent document states
+                st.session_state.doc_context = ""
                 doc_context = ""
-                st.session_state.pop("doc_context", None)
+                
+                # Clear Streamlit file uploader widget key if present
+                if "uploader_key" in st.session_state:
+                    del st.session_state["uploader_key"]
+                    
+                st.success("Document context cleared!")
                 st.rerun()
+
 
 import time
 import streamlit as st
