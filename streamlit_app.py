@@ -1133,52 +1133,93 @@ if doc_context:
                 st.session_state.pop("doc_context", None)
                 st.rerun()
 
-# Input Execution Pipeline
+import time
+import streamlit as st
+
+# ==============================================================================
+# INPUT EXECUTION PIPELINE (FRONTIER DISPATCHER)
+# ==============================================================================
 user_input = st.chat_input("Ask anything, use /search, /image, /debug, or /enhance...")
-if st.session_state.input_buffer and not user_input:
+
+# Handle buffer redirects (e.g. prompt presets or quick actions)
+if st.session_state.get("input_buffer") and not user_input:
     user_input = st.session_state.input_buffer
     st.session_state.input_buffer = ""
 
 if user_input and client:
     start_time = time.time()
+
+    # 1. Thread Binding & Message Mutation
+    current_thread = st.session_state.current_chat
+    if current_thread not in st.session_state.chats:
+        st.session_state.chats[current_thread] = []
     
-    # UPGRADE #62: Prompt Enhancement Trigger
+    active_chat_list = st.session_state.chats[current_thread]
+
+    # 2. UPGRADE #62: Command Override & Prompt Enhancement Pipeline
     if user_input.lower().startswith("/enhance"):
-        clean_p = user_input.replace("/enhance", "").strip()
-        with st.spinner("✨ Enhancing query structure..."):
-            user_input = enhance_user_prompt(clean_p, client)
-            st.info(f"**Enhanced Prompt:** {user_input}")
+        clean_prompt = re.sub(r"^/enhance\s*", "", user_input, flags=re.IGNORECASE).strip()
+        if clean_prompt:
+            with st.spinner("✨ Enhancing query structure..."):
+                user_input = enhance_user_prompt(clean_prompt, client)
+                st.info(f"**Enhanced Prompt:** {user_input}")
 
-    # 🔍 PRINT TO CLOUD LOGS
+    # Log user activity to backend cloud console
     print(f"--- [USER ACTIVITY DETECTED] ---")
-    print(f"Input Received: {user_input}")
+    print(f"Thread: {current_thread} | Input: {user_input[:100]}...")
 
-    # 🧠 Auto-Detect Intent
-    detected_route = classify_user_intent(user_input, client, selected_model)
-    print(f"--- [AUTO-ROUTER] Selected Route: {detected_route} ---")
-
-    active_chat_list.append({"role": "user", "content": user_input})
-
+    # 3. Dynamic Intent Classification & Slash Command Fast-Pass
     lowered_input = user_input.lower().strip()
 
-    # Ambiguity handler
+    if lowered_input.startswith("/search"):
+        detected_route = "ROUTE_SEARCH"
+    elif lowered_input.startswith("/image") or lowered_input.startswith("/imagine"):
+        detected_route = "ROUTE_IMAGE_GEN"
+    elif lowered_input.startswith("/debug"):
+        detected_route = "ROUTE_DEBUG"
+    else:
+        # Fallback to auto-classifier if available
+        if "classify_user_intent" in globals():
+            try:
+                detected_route = classify_user_intent(user_input, client, selected_model)
+            except Exception:
+                detected_route = "ROUTE_STANDARD"
+        else:
+            detected_route = "ROUTE_STANDARD"
+
+    print(f"--- [AUTO-ROUTER] Active Route: {detected_route} ---")
+
+    # 4. Append User Message to Thread State
+    active_chat_list.append({"role": "user", "content": user_input})
+    
+    # Render user prompt immediately in UI stream
+    with st.chat_message("user"):
+        st.markdown(user_input)
+
+    # 5. Query Disambiguation & Heuristic Parsing
     processed_prompt = user_input
     if "tadc" in lowered_input and "character" in lowered_input:
-        processed_prompt += " (referring to the individuals/cast in a show, not the letters of the acronym)"
+        processed_prompt += " (referring to the individuals/cast in the show 'The Amazing Digital Circus')"
+
+    # 6. Adaptive Temperature & Temperature Tuning
+    casual_triggers = {"hi", "hello", "hey", "howdy", "sup", "how are you", "what's up", "thanks", "thank you", "cool", "nice"}
+    analytical_keywords = ["compare", "vs", "probability", "percent", "rate", "code", "architecture", "dyson", "kardashev", "refactor", "math"]
+
+    words = set(re.findall(r"\w+", lowered_input))
     
-    casual_triggers = ["hi", "hello", "hey", "howdy", "sup", "how are you", "what's up", "thanks", "thank you", "cool", "nice"]
-    
-    if any(lowered_input.startswith(cw) or lowered_input == cw for cw in casual_triggers) and len(lowered_input.split()) < 8:
+    if len(lowered_input.split()) < 8 and words.intersection(casual_triggers):
         detected_style = "CASUAL"
         active_temperature = 0.85
-    elif any(kw in lowered_input for kw in ["compare", "vs", "probability", "percent", "rate", "code", "architecture", "dyson", "kardashev"]):
+    elif any(kw in lowered_input for kw in analytical_keywords):
         detected_style = "ANALYTICAL"
-        active_temperature = 0.2
+        active_temperature = 0.15
     else:
         detected_style = "GENERAL"
         active_temperature = 0.7
 
+    # 7. Render Assistant Context Window & Route Dispatcher
     with st.chat_message("assistant"):
+        # Execution flow moves directly into route execution blocks...
         
         # ROUTE 0: Autonomous Code Debugger
         if detected_route == "DEBUG":
