@@ -1071,47 +1071,37 @@ if user_input and client:
                 if isinstance(m.get("content"), str):
                     messages_payload.append({"role": m["role"], "content": m["content"]})
 
-            # Check if user uploaded an image for Vision analysis
+           # Check if user uploaded an image for Vision analysis
             if image_base64:
-                if not openrouter_client:
-                    st.warning("⚠️ OpenRouter key missing in secrets! Add `OPENROUTER_API_KEY` to enable live vision.")
-                    user_msg = user_input if user_input else "I attached an image."
-                    messages_payload.append({"role": "user", "content": user_msg})
-                    response = client.chat.completions.create(
-                        model=selected_model,
-                        messages=messages_payload,
-                        temperature=active_temperature,
-                    )
-                    final_reply = response.choices[0].message.content
-                    st.markdown(final_reply)
-                    active_chat_list.append({"role": "assistant", "content": final_reply})
-                else:
-                    prompt_text = user_input.strip() if user_input.strip() else "Describe and analyze this image in detail."
+                prompt_text = user_input.strip() if user_input.strip() else "Describe and analyze this image in detail."
 
-                    vision_messages = [
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": prompt_text},
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                        "url": f"data:{image_mime_type};base64,{image_base64}"
-                                    }
+                vision_messages = [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt_text},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{image_mime_type};base64,{image_base64}"
                                 }
                             ]
                         }
                     ]
-                    
-                    # List of active free vision endpoints on OpenRouter
-                    vision_models = [
-                        "openrouter/auto",  # OpenRouter automatically routes to available free/working models
-                        "google/gemma-3-12b-it:free",
-                        "qwen/qwen-2.5-vl-72b-instruct:free"
-                    ]
-                    
-                    success = False
-                    with st.spinner("👁️ Analyzing image with OpenRouter Vision..."):
+                ]
+                
+                # List of potential vision endpoints on OpenRouter
+                vision_models = [
+                    "openrouter/auto",
+                    "google/gemma-3-12b-it:free",
+                    "qwen/qwen-2.5-vl-72b-instruct:free"
+                ]
+                
+                success = False
+                
+                # Try OpenRouter vision models if client is configured
+                if openrouter_client:
+                    with st.spinner("👁️ Analyzing image with Vision..."):
                         for model_slug in vision_models:
                             try:
                                 response = openrouter_client.chat.completions.create(
@@ -1126,11 +1116,25 @@ if user_input and client:
                                 break
                             except Exception:
                                 continue
-                                
-                        if not success:
-                            st.error("⚠️ Free vision models are temporarily unavailable on OpenRouter.")
-                            st.info("💡 Try again in a few minutes or use text mode.")
-                            st.stop()
+                
+                # Dynamic Text Fallback if OpenRouter vision endpoints are busy/offline
+                if not success:
+                    st.info("📷 Image attached (Vision endpoints busy). Processing query with text engine...")
+                    
+                    fallback_msg = (
+                        f"[Attached Image: {uploaded_file.name}]\n"
+                        f"User Prompt: {prompt_text}"
+                    )
+                    messages_payload.append({"role": "user", "content": fallback_msg})
+                    
+                    response = client.chat.completions.create(
+                        model=selected_model,
+                        messages=messages_payload,
+                        temperature=active_temperature,
+                    )
+                    final_reply = response.choices[0].message.content
+                    st.markdown(final_reply)
+                    active_chat_list.append({"role": "assistant", "content": final_reply})
                             
                 def stream_generator():
                     for chunk in stream:
