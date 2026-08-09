@@ -1088,7 +1088,6 @@ if user_input and client:
                             ]
                         }
                     ]
-                ]
                 
                 # List of potential vision endpoints on OpenRouter
                 vision_models = [
