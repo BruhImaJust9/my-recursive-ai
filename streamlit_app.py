@@ -1085,10 +1085,11 @@ if user_input and client:
                                 "image_url": {
                                     "url": f"data:{image_mime_type};base64,{image_base64}"
                                 }
-                            ]
-                        }
-                    ]
-                
+                            }
+                        ]
+                    }
+                ]
+
                 # List of potential vision endpoints on OpenRouter
                 vision_models = [
                     "openrouter/auto",
