@@ -968,16 +968,23 @@ if user_input and client:
             # Check if user uploaded an image for Vision analysis
             if image_base64:
                 try:
-                    # Vision Payload
+                    # Clean prompt text
+                    prompt_text = user_input.strip() if user_input.strip() else "Describe and analyze this image in detail."
+
+                    # Construct vision payload (NOTE: System prompts omitted for Groq Vision API compatibility)
                     vision_messages = [
-                        {"role": "system", "content": "You are a helpful vision AI assistant. Describe and analyze the uploaded image accurately."},
                         {
                             "role": "user",
                             "content": [
-                                {"type": "text", "text": user_input if user_input else "What is in this image?"},
+                                {
+                                    "type": "text",
+                                    "text": prompt_text
+                                },
                                 {
                                     "type": "image_url",
-                                    "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{image_base64}"
+                                    }
                                 }
                             ]
                         }
@@ -988,15 +995,15 @@ if user_input and client:
                             model="llama-3.2-11b-vision-preview",
                             messages=vision_messages,
                             temperature=active_temperature,
-                            stream=False,  # Set to False to avoid Groq vision streaming errors
+                            stream=False
                         )
                         final_reply = response.choices[0].message.content
                         st.markdown(final_reply)
                         active_chat_list.append({"role": "assistant", "content": final_reply})
 
                 except Exception as vision_err:
-                    st.error(f"⚠️ Vision Processing Error: {vision_err}. Falling back to standard model.")
-                    # Fallback to standard chat response if vision API fails
+                    st.error(f"⚠️ Vision Processing Error: {vision_err}")
+                    # Show the actual error so we can fix it rather than silently failing to text mode!
                     messages_payload.append({"role": "user", "content": user_input})
                     response = client.chat.completions.create(
                         model=selected_model,
