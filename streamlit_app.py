@@ -1027,8 +1027,6 @@ if user_input and client:
                 final_reply = sanitize_and_repair_formatting(raw_reply)
 
                 active_chat_list.append({"role": "assistant", "content": final_reply})
-                {"role": "assistant", "content": final_reply}
-            )
 
     # Telemetry Updates (UPGRADE #60)
     st.session_state.telemetry["requests"] += 1
