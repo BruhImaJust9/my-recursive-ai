@@ -653,26 +653,36 @@ with st.sidebar:
     st.header("📄 File Attachment Context")
     uploaded_file = st.file_uploader(
         "Upload TXT, CSV, Code snippet, or Image:", 
-        type=["txt", "py", "js", "md", "csv", "jpg", "png", "jpeg"]  # 👈 Added image extensions
+        type=["txt", "py", "js", "md", "csv", "jpg", "png", "jpeg"]
     )
     doc_context = ""
-    image_base64 = None  # 👈 Store base64 image data for vision model
+    image_base64 = None 
+    image_mime_type = "image/jpeg"  # Default fallback
     
     if uploaded_file is not None:
         try:
-            if uploaded_file.name.lower().endswith((".jpg", ".png", ".jpeg")):
-                # Convert image to base64 for LLM Vision processing
+            filename = uploaded_file.name.lower()
+            if filename.endswith((".jpg", ".png", ".jpeg")):
                 import base64
+                # Detect correct mime type
+                if filename.endswith(".png"):
+                    image_mime_type = "image/png"
+                elif filename.endswith((".jpg", ".jpeg")):
+                    image_mime_type = "image/jpeg"
+
+                # Read raw bytes safely
+                uploaded_file.seek(0)
                 bytes_data = uploaded_file.read()
                 image_base64 = base64.b64encode(bytes_data).decode("utf-8")
                 st.image(uploaded_file, caption="📷 Image loaded into vision context", use_container_width=True)
-            elif uploaded_file.name.endswith(".csv"):
+            elif filename.endswith(".csv"):
                 df_upload = pd.read_csv(uploaded_file)
                 st.markdown("#### 🔍 CSV File Summary")
                 st.write(f"**Rows:** {df_upload.shape[0]} | **Cols:** {df_upload.shape[1]}")
                 st.dataframe(df_upload.head(3), use_container_width=True)
                 doc_context = f"CSV Data Summary:\nColumns: {list(df_upload.columns)}\nData Sample:\n{df_upload.head(10).to_csv(index=False)}"
             else:
+                uploaded_file.seek(0)
                 doc_context = uploaded_file.read().decode("utf-8")
                 st.success("File context loaded!")
         except Exception as e:
