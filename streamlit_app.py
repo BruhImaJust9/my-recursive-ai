@@ -1071,36 +1071,50 @@ if user_input and client:
                 if isinstance(m.get("content"), str):
                     messages_payload.append({"role": m["role"], "content": m["content"]})
 
-            # Check if user uploaded an image
+            # Check if user uploaded an image for Vision analysis
             if image_base64:
-                st.info("📷 Image attached!")
-                st.warning(
-                    "⚠️ Live image vision is currently paused on Groq's servers. "
-                    "Answering your question with the text engine."
-                )
-                
-                user_msg = user_input if user_input else "I attached an image."
-                messages_payload.append({"role": "user", "content": user_msg})
-                
-                response = client.chat.completions.create(
-                    model=selected_model,
-                    messages=messages_payload,
-                    temperature=active_temperature,
-                )
-                final_reply = response.choices[0].message.content
-                st.markdown(final_reply)
-                active_chat_list.append({"role": "assistant", "content": final_reply})
+                if not openrouter_client:
+                    st.warning("⚠️ OpenRouter key missing in secrets! Add `OPENROUTER_API_KEY` to enable live vision.")
+                    user_msg = user_input if user_input else "I attached an image."
+                    messages_payload.append({"role": "user", "content": user_msg})
+                    response = client.chat.completions.create(
+                        model=selected_model,
+                        messages=messages_payload,
+                        temperature=active_temperature,
+                    )
+                    final_reply = response.choices[0].message.content
+                    st.markdown(final_reply)
+                    active_chat_list.append({"role": "assistant", "content": final_reply})
+                else:
+                    prompt_text = user_input.strip() if user_input.strip() else "Describe and analyze this image in detail."
 
-            else:
-                # Standard Text Streaming Flow
-                messages_payload.append({"role": "user", "content": user_input})
-                
-                stream = client.chat.completions.create(
-                    model=selected_model,
-                    messages=messages_payload,
-                    temperature=active_temperature,
-                    stream=True,
-                )
+                    vision_messages = [
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt_text},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:{image_mime_type};base64,{image_base64}"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                    
+                    with st.spinner("👁️ Analyzing image with Qwen Vision..."):
+                        try:
+                            response = openrouter_client.chat.completions.create(
+                                model="qwen/qwen-2-vl-7b-instruct:free",
+                                messages=vision_messages,
+                                temperature=active_temperature,
+                            )
+                            final_reply = response.choices[0].message.content
+                            st.markdown(final_reply)
+                            active_chat_list.append({"role": "assistant", "content": final_reply})
+                        except Exception as v_err:
+                            st.error(f"⚠️ OpenRouter Vision Error: {v_err}")
 
                 def stream_generator():
                     for chunk in stream:
