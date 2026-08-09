@@ -945,7 +945,7 @@ if user_input and client:
                 except Exception as e:
                     active_chat_list.append({"role": "assistant", "content": f"Failed to fetch web page: {e}"})
 
-        # ROUTE 4: Standard Chat Generation
+       # ROUTE 4: Standard Chat Generation
         else:
             system_prompt = build_dynamic_system_prompt(
                 processed_prompt, personality, target_language, detected_style
@@ -974,16 +974,16 @@ if user_input and client:
                 if isinstance(m.get("content"), str):
                     messages_payload.append({"role": m["role"], "content": m["content"]})
 
-           # Check if user uploaded an image for Vision analysis
+            # Check if user uploaded an image
             if image_base64:
                 st.info("📷 Image attached!")
                 st.warning(
-                    "⚠️ Groq has decommissioned their Llama 3.2 Vision API endpoints, "
-                    "so live image reading is currently paused on Groq's servers."
+                    "⚠️ Live image vision is currently paused on Groq's servers. "
+                    "Answering your question with the text engine."
                 )
                 
-                # Treat user input as a regular chat message without trying to send image bytes to Groq
-                messages_payload.append({"role": "user", "content": user_input if user_input else "I uploaded an image."})
+                user_msg = user_input if user_input else "I attached an image."
+                messages_payload.append({"role": "user", "content": user_msg})
                 
                 response = client.chat.completions.create(
                     model=selected_model,
@@ -993,35 +993,6 @@ if user_input and client:
                 final_reply = response.choices[0].message.content
                 st.markdown(final_reply)
                 active_chat_list.append({"role": "assistant", "content": final_reply})
-                    
-                # Standard text fallback
-                    fallback_prompt = f"[User attached an image file: {uploaded_file.name}]. User question: {user_input}"
-                    messages_payload.append({"role": "user", "content": fallback_prompt})
-                    
-                    response = client.chat.completions.create(
-                        model=selected_model,
-                        messages=messages_payload,
-                        temperature=active_temperature,
-                    )
-                    final_reply = response.choices[0].message.content
-                    st.markdown(final_reply)
-                    active_chat_list.append({"role": "assistant", "content": final_reply})
-
-                except Exception as vision_err:
-                    st.warning("ℹ️ Direct AI Vision is currently unavailable on this Groq API endpoint. Answering text query with selected model.")
-                    
-                    # Safe fallback to standard selected model
-                    fallback_prompt = user_input if user_input else "Uploaded an image, but vision engine is offline."
-                    messages_payload.append({"role": "user", "content": fallback_prompt})
-                    
-                    response = client.chat.completions.create(
-                        model=selected_model,
-                        messages=messages_payload,
-                        temperature=active_temperature,
-                    )
-                    final_reply = response.choices[0].message.content
-                    st.markdown(final_reply)
-                    active_chat_list.append({"role": "assistant", "content": final_reply})
 
             else:
                 # Standard Text Streaming Flow
