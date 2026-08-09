@@ -644,7 +644,7 @@ with st.sidebar:
         [
             "llama-3.3-70b-versatile",
             "llama-3.1-8b-instant",
-            "llama-3.2-11b-vision-preview",
+            "llama-3.2-11b-vision-instruct",
             "mixtral-8x7b-32768",
         ],
     )
@@ -782,7 +782,7 @@ for idx, msg in enumerate(active_chat_list):
 col_v1, col_v2 = st.columns([1, 11])
 with col_v1:
     audio_bytes = audio_recorder(
-        text="",
+        text=""
         recording_color="#e8b62c",
         neutral_color="#6aa84f",
         icon_size="2x",
@@ -1001,7 +1001,7 @@ if user_input and client:
                     
                     with st.spinner("👁️ Analyzing image..."):
                         response = client.chat.completions.create(
-                            model="llama-3.2-11b-vision-preview",
+                            model="llama-3.2-11b-vision-instruct",
                             messages=vision_messages,
                             temperature=active_temperature,
                             stream=False
