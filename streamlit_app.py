@@ -1017,61 +1017,21 @@ if user_input and client:
             )
 
             system_prompt += (
-                "\n\n[STRICT CONTEXT RULE]: Always maintain awareness of prior topics in the chat. "
-                "If the user refers to an acronym, show, or topic mentioned earlier in the conversation, "
-                "do NOT substitute it with unrelated concepts from recent turns."
-            )
-
-            system_prompt += (
-                "\n\n[FORMATTING RULE]: When asked to color-code text or items, use Streamlit markdown syntax "
-                "like :red[text], :blue[text], :green[text], :orange[text], or :violet[text]. "
-                "DO NOT use raw HTML like <font color=...>. Keep color legends distinct, logical, and non-redundant."
+                "\n\n[STRICT CONTEXT RULE]: Always maintain awareness of prior topics in the chat."
             )
 
             if doc_context:
                 system_prompt += f"\n\n[USER ATTACHED FILE CONTEXT]:\n{doc_context[:4000]}"
 
-            # --- RAG DOCUMENT CONTEXT INJECTION ---
-            if doc_context:
-                # 1. Chunk document into 500-word segments
-                raw_words = doc_context.split()
-                chunk_size = 500
-                doc_chunks = [
-                    " ".join(raw_words[i : i + chunk_size])
-                    for i in range(0, len(raw_words), chunk_size)
-                ]
-
-                # 2. Score chunks based on keyword matching with user prompt
-                prompt_keywords = set(processed_prompt.lower().split())
-                scored_chunks = []
-                
-                for chunk in doc_chunks:
-                    score = sum(1 for word in prompt_keywords if word in chunk.lower())
-                    scored_chunks.append((score, chunk))
-                
-                # Sort chunks by highest relevance score
-                scored_chunks.sort(key=lambda x: x[0], reverse=True)
-                top_retrieved_chunks = [c[1] for c in scored_chunks[:3]]
-                rag_payload = "\n\n--- NEXT RETRIEVED CHUNK ---\n\n".join(top_retrieved_chunks)
-
-                # 3. Inject RAG payload into system context
-                system_prompt += (
-                    f"\n\n[RETRIEVAL-AUGMENTED GENERATION CONTEXT]:\n"
-                    f"The user has uploaded a document. Here are the most relevant sections retrieved for their query:\n"
-                    f"'''\n{rag_payload}\n'''\n"
-                    f"CRITICAL INSTRUCTION: Use the retrieved document context above to accurately answer "
-                    f"the user's questions. If the answer is contained in the text, highlight key facts directly."
-                )
-
-            # Construct clean standard system payload
+            # Construct system payload
             messages_payload = [{"role": "system", "content": system_prompt}]
 
-            # Append historical turns safely as strings
+            # Append chat history
             for m in active_chat_list[:-1]:
                 if isinstance(m.get("content"), str):
                     messages_payload.append({"role": m["role"], "content": m["content"]})
 
-           # Check if user uploaded an image for Vision analysis
+            # --- BRANCH 1: IMAGE HANDLING ---
             if image_base64:
                 prompt_text = user_input.strip() if user_input.strip() else "Describe and analyze this image in detail."
 
@@ -1090,16 +1050,14 @@ if user_input and client:
                     }
                 ]
 
-                # List of potential vision endpoints on OpenRouter
                 vision_models = [
                     "openrouter/auto",
                     "google/gemma-3-12b-it:free",
                     "qwen/qwen-2.5-vl-72b-instruct:free"
                 ]
-                
+
                 success = False
-                
-                # Try OpenRouter vision models if client is configured
+
                 if openrouter_client:
                     with st.spinner("👁️ Analyzing image with Vision..."):
                         for model_slug in vision_models:
@@ -1116,17 +1074,12 @@ if user_input and client:
                                 break
                             except Exception:
                                 continue
-                
-                # Dynamic Text Fallback if OpenRouter vision endpoints are busy/offline
+
                 if not success:
                     st.info("📷 Image attached (Vision endpoints busy). Processing query with text engine...")
-                    
-                    fallback_msg = (
-                        f"[Attached Image: {uploaded_file.name}]\n"
-                        f"User Prompt: {prompt_text}"
-                    )
+                    fallback_msg = f"[Attached Image: {uploaded_file.name}]\nUser Prompt: {prompt_text}"
                     messages_payload.append({"role": "user", "content": fallback_msg})
-                    
+
                     response = client.chat.completions.create(
                         model=selected_model,
                         messages=messages_payload,
@@ -1135,7 +1088,18 @@ if user_input and client:
                     final_reply = response.choices[0].message.content
                     st.markdown(final_reply)
                     active_chat_list.append({"role": "assistant", "content": final_reply})
-                            
+
+            # --- BRANCH 2: STANDARD TEXT STREAMING ---
+            else:
+                messages_payload.append({"role": "user", "content": user_input})
+
+                stream = client.chat.completions.create(
+                    model=selected_model,
+                    messages=messages_payload,
+                    temperature=active_temperature,
+                    stream=True,
+                )
+
                 def stream_generator():
                     for chunk in stream:
                         if chunk.choices[0].delta.content:
@@ -1143,7 +1107,6 @@ if user_input and client:
 
                 raw_reply = st.write_stream(stream_generator)
                 final_reply = sanitize_and_repair_formatting(raw_reply)
-
                 active_chat_list.append({"role": "assistant", "content": final_reply})
 
     # Telemetry Updates (UPGRADE #60)
