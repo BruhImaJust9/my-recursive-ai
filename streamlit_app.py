@@ -954,77 +954,79 @@ if user_input and client:
                 "DO NOT use raw HTML like <font color=...>. Keep color legends distinct, logical, and non-redundant."
             )
 
-            system_prompt += (
-                "\n\n[WORD AMBIGUITY RULE]: If the user asks about 'characters' in the context of a show, "
-                "franchise, game, or media series (especially when referred to by an acronym like TADC, FNAF, ATLA, etc.), "
-                "ALWAYS interpret 'characters' as the fictional personas/cast members of that media. "
-                "NEVER analyze the literal letters of the acronym unless explicitly asked to do a letter-by-letter breakdown."
-            )
-
-            system_prompt += (
-                "\n\n[STRICT FACTUALITY RULE]: Never invent or make up fake characters, scientists, or lore "
-                "for real media series, shows, or games (e.g., Five Nights at Freddy's / FNAF). "
-                "If you are unsure of the real cast or character names, state that clearly instead of inventing fake names.\n"
-                "[STREAMLIT COLOR RULE]: NEVER use raw HTML tags like <font color=...>. "
-                "ONLY use native Streamlit markdown color syntax, such as :red[text], :blue[text], :green[text], :purple[text], or :orange[text]."
-            )
-
-            system_prompt += (
-                "\n\n[STRICT COLOR RULES]: You MAY ONLY use these valid Streamlit colors: "
-                ":red[text], :blue[text], :green[text], :orange[text], :violet[text], or :gray[text]. "
-                "NEVER use unsupported colors like pink, brown, black, or raw HTML tags.\n"
-                "[NO LEGEND REPETITION]: Do NOT create a separate 'Color Code' legend at the bottom repeating the text. Keep it clean.\n"
-                "[FACTUALITY GUARD]: If you do not know the exact real characters of a show or media (e.g. FNAF, anime), "
-                "do NOT invent fake names. Admit you need more context or search for it."
-            )
-
             if doc_context:
-                system_prompt += (
-                    f"\n\n[USER ATTACHED FILE CONTEXT]:\n{doc_context[:4000]}"
-                )
+                system_prompt += f"\n\n[USER ATTACHED FILE CONTEXT]:\n{doc_context[:4000]}"
 
+            # Construct clean standard system payload
             messages_payload = [{"role": "system", "content": system_prompt}]
-            for m in active_chat_list:
+
+            # Append historical turns safely as strings
+            for m in active_chat_list[:-1]:
                 if isinstance(m.get("content"), str):
-                    messages_payload.append(
-                        {"role": m["role"], "content": m["content"]}
-                    )
+                    messages_payload.append({"role": m["role"], "content": m["content"]})
 
             # Check if user uploaded an image for Vision analysis
             if image_base64:
-                # Force vision model if not already selected
-                vision_model = "llama-3.2-11b-vision-preview"
-                messages_payload.append({
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": user_input},
+                try:
+                    # Vision Payload
+                    vision_messages = [
+                        {"role": "system", "content": "You are a helpful vision AI assistant. Describe and analyze the uploaded image accurately."},
                         {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": user_input if user_input else "What is in this image?"},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}
+                                }
+                            ]
                         }
                     ]
-                })
-                model_to_use = vision_model
-            else:
-                messages_payload.append({"role": "user", "content": user_input})
-                model_to_use = selected_model
                     
-            stream = client.chat.completions.create(
-                model=selected_model,
-                messages=messages_payload,
-                temperature=active_temperature,
-                stream=True,
-            )
+                    with st.spinner("👁️ Analyzing image..."):
+                        response = client.chat.completions.create(
+                            model="llama-3.2-11b-vision-preview",
+                            messages=vision_messages,
+                            temperature=active_temperature,
+                            stream=False,  # Set to False to avoid Groq vision streaming errors
+                        )
+                        final_reply = response.choices[0].message.content
+                        st.markdown(final_reply)
+                        active_chat_list.append({"role": "assistant", "content": final_reply})
 
-            def stream_generator():
-                for chunk in stream:
-                    if chunk.choices[0].delta.content:
-                        yield chunk.choices[0].delta.content
+                except Exception as vision_err:
+                    st.error(f"⚠️ Vision Processing Error: {vision_err}. Falling back to standard model.")
+                    # Fallback to standard chat response if vision API fails
+                    messages_payload.append({"role": "user", "content": user_input})
+                    response = client.chat.completions.create(
+                        model=selected_model,
+                        messages=messages_payload,
+                        temperature=active_temperature,
+                    )
+                    final_reply = response.choices[0].message.content
+                    st.markdown(final_reply)
+                    active_chat_list.append({"role": "assistant", "content": final_reply})
 
-            raw_reply = st.write_stream(stream_generator)
-            final_reply = sanitize_and_repair_formatting(raw_reply)
+            else:
+                # Standard Text Streaming Flow
+                messages_payload.append({"role": "user", "content": user_input})
+                
+                stream = client.chat.completions.create(
+                    model=selected_model,
+                    messages=messages_payload,
+                    temperature=active_temperature,
+                    stream=True,
+                )
 
-            active_chat_list.append(
+                def stream_generator():
+                    for chunk in stream:
+                        if chunk.choices[0].delta.content:
+                            yield chunk.choices[0].delta.content
+
+                raw_reply = st.write_stream(stream_generator)
+                final_reply = sanitize_and_repair_formatting(raw_reply)
+
+                active_chat_list.append({"role": "assistant", "content": final_reply})
                 {"role": "assistant", "content": final_reply}
             )
 
