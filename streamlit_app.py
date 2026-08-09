@@ -978,10 +978,9 @@ if user_input and client:
             # Check if user uploaded an image for Vision analysis
             if image_base64:
                 try:
-                    # Clean prompt text
                     prompt_text = user_input.strip() if user_input.strip() else "Describe and analyze this image in detail."
 
-                    # Construct vision payload (NOTE: System prompts omitted for Groq Vision API compatibility)
+                    # Construct exact Groq vision schema with matching MIME type
                     vision_messages = [
                         {
                             "role": "user",
@@ -993,7 +992,7 @@ if user_input and client:
                                 {
                                     "type": "image_url",
                                     "image_url": {
-                                        "url": f"data:image/jpeg;base64,{image_base64}"
+                                        "url": f"data:{image_mime_type};base64,{image_base64}"
                                     }
                                 }
                             ]
