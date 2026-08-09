@@ -735,39 +735,60 @@ def enhance_user_prompt(prompt_text: str, client) -> str:
         return prompt_text
 
 
-# ==========================================
-# UPGRADE #53: AUTO-SEARCH INTENT ROUTER
-# ==========================================
-REALTIME_KEYWORDS = [
-    "news",
-    "latest",
-    "today",
-    "yesterday",
-    "current",
-    "weather",
-    "score",
-    "results",
-    "winner",
-    "stock",
-    "price",
-    "2026",
-    "who won",
-    "schedule",
-    "upcoming",
-    "event",
-    "standing",
-    "release date",
-]
+import re
+
+# ==============================================================================
+# UPGRADE #53: AUTO-SEARCH INTENT ROUTER (FRONTIER PARALLEL)
+# ==============================================================================
+
+# Search Trigger Keywords
+REALTIME_KEYWORDS = {
+    "news", "latest", "today", "yesterday", "current", "weather", 
+    "score", "results", "winner", "stock", "price", "who won", 
+    "schedule", "upcoming", "event", "standings", "release date", 
+    "trending", "update", "right now", "live"
+}
+
+MEDIA_LORE_KEYWORDS = {
+    "character", "characters", "cast", "show", "episode", "lore", 
+    "tadc", "fnaf", "anime", "manga", "season", "actor", "voice actor"
+}
 
 
-def needs_automatic_search(user_text):
-    lowered = user_text.lower()
-    media_keywords = ["character", "cast", "show", "episode", "lore", "tadc", "fnaf", "anime"]
+def needs_automatic_search(user_text: str) -> bool:
+    """Evaluates user input to determine if live web search context is required.
     
-    # Trigger web search if user asks for characters/media info to prevent fake names
-    if any(kw in lowered for kw in media_keywords):
+    Prevents hallucinations on niche pop-culture, media lore, and real-time news.
+    """
+    if not user_text or not user_text.strip():
+        return False
+
+    lowered = user_text.lower().strip()
+
+    # 1. Explicit Slash Command Override
+    if lowered.startswith("/search"):
         return True
-        
+
+    # 2. Skip search for raw URL pastes or standard code/math snippets
+    if re.search(r"https?://|www\.", lowered) or lowered.startswith("```"):
+        return False
+
+    # 3. Dynamic Temporal Detection (Detects mentions of modern years like 2024-2026)
+    if re.search(r"\b(202[4-6])\b", lowered):
+        return True
+
+    # 4. Word-Boundary Phrase Matching for Realtime & Media Keywords
+    # Prevents false positives like 'broadcast' matching 'cast'
+    tokens = set(re.findall(r"\b\w+\b", lowered))
+
+    if tokens.intersection(REALTIME_KEYWORDS) or tokens.intersection(MEDIA_LORE_KEYWORDS):
+        return True
+
+    # 5. Multi-Word Exact Phrase Detection
+    phrases = ["who won", "release date", "right now", "voice actor", "who plays"]
+    if any(phrase in lowered for phrase in phrases):
+        return True
+
     return False
 
 import os
