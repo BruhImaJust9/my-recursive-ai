@@ -171,7 +171,7 @@ def execute_deconstructed_multi_search(
     query: str, client, selected_model: str
 ) -> str:
     """UPGRADE #32 & #34: Deconstructs complex queries into sub-searches,
-    executes multi-angle retrieval, and synthesizes factually verified claims.
+    executes multi-angle retrieval, and synthesizes factually verified claims with clickable citations.
     """
     if not TAVILY_KEY:
         return "⚠️ Missing `TAVILY_API_KEY` in Streamlit secrets!"
@@ -201,18 +201,29 @@ def execute_deconstructed_multi_search(
 
     # 2. Concurrently retrieve facts across queries
     aggregated_sources = []
+    sources_metadata = []
     source_counter = 1
 
     for q in queries:
         try:
             res = tavily.search(query=q, max_results=2)
             for item in res.get("results", []):
-                title = item.get("title", "Source")
-                content = item.get("content", "")
-                url = item.get("url", "#")
+                title = item.get("title", "Source").strip()
+                content = item.get("content", "").strip()
+                url = item.get("url", "#").strip()
+                
+                # Store structured format for LLM prompt context
                 aggregated_sources.append(
-                    f"[{source_counter}] **{title}**: {content} (URL: {url})"
+                    f"[{source_counter}] **{title}** (URL: {url})\nContent: {content}"
                 )
+                
+                # Store metadata for references list at the bottom
+                sources_metadata.append({
+                    "id": source_counter,
+                    "title": title,
+                    "url": url
+                })
+                
                 source_counter += 1
         except Exception:
             continue
@@ -220,10 +231,13 @@ def execute_deconstructed_multi_search(
     if not aggregated_sources:
         return "No authoritative search sources could be retrieved."
 
-    # 3. Synthesize with Citation Anchors
+    # 3. Synthesize with Clickable Citation Anchors
     synthesis_prompt = (
-        f"Synthesize an accurate, well-structured answer for: '{query}' using these factual sources.\n"
-        "Insert inline citation anchors (e.g. [1], [2]) corresponding to sources used.\n\n"
+        f"You are an expert research assistant. Synthesize an accurate, well-structured answer for the query: '{query}' using these factual sources.\n\n"
+        "CRITICAL CITATION RULES:\n"
+        "1. Insert clickable markdown citation links in your answer whenever referencing facts, e.g., [[1]](URL), [[2]](URL).\n"
+        "2. Make sure the citation URL matches the exact source URL provided below.\n"
+        "3. Keep the tone informative, balanced, and easy to read.\n\n"
         "SOURCES:\n" + "\n\n".join(aggregated_sources)
     )
 
@@ -233,7 +247,14 @@ def execute_deconstructed_multi_search(
         temperature=0.2,
     )
 
-    return synthesis_res.choices[0].message.content
+    ai_response = synthesis_res.choices[0].message.content.strip()
+
+    # 4. Append clean Sources & References footer
+    references_footer = "\n\n---\n### 🌐 Sources & References\n"
+    for src in sources_metadata:
+        references_footer += f"* [[{src['id']}]] [{src['title']}]({src['url']})\n"
+
+    return ai_response + references_footer
 
 
 # ==========================================
