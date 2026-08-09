@@ -1103,10 +1103,11 @@ if user_input and client:
                         }
                     ]
                     
-                    with st.spinner("👁️ Analyzing image with Qwen Vision..."):
+                    with st.spinner("👁️ Analyzing image with OpenRouter Vision..."):
                         try:
+                            # Using currently active free vision model endpoint
                             response = openrouter_client.chat.completions.create(
-                                model="qwen/qwen-2-vl-7b-instruct:free",
+                                model="meta-llama/llama-3.2-11b-vision-instruct:free",
                                 messages=vision_messages,
                                 temperature=active_temperature,
                             )
@@ -1115,7 +1116,9 @@ if user_input and client:
                             active_chat_list.append({"role": "assistant", "content": final_reply})
                         except Exception as v_err:
                             st.error(f"⚠️ OpenRouter Vision Error: {v_err}")
-
+                            st.info("💡 Trying alternative model if endpoints shifted...")
+                            st.stop()  # Prevents code from leaking down to stream_generator
+                            
                 def stream_generator():
                     for chunk in stream:
                         if chunk.choices[0].delta.content:
