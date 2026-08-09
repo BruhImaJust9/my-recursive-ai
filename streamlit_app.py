@@ -994,7 +994,7 @@ if user_input and client:
                 st.markdown(final_reply)
                 active_chat_list.append({"role": "assistant", "content": final_reply})
                     
-                    # Standard text fallback
+                # Standard text fallback
                     fallback_prompt = f"[User attached an image file: {uploaded_file.name}]. User question: {user_input}"
                     messages_payload.append({"role": "user", "content": fallback_prompt})
                     
