@@ -782,7 +782,7 @@ for idx, msg in enumerate(active_chat_list):
 col_v1, col_v2 = st.columns([1, 11])
 with col_v1:
     audio_bytes = audio_recorder(
-        text=""
+        text="",
         recording_color="#e8b62c",
         neutral_color="#6aa84f",
         icon_size="2x",
