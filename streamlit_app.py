@@ -18,64 +18,77 @@ from PIL import Image
 import streamlit as st
 from tavily import TavilyClient
 
-# ==========================================
+# ==============================================================================
 # 0. PERSISTENCE & HELPERS
-# ==========================================
+# ==============================================================================
 CHAT_STORAGE_FILE = "persistent_chats.json"
 
 
-def load_saved_chats():
+def load_saved_chats() -> dict:
+    """Loads saved chat threads from disk safely with structural validation."""
     if os.path.exists(CHAT_STORAGE_FILE):
         try:
-            with open(CHAT_STORAGE_FILE, "r") as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {"Chat 1": []}
+            with open(CHAT_STORAGE_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict) and len(data) > 0:
+                    return data
+        except Exception as err:
+            print(f"⚠️ [PERSISTENCE WARN] Failed to load chat history: {err}")
+            
+    return {"New Chat": []}
 
 
-def save_chats_to_disk():
+def save_chats_to_disk() -> None:
+    """Atomically serializes chat history to disk for authenticated sessions.
+    
+    Prevents file corruption on unexpected app terminations.
+    """
     try:
-        # Only save persistent data to server disk if logged in as Admin/Owner
-        if st.session_state.get("is_logged_in", False):
-            clean_chats = {}
-            for session_name, msg_list in st.session_state.chats.items():
-                clean_chats[session_name] = []
-                for msg in msg_list:
-                    clean_msg = {
-                        k: v
-                        for k, v in msg.items()
-                        if k not in ["audio", "image_url"]
-                    }
-                    clean_chats[session_name].append(clean_msg)
+        # Only persist data if the user is authenticated as Admin/Owner
+        if not st.session_state.get("is_logged_in", False):
+            return
 
-            with open(CHAT_STORAGE_FILE, "w") as f:
-                json.dump(clean_chats, f, indent=2)
-        else:
-            # Guest session: Do not save anything to server disk!
-            pass
-    except Exception:
-        pass
+        clean_chats = {}
+        for session_name, msg_list in st.session_state.chats.items():
+            clean_chats[session_name] = []
+            
+            for msg in msg_list:
+                if not isinstance(msg, dict):
+                    continue
+                
+                # Exclude non-serializable payloads, base64 data, and heavy media
+                clean_msg = {
+                    k: v for k, v in msg.items()
+                    if k not in ["audio", "image_url", "bytes", "raw_response"]
+                    and isinstance(v, (str, int, float, bool, list, dict))
+                }
+                clean_chats[session_name].append(clean_msg)
 
-# Initialize User Session State
+        # Atomic File Write: Save to temp file first, then replace original
+        dir_name = os.path.dirname(CHAT_STORAGE_FILE) or "."
+        with tempfile.NamedTemporaryFile("w", dir=dir_name, delete=False, encoding="utf-8") as tf:
+            json.dump(clean_chats, tf, indent=2, ensure_ascii=False)
+            temp_path = tf.name
+
+        os.replace(temp_path, CHAT_STORAGE_FILE)
+
+    except Exception as err:
+        print(f"⚠️ [PERSISTENCE ERROR] Failed to save chats to disk: {err}")
+
+
+# ==============================================================================
+# SESSION STATE INITIALIZATION
+# ==============================================================================
 if "is_logged_in" not in st.session_state:
     st.session_state.is_logged_in = False  # Default to Guest Mode
 
 if "chats" not in st.session_state:
     if st.session_state.is_logged_in:
-        # Load real history for logged-in admin
-        st.session_state.chats = load_chats_from_disk()
+        st.session_state.chats = load_saved_chats()
     else:
-        # Fresh, temporary workspace for guests
         st.session_state.chats = {"New Chat": []}
-        st.session_state.current_chat = "New Chat"
 
-
-# Initialize Session States
-if "chats" not in st.session_state:
-    st.session_state.chats = load_saved_chats()
-
-if "current_chat" not in st.session_state:
+if "current_chat" not in st.session_state or st.session_state.current_chat not in st.session_state.chats:
     st.session_state.current_chat = list(st.session_state.chats.keys())[0]
 
 if "input_buffer" not in st.session_state:
@@ -87,20 +100,29 @@ if "memory_vault" not in st.session_state:
 if "bookmarks" not in st.session_state:
     st.session_state.bookmarks = []
 
-# UPGRADE #60: Session Telemetry Tracker
+# UPGRADE #60: Workspace Telemetry Tracker
 if "telemetry" not in st.session_state:
-    st.session_state.telemetry = {"requests": 0, "est_tokens": 0, "last_latency": 0.0}
+    st.session_state.telemetry = {
+        "requests": 0, 
+        "est_tokens": 0, 
+        "last_latency": 0.0
+    }
 
-from openai import OpenAI
 
-# Initialize OpenRouter Client for Vision
-OPENROUTER_KEY = st.secrets.get("OPENROUTER_API_KEY", None)
+# ==============================================================================
+# CLIENT & CLIENT SECRET INITIALIZATIONS
+# ==============================================================================
+OPENROUTER_KEY = st.secrets.get("OPENROUTER_API_KEY", os.getenv("OPENROUTER_API_KEY", ""))
 
 if OPENROUTER_KEY:
-    openrouter_client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=OPENROUTER_KEY,
-    )
+    try:
+        openrouter_client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=OPENROUTER_KEY,
+        )
+    except Exception as err:
+        print(f"⚠️ [CLIENT ERROR] Could not initialize OpenRouter client: {err}")
+        openrouter_client = None
 else:
     openrouter_client = None
 
