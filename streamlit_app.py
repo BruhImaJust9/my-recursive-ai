@@ -105,72 +105,139 @@ else:
     openrouter_client = None
 
 
-# ==========================================
-# 1. UPGRADES #33 & #48: LATEX & SYNTAX AUTO-REPAIR ENGINE
-# ==========================================
+import re
+import io
+import base64
+import tempfile
+from datetime import datetime
+
+# ==============================================================================
+# UPGRADES #33 & #48: LATEX & SYNTAX AUTO-REPAIR ENGINE
+# ==============================================================================
 def sanitize_and_repair_formatting(text: str) -> str:
-    """UPGRADES #33 & #48: Automatically fixes LaTeX math syntax, normalizes
-    markdown, and repairs broken list formatting.
+    """Automatically fixes LaTeX math syntax, normalizes markdown spacing,
+    repairs broken list formatting, and strips unwanted retrieval disclaimers.
     """
     if not text:
         return ""
 
-    # Fix display math syntax: \[ ... \] -> $$ ... $$
-    text = re.sub(r"\\\[\s*(.*?)\s*\\\]", r"$$\1$$", text, flags=re.DOTALL)
+    # 1. Standardize Display Math Syntax: \[ ... \] -> $$ ... $$
+    text = re.sub(r"\\\[\s*([\s\S]*?)\s*\\\]", r"$$\1$$", text)
 
-    # Fix inline math syntax: \( ... \) -> $ ... $
-    text = re.sub(r"\\\(\s*(.*?)\s*\\\)", r"$\1$", text, flags=re.DOTALL)
+    # 2. Standardize Inline Math Syntax: \( ... \) -> $ ... $
+    text = re.sub(r"\\\(\s*([\s\S]*?)\s*\\\)", r"$\1$", text)
 
-    # Remove awkward search artifact disclaimers if present
-    text = re.sub(
+    # 3. Repair Broken Markdown Lists (e.g., "word* bullet" -> "word\n* bullet")
+    text = re.sub(r"([^\n])\n?(\s*[*|-]\s+[A-Za-z0-9])", r"\1\n\2", text)
+    text = re.sub(r"([^\n])\n?(\s*\d+\.\s+[A-Za-z0-9])", r"\1\n\2", text)
+
+    # 4. Remove Search Artifacts & Meta-Disclaimers
+    search_disclaimers = [
         r"The provided search results do not directly address.*?\n",
-        "",
-        text,
-        flags=re.IGNORECASE,
-    )
+        r"Based on the search results provided.*?\n",
+        r"According to the retrieved sources.*?\n"
+    ]
+    for pattern in search_disclaimers:
+        text = re.sub(pattern, "", text, flags=re.IGNORECASE)
+
+    # 5. Clean multi-line whitespace padding
+    text = re.sub(r"\n{3,}", "\n\n", text)
 
     return text.strip()
 
-def export_chat_as_markdown(chat_list) -> str:
-    md_content = "# Chat Session Export\n\n"
+
+# ==============================================================================
+# CHAT EXPORT PIPELINE (FRONTIER MARKDOWN GENERATOR)
+# ==============================================================================
+def export_chat_as_markdown(chat_list: list, title: str = "Chat Session") -> str:
+    """Converts structured chat history into clean, standardized Markdown 
+    complete with ISO header metadata and formatted message blocks.
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    md_content = [
+        f"# 📄 {title}",
+        f"**Exported On:** {timestamp}  ",
+        f"**Total Messages:** {len(chat_list)}  ",
+        "\n---\n"
+    ]
+
     for msg in chat_list:
-        role = "### 👤 User" if msg["role"] == "user" else "### 🤖 Assistant"
-        md_content += f"{role}\n{msg['content']}\n\n---\n\n"
-    return md_content
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
 
-# Grab active chat messages safely from session state (or default to empty list)
-active_chat_list = st.session_state.get("messages", [])
+        # Handle structural content payloads (e.g. lists or dicts) safely
+        if isinstance(content, list):
+            # Extract plain text segments if multimodal format is used
+            extracted = []
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    extracted.append(item.get("text", ""))
+            content = "\n".join(extracted) if extracted else str(content)
+        elif not isinstance(content, str):
+            content = str(content)
 
-md_data = export_chat_as_markdown(active_chat_list)
-st.sidebar.download_button(
-    label="📥 Export Chat (.md)",
-    data=md_data,
-    file_name="chat_history.md",
-    mime="text/markdown"
-)
+        header = "### 👤 User" if role == "user" else "### 🤖 Assistant"
+        md_content.append(f"{header}\n\n{content.strip()}\n\n---\n")
 
-def enhance_prompt(raw_prompt: str) -> str:
-    return (
-        f"Expand the following request into a clear, detailed, and structured prompt, "
-        f"specifying context, desired formatting, and constraints:\n\n'{raw_prompt}'"
-    )
-
-# Can be run via slash command or a UI button
-    if user_input.lower().startswith("/enhance "):
-        lazy_prompt = user_input.replace("/enhance ", "").strip()
-        enhanced_prompt = enhance_prompt(lazy_prompt)
-        # Send enhanced_prompt directly to your LLM generator
+    return "\n".join(md_content)
 
 
+# Streamlit Download Button Helper
+def render_chat_export_ui():
+    """UI Helper to render the Markdown download action safely in the sidebar."""
+    active_chat_list = st.session_state.get("messages", [])
+    current_title = st.session_state.get("current_chat", "Chat Session")
+
+    if active_chat_list:
+        md_data = export_chat_as_markdown(active_chat_list, title=current_title)
+        st.sidebar.download_button(
+            label="📥 Export Chat (.md)",
+            data=md_data,
+            file_name=f"{re.sub(r'[^a-zA-Z0-9_-]', '_', current_title).lower()}_export.md",
+            mime="text/markdown",
+            use_container_width=True
+        )
+
+
+# ==============================================================================
+# UPGRADE #61: TEXT-TO-SPEECH AUDIO PIPELINE
+# ==============================================================================
 def generate_tts_audio(text: str, speed_factor: float = 1.0) -> str:
-    """Helper for TTS Generation (UPGRADE #61: Enhanced with playback parameters)."""
+    """Strips markdown/code syntax and converts text into spoken audio.
+    
+    Returns temporary file path for UI audio playback widget.
+    """
+    if not text or not text.strip():
+        return None
+
     try:
-        clean_text = re.sub(r"[*_#`$]", "", text)[:300]
+        # 1. Clean markdown, LaTeX, and code snippets for spoken clarity
+        clean_text = text
+        clean_text = re.sub(r"```[\s\S]*?```", " [code block omitted] ", clean_text)  # Remove raw code
+        clean_text = re.sub(r"`.*?`", "", clean_text)                                 # Remove inline code
+        clean_text = re.sub(r"\$\$.*?\$\$", " [equation] ", clean_text)              # Remove display math
+        clean_text = re.sub(r"\$.*?\$", " [math] ", clean_text)                       # Remove inline math
+        clean_text = re.sub(r"\[(.*?)\]\((.*?)\)", r"\1", clean_text)                # Keep link text, strip URL
+        clean_text = re.sub(r"[*_#~>]", "", clean_text)                                # Strip formatting symbols
+        clean_text = re.sub(r"\s+", " ", clean_text).strip()                          # Collapse extra spaces
+
+        # Limit to first 400 characters for high-speed speech output
+        clean_text = clean_text[:400]
+
+        if not clean_text:
+            return None
+
+        # 2. Render speech via gTTS
         tts = gTTS(text=clean_text, lang="en", slow=(speed_factor < 1.0))
-        fp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-        tts.save(fp.name)
-        return fp.name
+        
+        # 3. Save safely to temp file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+            tts.save(fp.name)
+            return fp.name
+
     except Exception:
+        # Fail gracefully if speech generation is interrupted or offline
         return None
 
 
