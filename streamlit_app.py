@@ -1018,6 +1018,38 @@ if user_input and client:
             if doc_context:
                 system_prompt += f"\n\n[USER ATTACHED FILE CONTEXT]:\n{doc_context[:4000]}"
 
+            # --- RAG DOCUMENT CONTEXT INJECTION ---
+            if doc_context:
+                # 1. Chunk document into 500-word segments
+                raw_words = doc_context.split()
+                chunk_size = 500
+                doc_chunks = [
+                    " ".join(raw_words[i : i + chunk_size])
+                    for i in range(0, len(raw_words), chunk_size)
+                ]
+
+                # 2. Score chunks based on keyword matching with user prompt
+                prompt_keywords = set(processed_prompt.lower().split())
+                scored_chunks = []
+                
+                for chunk in doc_chunks:
+                    score = sum(1 for word in prompt_keywords if word in chunk.lower())
+                    scored_chunks.append((score, chunk))
+                
+                # Sort chunks by highest relevance score
+                scored_chunks.sort(key=lambda x: x[0], reverse=True)
+                top_retrieved_chunks = [c[1] for c in scored_chunks[:3]]
+                rag_payload = "\n\n--- NEXT RETRIEVED CHUNK ---\n\n".join(top_retrieved_chunks)
+
+                # 3. Inject RAG payload into system context
+                system_prompt += (
+                    f"\n\n[RETRIEVAL-AUGMENTED GENERATION CONTEXT]:\n"
+                    f"The user has uploaded a document. Here are the most relevant sections retrieved for their query:\n"
+                    f"'''\n{rag_payload}\n'''\n"
+                    f"CRITICAL INSTRUCTION: Use the retrieved document context above to accurately answer "
+                    f"the user's questions. If the answer is contained in the text, highlight key facts directly."
+                )
+
             # Construct clean standard system payload
             messages_payload = [{"role": "system", "content": system_prompt}]
 
