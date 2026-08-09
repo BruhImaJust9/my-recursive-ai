@@ -976,42 +976,23 @@ if user_input and client:
 
            # Check if user uploaded an image for Vision analysis
             if image_base64:
-                try:
-                    prompt_text = user_input.strip() if user_input.strip() else "Describe and analyze this image in detail."
-
-                    # Clean payload for Groq Vision (User role only, no system message)
-                    vision_messages = [
-                        {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": prompt_text
-                                },
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                        "url": f"data:{image_mime_type};base64,{image_base64}"
-                                    }
-                                }
-                            ]
-                        }
-                    ]
-                    
-                    with st.spinner("👁️ Analyzing image with Groq Vision..."):
-                        response = client.chat.completions.create(
-                            model="llama-3.2-11b-vision-preview",
-                            messages=vision_messages,
-                            temperature=active_temperature,
-                            stream=False
-                        )
-                        final_reply = response.choices[0].message.content
-                        st.markdown(final_reply)
-                        active_chat_list.append({"role": "assistant", "content": final_reply})
-
-                except Exception as vision_err:
-                    st.error(f"⚠️ Groq Vision Error: {vision_err}")
-                    st.info("💡 Tip: Groq vision models have strict rate limits on free tiers. Try again in a minute or test with a smaller image!")
+                st.info("📷 Image attached!")
+                st.warning(
+                    "⚠️ Groq has decommissioned their Llama 3.2 Vision API endpoints, "
+                    "so live image reading is currently paused on Groq's servers."
+                )
+                
+                # Treat user input as a regular chat message without trying to send image bytes to Groq
+                messages_payload.append({"role": "user", "content": user_input if user_input else "I uploaded an image."})
+                
+                response = client.chat.completions.create(
+                    model=selected_model,
+                    messages=messages_payload,
+                    temperature=active_temperature,
+                )
+                final_reply = response.choices[0].message.content
+                st.markdown(final_reply)
+                active_chat_list.append({"role": "assistant", "content": final_reply})
                     
                     # Standard text fallback
                     fallback_prompt = f"[User attached an image file: {uploaded_file.name}]. User question: {user_input}"
