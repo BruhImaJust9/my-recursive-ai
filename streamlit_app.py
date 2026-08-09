@@ -652,13 +652,21 @@ with st.sidebar:
     st.markdown("---")
     st.header("📄 File Attachment Context")
     uploaded_file = st.file_uploader(
-        "Upload TXT, CSV or Code snippet:", type=["txt", "py", "js", "md", "csv"]
+        "Upload TXT, CSV, Code snippet, or Image:", 
+        type=["txt", "py", "js", "md", "csv", "jpg", "png", "jpeg"]  # 👈 Added image extensions
     )
     doc_context = ""
+    image_base64 = None  # 👈 Store base64 image data for vision model
+    
     if uploaded_file is not None:
         try:
-            if uploaded_file.name.endswith(".csv"):
-                # UPGRADE #58: Data Inspector
+            if uploaded_file.name.lower().endswith((".jpg", ".png", ".jpeg")):
+                # Convert image to base64 for LLM Vision processing
+                import base64
+                bytes_data = uploaded_file.read()
+                image_base64 = base64.b64encode(bytes_data).decode("utf-8")
+                st.image(uploaded_file, caption="📷 Image loaded into vision context", use_container_width=True)
+            elif uploaded_file.name.endswith(".csv"):
                 df_upload = pd.read_csv(uploaded_file)
                 st.markdown("#### 🔍 CSV File Summary")
                 st.write(f"**Rows:** {df_upload.shape[0]} | **Cols:** {df_upload.shape[1]}")
@@ -667,8 +675,8 @@ with st.sidebar:
             else:
                 doc_context = uploaded_file.read().decode("utf-8")
                 st.success("File context loaded!")
-        except Exception:
-            st.error("Error reading file!")
+        except Exception as e:
+            st.error(f"Error reading file: {e}")
 
     st.markdown("---")
     st.header("🧠 Memory Vault Facts")
