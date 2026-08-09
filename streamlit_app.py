@@ -748,39 +748,80 @@ def needs_automatic_search(user_text):
         
     return False
 
-# ==========================================
-# 5. UI CONFIG & MAIN APP LOOP
-# ==========================================
-st.set_page_config(page_title="AI Workspace", page_icon="🤖", layout="wide")
+import os
+import re
+import json
+import base64
+import mimetypes
+import pandas as pd
+import streamlit as st
+from groq import Groq
 
+# ==============================================================================
+# 5. UI CONFIG & SESSION STATE INITIALIZATION
+# ==============================================================================
+st.set_page_config(
+    page_title="AI Workspace",
+    page_icon="🤖",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Modern Custom CSS Styling
 st.markdown(
-    "<style>"
-    "iframe[title*='audio_recorder'], iframe[src*='audio_recorder'] {"
-    "background-color: transparent !important; border: none !important;"
-    "}"
-    "div[data-testid='stCustomComponentV1'] {"
-    "background-color: transparent !important; border: none !important; padding: 0 !important;"
-    "}"
-    "div[data-testid='column'] button {"
-    "border: none !important; background: transparent !important; color: #888888 !important;"
-    "font-size: 0.8rem !important; padding: 2px 8px !important; border-radius: 6px !important;"
-    "}"
-    "div[data-testid='column'] button:hover {"
-    "background-color: rgba(255, 255, 255, 0.08) !important; color: #ffffff !important;"
-    "}"
-    ".model-badge {"
-    "background: rgba(255, 255, 255, 0.08); padding: 4px 10px; border-radius: 12px;"
-    "font-size: 0.75rem; color: #aaa; border: 1px solid rgba(255, 255, 255, 0.1);"
-    "}"
-    "</style>",
+    """
+    <style>
+    iframe[title*='audio_recorder'], iframe[src*='audio_recorder'] {
+        background-color: transparent !important; 
+        border: none !important;
+    }
+    div[data-testid='stCustomComponentV1'] {
+        background-color: transparent !important; 
+        border: none !important; 
+        padding: 0 !important;
+    }
+    div[data-testid='column'] button {
+        border: none !important; 
+        background: transparent !important; 
+        color: #888888 !important;
+        font-size: 0.8rem !important; 
+        padding: 2px 8px !important; 
+        border-radius: 6px !important;
+    }
+    div[data-testid='column'] button:hover {
+        background-color: rgba(255, 255, 255, 0.08) !important; 
+        color: #ffffff !important;
+    }
+    .model-badge {
+        background: rgba(255, 255, 255, 0.08); 
+        padding: 4px 10px; 
+        border-radius: 12px;
+        font-size: 0.75rem; 
+        color: #aaa; 
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    </style>
+    """,
     unsafe_allow_html=True,
 )
 
+# Ensure Session State Keys Exist
+if "chats" not in st.session_state:
+    st.session_state.chats = {"Chat 1": []}
+
+if "current_chat" not in st.session_state or st.session_state.current_chat not in st.session_state.chats:
+    st.session_state.current_chat = list(st.session_state.chats.keys())[0]
+
+if "memory_vault" not in st.session_state:
+    st.session_state.memory_vault = []
+
+# Title & App Header
 st.title("🤖 Intelligent AI Workspace")
 st.caption(
-    "Enhanced with Upgrades #31–#63: Epistemic Physics Guardrails, Live Code Debugger & Dynamic Workspace Telemetry"
+    "Enhanced with Epistemic Physics Guardrails, Live RAG Context & Dynamic Workspace Telemetry"
 )
 
+# API Key Check & Client Setup
 GROQ_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
 
 if GROQ_KEY:
@@ -789,18 +830,24 @@ else:
     client = None
     st.warning("⚠️ Missing `GROQ_API_KEY` in Streamlit secrets!")
 
-# Sidebar Controls
+# ==============================================================================
+# SIDEBAR CONTROLS & WORKSPACE MANAGER
+# ==============================================================================
 with st.sidebar:
     st.header("⚙️ Workspace Controls")
     st.markdown("---")
 
-    # Thread Controls
+    # 1. Thread Management
     st.header("💬 Chat Sessions")
     chat_names = list(st.session_state.chats.keys())
+    
+    # Safe index lookup for the active thread
+    current_index = chat_names.index(st.session_state.current_chat) if st.session_state.current_chat in chat_names else 0
+
     selected_chat = st.selectbox(
         "Select Thread:",
         chat_names,
-        index=chat_names.index(st.session_state.current_chat),
+        index=current_index,
     )
 
     if selected_chat != st.session_state.current_chat:
@@ -814,6 +861,8 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("---")
+
+    # 2. Model Parameters
     target_language = st.selectbox(
         "Response Language:",
         ["English", "Spanish", "French", "German", "Mandarin", "Japanese"],
@@ -837,74 +886,104 @@ with st.sidebar:
     )
 
     st.markdown("---")
+
+    # 3. File Context & Multimodal Ingestion Pipeline
     st.header("📄 File Attachment Context")
     uploaded_file = st.file_uploader(
-        "Upload TXT, CSV, Code snippet, or Image:", 
-        type=["txt", "py", "js", "md", "csv", "jpg", "png", "jpeg"]
+        "Upload TXT, CSV, Code, or Image:", 
+        type=["txt", "py", "js", "md", "csv", "jpg", "png", "jpeg", "webp"]
     )
+    
     doc_context = ""
     image_base64 = None 
-    image_mime_type = "image/jpeg"  # Default fallback
-    
+    image_mime_type = "image/jpeg"
+
     if uploaded_file is not None:
         try:
             filename = uploaded_file.name.lower()
-            if filename.endswith((".jpg", ".png", ".jpeg")):
-                import base64
-                # Detect correct mime type
-                if filename.endswith(".png"):
-                    image_mime_type = "image/png"
-                elif filename.endswith((".jpg", ".jpeg")):
-                    image_mime_type = "image/jpeg"
+            
+            # Robust Image Processing
+            if filename.endswith((".jpg", ".png", ".jpeg", ".webp")):
+                mime_guess, _ = mimetypes.guess_type(uploaded_file.name)
+                image_mime_type = mime_guess if mime_guess else "image/jpeg"
 
-                # Read raw bytes safely
                 uploaded_file.seek(0)
                 bytes_data = uploaded_file.read()
                 image_base64 = base64.b64encode(bytes_data).decode("utf-8")
-                st.image(uploaded_file, caption="📷 Image loaded into vision context", use_container_width=True)
+                st.image(uploaded_file, caption="📷 Loaded into Vision Context", use_container_width=True)
+            
+            # CSV Analysis & Summarization
             elif filename.endswith(".csv"):
                 df_upload = pd.read_csv(uploaded_file)
                 st.markdown("#### 🔍 CSV File Summary")
-                st.write(f"**Rows:** {df_upload.shape[0]} | **Cols:** {df_upload.shape[1]}")
+                st.write(f"**Rows:** {df_upload.shape[0]:,} | **Cols:** {df_upload.shape[1]}")
                 st.dataframe(df_upload.head(3), use_container_width=True)
-                doc_context = f"CSV Data Summary:\nColumns: {list(df_upload.columns)}\nData Sample:\n{df_upload.head(10).to_csv(index=False)}"
+                
+                doc_context = (
+                    f"CSV File Summary ({uploaded_file.name}):\n"
+                    f"Columns: {list(df_upload.columns)}\n"
+                    f"Data Head:\n{df_upload.head(10).to_csv(index=False)}"
+                )
+            
+            # Plain Text / Code Processing
             else:
                 uploaded_file.seek(0)
-                doc_context = uploaded_file.read().decode("utf-8")
-                st.success("File context loaded!")
+                doc_context = uploaded_file.read().decode("utf-8", errors="replace")
+                st.success(f"📄 Loaded text context ({len(doc_context.split()):,} words)")
+
         except Exception as e:
             st.error(f"Error reading file: {e}")
 
     st.markdown("---")
+
+    # 4. Memory Vault Management
     st.header("🧠 Memory Vault Facts")
-    new_memory_fact = st.text_input("Add Persistent Fact:", key="memory_input")
-    if st.button("Save Memory Fact") and new_memory_fact:
-        st.session_state.memory_vault.append(new_memory_fact)
-        st.success(f"Remembered: '{new_memory_fact}'")
+    new_memory_fact = st.text_input("Add Persistent Fact:", key="memory_input_field")
+    
+    if st.button("Save Memory Fact", use_container_width=True) and new_memory_fact.strip():
+        st.session_state.memory_vault.append(new_memory_fact.strip())
+        st.success(f"Remembered: '{new_memory_fact.strip()}'")
         st.rerun()
 
     if st.session_state.memory_vault:
         for idx, fact in enumerate(st.session_state.memory_vault):
             col_m1, col_m2 = st.columns([8, 2])
-            col_m1.caption(f"- {fact}")
-            if col_m2.button("❌", key=f"del_mem_{idx}"):
+            col_m1.caption(f"• {fact}")
+            if col_m2.button("❌", key=f"del_mem_fact_{idx}"):
                 st.session_state.memory_vault.pop(idx)
                 st.rerun()
+                
+        if st.button("🧹 Clear All Memories", use_container_width=True):
+            st.session_state.memory_vault = []
+            st.rerun()
     else:
         st.caption("No custom memory facts saved yet.")
 
-    # UPGRADE #59: Live Thread Export Engine
+    # 5. Live Thread Export Engine
     st.markdown("---")
-    st.header("📥 Workspace Thread Export")
+    st.header("📥 Thread Export Options")
     export_chat = st.session_state.chats.get(st.session_state.current_chat, [])
-    chat_export_str = json.dumps(export_chat, indent=2)
+    
+    # JSON Export
+    chat_export_json = json.dumps(export_chat, indent=2)
     st.download_button(
-        label="Download Chat (JSON)",
-        data=chat_export_str,
-        file_name=f"{st.session_state.current_chat}.json",
+        label="Download Chat (.json)",
+        data=chat_export_json,
+        file_name=f"{re.sub(r'[^a-zA-Z0-9_-]', '_', st.session_state.current_chat).lower()}.json",
         mime="application/json",
         use_container_width=True,
     )
+
+    # Markdown Export (if export function exists)
+    if "export_chat_as_markdown" in globals():
+        chat_export_md = export_chat_as_markdown(export_chat, title=st.session_state.current_chat)
+        st.download_button(
+            label="Download Chat (.md)",
+            data=chat_export_md,
+            file_name=f"{re.sub(r'[^a-zA-Z0-9_-]', '_', st.session_state.current_chat).lower()}.md",
+            mime="text/markdown",
+            use_container_width=True,
+        )
 
     # UPGRADE #60: Session Telemetry
     st.markdown("---")
