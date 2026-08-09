@@ -91,6 +91,19 @@ if "bookmarks" not in st.session_state:
 if "telemetry" not in st.session_state:
     st.session_state.telemetry = {"requests": 0, "est_tokens": 0, "last_latency": 0.0}
 
+from openai import OpenAI
+
+# Initialize OpenRouter Client for Vision
+OPENROUTER_KEY = st.secrets.get("OPENROUTER_API_KEY", None)
+
+if OPENROUTER_KEY:
+    openrouter_client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=OPENROUTER_KEY,
+    )
+else:
+    openrouter_client = None
+
 
 # ==========================================
 # 1. UPGRADES #33 & #48: LATEX & SYNTAX AUTO-REPAIR ENGINE
