@@ -856,6 +856,37 @@ def classify_user_intent(prompt, client, model_name):
 
     return "CHAT"
 
+# ==============================================================================
+# FEATURE #3: DOCUMENT CANVAS UI PANEL
+# ==============================================================================
+if doc_context:
+    with st.expander("📄 **Document Canvas & RAG Inspector**", expanded=True):
+        col_canvas1, col_canvas2 = st.columns([3, 1])
+        
+        with col_canvas1:
+            st.markdown("### 📝 Loaded Document Context")
+            # Scrollable code/text canvas viewer
+            st.text_area(
+                label="Document Content Preview",
+                value=doc_context[:2000] + ("..." if len(doc_context) > 2000 else ""),
+                height=180,
+                disabled=True,
+                label_visibility="collapsed"
+            )
+            
+        with col_canvas2:
+            st.markdown("### 📊 Metrics")
+            word_count = len(doc_context.split())
+            char_count = len(doc_context)
+            
+            st.metric("Total Words", f"{word_count:,}")
+            st.metric("Total Characters", f"{char_count:,}")
+            
+            if st.button("🧹 Clear Document Context"):
+                doc_context = ""
+                st.session_state.pop("doc_context", None)
+                st.rerun()
+
 # Input Execution Pipeline
 user_input = st.chat_input("Ask anything, use /search, /image, /debug, or /enhance...")
 if st.session_state.input_buffer and not user_input:
