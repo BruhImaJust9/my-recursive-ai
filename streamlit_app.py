@@ -167,6 +167,77 @@ def sanitize_and_repair_formatting(text: str) -> str:
 
     return text.strip()
 
+# ==============================================================================
+# UPGRADE #58: DYNAMIC CHAT HISTORY & ACTION TOOLBAR RENDERER
+# ==============================================================================
+def render_chat_history_thread(active_chat_list: list, client=None) -> None:
+    """Renders the entire conversation thread with inline LaTeX repair,
+    multimodal image/audio attachments, and assistant action toolbars.
+    """
+    if not active_chat_list:
+        st.info("👋 Welcome! Start a conversation or pick a command below.")
+        return
+
+    for msg_idx, msg in enumerate(active_chat_list):
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        
+        # Determine avatar display icon
+        avatar = "👤" if role == "user" else "🤖"
+
+        with st.chat_message(role, avatar=avatar):
+            # 1. Handle Multimodal Input (Text + Image Payloads)
+            if isinstance(content, list):
+                for part in content:
+                    if isinstance(part, dict):
+                        if part.get("type") == "text":
+                            raw_text = part.get("text", "")
+                            clean_text = (
+                                sanitize_and_repair_formatting(raw_text)
+                                if "sanitize_and_repair_formatting" in globals()
+                                else raw_text
+                            )
+                            st.markdown(clean_text)
+                            
+                        elif part.get("type") == "image_url":
+                            image_url = part.get("image_url", {}).get("url", "")
+                            if image_url:
+                                st.image(image_url, caption="Attached Image", use_container_width=True)
+            else:
+                # 2. Standard Text Rendering with Formatting Auto-Repair
+                clean_text = (
+                    sanitize_and_repair_formatting(str(content))
+                    if "sanitize_and_repair_formatting" in globals()
+                    else str(content)
+                )
+                st.markdown(clean_text)
+
+            # 3. Assistant Message Action Toolbar & Interactive Elements
+            if role == "assistant":
+                # Render Inline Code Executor if code blocks exist in text
+                if "render_interactive_code_runner" in globals():
+                    render_interactive_code_runner(clean_text, msg_idx)
+
+                # Interactive Action Bar (TTS & Utility Actions)
+                col_tb1, col_tb2, col_tb3 = st.columns([2, 2, 8])
+                
+                with col_tb1:
+                    # Text-to-Speech Action Button
+                    tts_key = f"tts_btn_{msg_idx}"
+                    if st.button("🔊 Listen", key=tts_key, help="Generate spoken audio"):
+                        if "generate_tts_audio" in globals():
+                            with st.spinner("Generating speech..."):
+                                audio_path = generate_tts_audio(clean_text)
+                                if audio_path:
+                                    st.audio(audio_path, format="audio/mp3")
+                                else:
+                                    st.error("Audio generation unavailable.")
+
+                with col_tb2:
+                    # Model Badge / Telemetry Label
+                    model_label = msg.get("model", "Llama 3.3")
+                    st.markdown(f"<span class='model-badge'>{model_label}</span>", unsafe_allow_html=True)
+
 
 # ==============================================================================
 # CHAT EXPORT PIPELINE (FRONTIER MARKDOWN GENERATOR)
