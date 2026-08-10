@@ -256,6 +256,43 @@ def render_sidebar_telemetry_widget() -> None:
             st.rerun()
 
 # ==============================================================================
+# UPGRADE #66: FRONTIER AGENTIC REASONING & COMPREHENSIVE ANALYSIS ENGINE
+# ==============================================================================
+def inject_analytical_thinking_engine(user_prompt: str, client, model_name: str = "llama-3.3-70b-versatile") -> str:
+    """Forces the LLM to abandon standard 'short-answer' mode in favor of 
+    structured multi-factor analysis, probabilistic estimations, and deep reasoning.
+    """
+    
+    SYSTEM_SOUCE_PROMPT = (
+        "You are a World-Class Strategic Analyst, Educational Consultant, and Systems Engineer.\n"
+        "Your goal is to provide deep, beautifully formatted, multi-perspective answers that "
+        "explain THE WHY behind every conclusion.\n\n"
+        
+        "CRITICAL RESPONSE DIRECTIVES:\n"
+        "1. NEVER give a lazy one-sentence answer. Always break down complex prompts into logical tiers.\n"
+        "2. USE STRUCTURAL BREAKDOWNS: Use bold headers, numbered logic chains, bullet points, and percentage/probability matrices.\n"
+        "3. EVALUATE CONTRADICTORY DATA: If input contains mixed signals (e.g., high test scores vs. average grades), explicitely detail the tension between those variables.\n"
+        "4. ESTIMATE PROBABILITIES: When exact outcomes are unknown, provide percentage-based estimations with rationale for each tier.\n"
+        "5. PROACTIVE FOLLOW-UPS: End deep analyses with an engaging, highly relevant question or invitation to explore edge cases.\n"
+        "6. TONE: Intelligent, empathetic, grounded, and engaging with clean structural clarity."
+    )
+
+    try:
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": SYSTEM_SOUCE_PROMPT},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.6,  # Perfect balance between creative reasoning and deterministic logic
+            max_tokens=2500,
+        )
+        return response.choices[0].message.content.strip()
+
+    except Exception as e:
+        return f"❌ Execution Error in Reasoning Engine: {str(e)}"
+
+# ==============================================================================
 # UPGRADE #58: DYNAMIC CHAT HISTORY & ACTION TOOLBAR RENDERER
 # ==============================================================================
 def render_chat_history_thread(active_chat_list: list, client=None) -> None:
