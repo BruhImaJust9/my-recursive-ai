@@ -269,6 +269,67 @@ def perform_live_search(query: str) -> str:
             status.update(label="❌ Search failed", state="error", expanded=False)
             return f"Search error: {str(e)}"
 
+import time
+import streamlit as st
+import openai
+
+def smart_model_router(prompt: str, client, preferred_model: str = "llama-3.3-70b-versatile") -> str:
+    """
+    Production-Grade Smart Router:
+    1. Analyzes prompt complexity to pick the cheapest/fastest optimal model.
+    2. Executes the call with streaming UI output.
+    3. Provides automatic fallback to backup models if the main provider fails.
+    """
+    # 1. Complexity Heuristic Check
+    prompt_len = len(prompt.split())
+    is_complex = any(kw in prompt.lower() for kw in [
+        "code", "refactor", "analyze", "explain in detail", "architecture", "compare", "math"
+    ]) or prompt_len > 120
+
+    # 2. Select Optimal Model Tier
+    if is_complex:
+        primary_model = preferred_model  # Heavyweight model
+        backup_model = "gpt-4o-mini"
+    else:
+        primary_model = "llama-3.1-8b-instant"  # Lightning-fast lightweight model
+        backup_model = preferred_model
+
+    # Helper function to attempt completion call
+    def attempt_completion(model_name: str):
+        return client.chat.completions.create(
+            model=model_name,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            stream=True
+        )
+
+    # 3. Execution with Automatic Fallback & Streaming
+    response_container = st.empty()
+    full_response = ""
+
+    try:
+        # Try Primary Selected Model
+        stream = attempt_completion(primary_model)
+        st.caption(f"⚡ Routed to: `{primary_model}`")
+    except Exception as primary_error:
+        # Failover to Backup Model if Primary Fails
+        st.warning(f"⚠️ `{primary_model}` unavailable. Failing over to `{backup_model}`...")
+        try:
+            stream = attempt_completion(backup_model)
+            st.caption(f"🛡️ Routed to Backup: `{backup_model}`")
+        except Exception as fallback_error:
+            st.error("❌ All model providers are currently unreachable.")
+            return f"Error: {str(fallback_error)}"
+
+    # 4. Stream response to UI in real-time
+    for chunk in stream:
+        content = chunk.choices[0].delta.content or ""
+        full_response += content
+        response_container.markdown(full_response + "▌")
+
+    response_container.markdown(full_response)
+    return full_response
+
 # ==============================================================================
 # UPGRADE #65: LIVE DYNAMIC WORKSPACE TELEMETRY & BENCHMARKER
 # ==============================================================================
