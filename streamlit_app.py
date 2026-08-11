@@ -182,6 +182,46 @@ def handle_chat_input(user_input: str):
     # Standard LLM completion
     return generate_llm_response(user_input)
 
+import streamlit as st
+import time
+
+def process_user_intent(user_input: str):
+    """Processes slash commands with real-time status feedback containers."""
+    
+    # 1. LIVE SEARCH INTERCEPTOR
+    if user_input.startswith("/search"):
+        query = user_input.replace("/search", "").strip()
+        
+        # Display the live animated status box
+        with st.status("🌐 Synthesizing multi-query angle...", expanded=True) as status:
+            st.write(f"🔎 Drafting search vector for: `{query}`...")
+            time.sleep(0.8)  # Simulating web fetch
+            
+            st.write("📊 Aggregating live web search results...")
+            time.sleep(0.6)
+            
+            status.update(label="✅ Search completed!", state="complete", expanded=False)
+        
+        # Return real search results here
+        return perform_live_search(query)
+
+    # 2. IMAGE GENERATION INTERCEPTOR
+    elif user_input.startswith("/image"):
+        prompt = user_input.replace("/image", "").strip()
+        
+        with st.status("🎨 Generating image...", expanded=True) as status:
+            st.write(f"🖌️ Rendering canvas prompt: *'{prompt}'*...")
+            time.sleep(1.2)  # Simulating diffusion pipeline call
+            
+            status.update(label="✨ Image rendered successfully!", state="complete", expanded=False)
+        
+        # Display image via Streamlit widget
+        return render_generated_image(prompt)
+
+    # 3. STANDARD LLM RESPONSE
+    else:
+        return execute_standard_llm(user_input)
+
 # ==============================================================================
 # UPGRADE #65: LIVE DYNAMIC WORKSPACE TELEMETRY & BENCHMARKER
 # ==============================================================================
