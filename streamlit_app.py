@@ -167,6 +167,21 @@ def sanitize_and_repair_formatting(text: str) -> str:
 
     return text.strip()
 
+def handle_chat_input(user_input: str):
+    # Intercept system/slash commands before passing to LLM
+    if user_input.startswith("/image"):
+        prompt = user_input.replace("/image", "").strip()
+        # Call DALL-E / Flux / Stable Diffusion API here
+        return render_generated_image(prompt)
+
+    elif user_input.startswith("/search"):
+        query = user_input.replace("/search", "").strip()
+        # Call Google Search / Tavily API here
+        return perform_live_search(query)
+
+    # Standard LLM completion
+    return generate_llm_response(user_input)
+
 # ==============================================================================
 # UPGRADE #65: LIVE DYNAMIC WORKSPACE TELEMETRY & BENCHMARKER
 # ==============================================================================
