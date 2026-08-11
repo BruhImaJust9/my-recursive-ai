@@ -1715,11 +1715,10 @@ elif detected_route == "ROUTE_SEARCH":
             st.markdown(assistant_response)
 
         # --- ROUTE D: STANDARD LLM COMPLETION ---
-        else:
+        else:  # <--- THE CATCH-ALL ELSE GOES AT THE VERY END
             if "stream_llm_response" in globals():
                 assistant_response = stream_llm_response(processed_prompt, active_temperature)
             else:
-                # Fallback simple complete call
                 completion = client.chat.completions.create(
                     model=st.session_state.get("selected_model", "gpt-4o"),
                     messages=[{"role": "user", "content": processed_prompt}],
