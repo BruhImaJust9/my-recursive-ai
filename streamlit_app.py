@@ -237,24 +237,57 @@ def render_telemetry_dashboard() -> None:
     )
 
 
+import streamlit as st
+
+# ==============================================================================
+# UPGRADE #65-B: SIDEBAR TELEMETRY WIDGET (PRODUCTION GRADE)
+# ==============================================================================
 def render_sidebar_telemetry_widget() -> None:
-    """Compact telemetry card optimized for the sidebar."""
+    """Renders a compact, real-time analytics card in the sidebar displaying
+    request velocity, token consumption, and model latency metrics.
+    """
+    # 1. Guarantee state initialization
     if "telemetry" not in st.session_state:
-        return
+        st.session_state.telemetry = {"requests": 0, "est_tokens": 0, "last_latency": 0.0}
 
     telemetry = st.session_state.telemetry
     reqs = telemetry.get("requests", 0)
     tokens = telemetry.get("est_tokens", 0)
     latency = telemetry.get("last_latency", 0.0)
 
-    with st.sidebar.expander("📈 **Live Telemetry**", expanded=False):
-        st.caption(f"**Requests Sent:** {reqs}")
-        st.caption(f"**Tokens Consumed:** {tokens:,}")
-        st.caption(f"**Last Response Time:** {latency:.2f}s")
-        if st.button("🧹 Reset Telemetry", key="reset_telemetry_btn", use_container_width=True):
-            st.session_state.telemetry = {"requests": 0, "est_tokens": 0, "last_latency": 0.0}
-            st.rerun()
+    # 2. Derived performance metrics
+    avg_tokens = round(tokens / reqs) if reqs > 0 else 0
+    
+    # Latency rating badge
+    if latency == 0.0:
+        latency_badge = "⏸️ Idle"
+    elif latency < 1.5:
+        latency_badge = "⚡ Fast"
+    elif latency < 3.5:
+        latency_badge = "🟢 Normal"
+    else:
+        latency_badge = "🟡 Slow"
 
+    # 3. Render Widget
+    with st.sidebar.expander("📈 **Live Telemetry**", expanded=False):
+        col_m1, col_m2 = st.columns(2)
+        
+        with col_m1:
+            st.metric("Requests", f"{reqs:,}")
+            st.metric("Avg Tkn/Req", f"{avg_tokens:,}")
+
+        with col_m2:
+            st.metric("Total Tokens", f"{tokens:,}")
+            st.metric("Latency", f"{latency:.2f}s", delta=latency_badge, delta_color="off")
+
+        st.markdown("---")
+
+        # Reset Telemetry Action
+        if st.button("🧹 Reset Telemetry", key="sidebar_reset_telemetry_btn", use_container_width=True):
+            st.session_state.telemetry = {"requests": 0, "est_tokens": 0, "last_latency": 0.0}
+            st.toast("Telemetry metrics reset!", icon="🧹")
+            st.rerun()
+            
 # ==============================================================================
 # UPGRADE #66: FRONTIER AGENTIC REASONING & COMPREHENSIVE ANALYSIS ENGINE
 # ==============================================================================
@@ -364,6 +397,11 @@ def render_chat_history_thread(active_chat_list: list, client=None) -> None:
                     st.markdown(f"<span class='model-badge'>{model_label}</span>", unsafe_allow_html=True)
 
 
+import re
+import tempfile
+from datetime import datetime
+import streamlit as st
+
 # ==============================================================================
 # CHAT EXPORT PIPELINE (FRONTIER MARKDOWN GENERATOR)
 # ==============================================================================
@@ -381,12 +419,14 @@ def export_chat_as_markdown(chat_list: list, title: str = "Chat Session") -> str
     ]
 
     for msg in chat_list:
+        if not isinstance(msg, dict):
+            continue
+
         role = msg.get("role", "user")
         content = msg.get("content", "")
 
         # Handle structural content payloads (e.g. lists or dicts) safely
         if isinstance(content, list):
-            # Extract plain text segments if multimodal format is used
             extracted = []
             for item in content:
                 if isinstance(item, dict) and item.get("type") == "text":
@@ -401,20 +441,25 @@ def export_chat_as_markdown(chat_list: list, title: str = "Chat Session") -> str
     return "\n".join(md_content)
 
 
-# Streamlit Download Button Helper
-def render_chat_export_ui():
+def render_chat_export_ui() -> None:
     """UI Helper to render the Markdown download action safely in the sidebar."""
-    active_chat_list = st.session_state.get("messages", [])
-    current_title = st.session_state.get("current_chat", "Chat Session")
+    current_chat_name = st.session_state.get("current_chat", "New Chat")
+    
+    # Safely fetch active chat thread
+    chats = st.session_state.get("chats", {})
+    active_chat_list = chats.get(current_chat_name, [])
 
     if active_chat_list:
-        md_data = export_chat_as_markdown(active_chat_list, title=current_title)
+        md_data = export_chat_as_markdown(active_chat_list, title=current_chat_name)
+        clean_filename = re.sub(r'[^a-zA-Z0-9_-]', '_', current_chat_name).lower()
+        
         st.sidebar.download_button(
             label="📥 Export Chat (.md)",
             data=md_data,
-            file_name=f"{re.sub(r'[^a-zA-Z0-9_-]', '_', current_title).lower()}_export.md",
+            file_name=f"{clean_filename}_export.md",
             mime="text/markdown",
-            use_container_width=True
+            use_container_width=True,
+            key="export_chat_md_btn"
         )
 
 
@@ -430,14 +475,21 @@ def generate_tts_audio(text: str, speed_factor: float = 1.0) -> str:
         return None
 
     try:
-        # 1. Clean markdown, LaTeX, and code snippets for spoken clarity
+        from gtts import gTTS
+    except ImportError:
+        print("⚠️ [TTS WARN] 'gTTS' package is not installed. Run 'pip install gTTS'.")
+        return None
+
+    try:
+        # 1. Clean markdown, LaTeX, HTML, and code snippets for spoken clarity
         clean_text = text
         clean_text = re.sub(r"```[\s\S]*?```", " [code block omitted] ", clean_text)  # Remove raw code
         clean_text = re.sub(r"`.*?`", "", clean_text)                                 # Remove inline code
         clean_text = re.sub(r"\$\$.*?\$\$", " [equation] ", clean_text)              # Remove display math
         clean_text = re.sub(r"\$.*?\$", " [math] ", clean_text)                       # Remove inline math
         clean_text = re.sub(r"\[(.*?)\]\((.*?)\)", r"\1", clean_text)                # Keep link text, strip URL
-        clean_text = re.sub(r"[*_#~>]", "", clean_text)                                # Strip formatting symbols
+        clean_text = re.sub(r"<.*?>", "", clean_text)                                # Strip raw HTML
+        clean_text = re.sub(r"[*_#~>]", "", clean_text)                               # Strip formatting symbols
         clean_text = re.sub(r"\s+", " ", clean_text).strip()                          # Collapse extra spaces
 
         # Limit to first 400 characters for high-speed speech output
@@ -454,10 +506,9 @@ def generate_tts_audio(text: str, speed_factor: float = 1.0) -> str:
             tts.save(fp.name)
             return fp.name
 
-    except Exception:
-        # Fail gracefully if speech generation is interrupted or offline
+    except Exception as err:
+        print(f"⚠️ [TTS ERROR] Speech synthesis failed: {err}")
         return None
-
 
 # ==========================================
 # 2. UPGRADE #32 & #34: MULTI-ANGLE SEARCH & FACT ENGINE
