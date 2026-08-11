@@ -1577,8 +1577,12 @@ if doc_context and doc_context.strip():
 import time
 import streamlit as st
 
+import time
+import re
+import streamlit as st
+
 # ==============================================================================
-# INPUT EXECUTION PIPELINE (FRONTIER DISPATCHER)
+# INPUT EXECUTION PIPELINE (FRONTIER DISPATCHER - PRODUCTION GRADE)
 # ==============================================================================
 user_input = st.chat_input("Ask anything, use /search, /image, /debug, or /enhance...")
 
@@ -1591,21 +1595,24 @@ if user_input and client:
     start_time = time.time()
 
     # 1. Thread Binding & Message Mutation
-    current_thread = st.session_state.current_chat
+    current_thread = st.session_state.get("current_chat", "New Chat")
+    if "chats" not in st.session_state:
+        st.session_state.chats = {}
     if current_thread not in st.session_state.chats:
         st.session_state.chats[current_thread] = []
     
     active_chat_list = st.session_state.chats[current_thread]
 
-    # 2. UPGRADE #62: Command Override & Prompt Enhancement Pipeline
+    # 2. Command Override & Prompt Enhancement Pipeline
     if user_input.lower().startswith("/enhance"):
         clean_prompt = re.sub(r"^/enhance\s*", "", user_input, flags=re.IGNORECASE).strip()
         if clean_prompt:
             with st.spinner("✨ Enhancing query structure..."):
-                user_input = enhance_user_prompt(clean_prompt, client)
-                st.info(f"**Enhanced Prompt:** {user_input}")
+                if "enhance_user_prompt" in globals():
+                    user_input = enhance_user_prompt(clean_prompt, client)
+                    st.info(f"**Enhanced Prompt:** {user_input}")
 
-    # Log user activity to backend cloud console
+    # Log user activity
     print(f"--- [USER ACTIVITY DETECTED] ---")
     print(f"Thread: {current_thread} | Input: {user_input[:100]}...")
 
@@ -1630,10 +1637,9 @@ if user_input and client:
 
     print(f"--- [AUTO-ROUTER] Active Route: {detected_route} ---")
 
-    # 4. Append User Message to Thread State
+    # 4. Append User Message to Thread State & Render Immediately
     active_chat_list.append({"role": "user", "content": user_input})
     
-    # Render user prompt immediately in UI stream
     with st.chat_message("user"):
         st.markdown(user_input)
 
@@ -1642,7 +1648,7 @@ if user_input and client:
     if "tadc" in lowered_input and "character" in lowered_input:
         processed_prompt += " (referring to the individuals/cast in the show 'The Amazing Digital Circus')"
 
-    # 6. Adaptive Temperature & Temperature Tuning
+    # 6. Adaptive Temperature & Style Tuning
     casual_triggers = {"hi", "hello", "hey", "howdy", "sup", "how are you", "what's up", "thanks", "thank you", "cool", "nice"}
     analytical_keywords = ["compare", "vs", "probability", "percent", "rate", "code", "architecture", "dyson", "kardashev", "refactor", "math"]
 
@@ -1658,9 +1664,69 @@ if user_input and client:
         detected_style = "GENERAL"
         active_temperature = 0.7
 
-    # 7. Render Assistant Context Window & Route Dispatcher
+    # 7. ROUTE DISPATCHER & ASSISTANT EXECUTION
     with st.chat_message("assistant"):
-        # Execution flow moves directly into route execution blocks...
+        assistant_response = ""
+
+        # --- ROUTE A: LIVE WEB SEARCH ---
+        if detected_route == "ROUTE_SEARCH":
+            query = re.sub(r"^/search\s*", "", user_input, flags=re.IGNORECASE).strip()
+            
+            if "perform_live_search" in globals():
+                search_results = perform_live_search(query)
+                augmented_prompt = f"Web Context:\n{search_results}\n\nUser Question: {query}"
+                
+                # Stream standard LLM completion using search context
+                if "stream_llm_response" in globals():
+                    assistant_response = stream_llm_response(augmented_prompt, active_temperature)
+                else:
+                    assistant_response = f"**Search Results for '{query}':**\n\n{search_results}"
+            else:
+                st.warning("⚠️ Live search tool function `perform_live_search` is not defined.")
+                assistant_response = "Search tool unavailable."
+
+        # --- ROUTE B: IMAGE GENERATION ---
+        elif detected_route == "ROUTE_IMAGE_GEN":
+            image_prompt = re.sub(r"^/(image|imagine)\s*", "", user_input, flags=re.IGNORECASE).strip()
+            
+            if "generate_and_render_image" in globals():
+                assistant_response = generate_and_render_image(image_prompt)
+            else:
+                st.warning("⚠️ Image generation function `generate_and_render_image` is not defined.")
+                assistant_response = "Image generation tool unavailable."
+
+        # --- ROUTE C: DEBUG TOOL ---
+        elif detected_route == "ROUTE_DEBUG":
+            st.toast("🛠️ Diagnostic trace initiated...", icon="🔍")
+            assistant_response = f"**System Debug Payload:**\n* Active Thread: `{current_thread}`\n* Detected Style: `{detected_style}`\n* Active Temperature: `{active_temperature}`"
+            st.markdown(assistant_response)
+
+        # --- ROUTE D: STANDARD LLM COMPLETION ---
+        else:
+            if "stream_llm_response" in globals():
+                assistant_response = stream_llm_response(processed_prompt, active_temperature)
+            else:
+                # Fallback simple complete call
+                completion = client.chat.completions.create(
+                    model=st.session_state.get("selected_model", "gpt-4o"),
+                    messages=[{"role": "user", "content": processed_prompt}],
+                    temperature=active_temperature
+                )
+                assistant_response = completion.choices[0].message.content
+                st.markdown(assistant_response)
+
+    # 8. Record Response to State, Update Telemetry & Rerun
+    if assistant_response:
+        active_chat_list.append({"role": "assistant", "content": assistant_response})
+        
+        # Log latency telemetry
+        elapsed_time = time.time() - start_time
+        if "telemetry" in st.session_state:
+            st.session_state.telemetry["requests"] += 1
+            st.session_state.telemetry["last_latency"] = elapsed_time
+            st.session_state.telemetry["est_tokens"] += len(user_input.split()) + len(assistant_response.split())
+
+        st.rerun()
         
         # ROUTE 0: Autonomous Code Debugger
         if detected_route == "DEBUG":
