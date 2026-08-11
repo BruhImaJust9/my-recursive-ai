@@ -1777,16 +1777,7 @@ if user_input and client:
 
         # --- ROUTE D: STANDARD LLM COMPLETION ---
         else:
-            if "stream_llm_response" in globals():
-                assistant_response = stream_llm_response(processed_prompt, active_temperature)
-            else:
-                assistant_response = smart_model_router(processed_prompt, client, st.session_state.get("selected_model", "llama-3.3-70b-versatile"))
-                    model=st.session_state.get("selected_model", "gpt-4o"),
-                    messages=[{"role": "user", "content": processed_prompt}],
-                    temperature=active_temperature
-                )
-                assistant_response = completion.choices[0].message.content
-                st.markdown(assistant_response)
+            assistant_response = smart_model_router(processed_prompt, client, st.session_state.get("selected_model", "llama-3.3-70b-versatile"))
 
     # 8. Record Response to State, Update Telemetry & Rerun
     if assistant_response:
