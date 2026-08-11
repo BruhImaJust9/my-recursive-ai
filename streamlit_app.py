@@ -182,6 +182,26 @@ def handle_chat_input(user_input: str):
     # Standard LLM completion
     return generate_llm_response(user_input)
 
+def handle_chat_pipeline(user_input: str):
+    # 1. Intercept Image Requests
+    if user_input.startswith("/image"):
+        clean_prompt = user_input.replace("/image", "").strip()
+        return generate_and_render_image(clean_prompt)
+
+    # 2. Intercept Live Search Requests
+    elif user_input.startswith("/search") or "search" in user_input.lower():
+        clean_query = user_input.replace("/search", "").strip()
+        search_context = perform_live_search(clean_query)
+        
+        # Pass retrieved web context into the LLM prompt
+        augmented_prompt = f"Web Search Context:\n{search_context}\n\nUser Question: {clean_query}"
+        return query_llm_with_context(augmented_prompt)
+
+    # 3. Standard Chat Output
+    else:
+        return query_llm_standard(user_input)
+        
+
 import streamlit as st
 import time
 
@@ -221,6 +241,33 @@ def process_user_intent(user_input: str):
     # 3. STANDARD LLM RESPONSE
     else:
         return execute_standard_llm(user_input)
+
+import streamlit as st
+import requests
+
+def perform_live_search(query: str) -> str:
+    """Queries a search API and formats the context for the LLM."""
+    with st.status("🌐 Synthesizing multi-query angle...", expanded=True) as status:
+        st.write(f"🔎 Executing search vector: `{query}`...")
+        
+        try:
+            # Example using a search API endpoint
+            # Replace with your API key / provider (SerpAPI, Tavily, Google, etc.)
+            api_url = f"https://api.tavily.com/search"
+            payload = {"query": query, "api_key": st.secrets.get("TAVILY_API_KEY", "")}
+            
+            response = requests.post(api_url, json=payload, timeout=10)
+            data = response.json()
+            
+            results = data.get("results", [])
+            formatted_context = "\n".join([f"- {r['title']}: {r['content']}" for r in results[:3]])
+            
+            status.update(label="✅ Search completed!", state="complete", expanded=False)
+            return formatted_context
+
+        except Exception as e:
+            status.update(label="❌ Search failed", state="error", expanded=False)
+            return f"Search error: {str(e)}"
 
 # ==============================================================================
 # UPGRADE #65: LIVE DYNAMIC WORKSPACE TELEMETRY & BENCHMARKER
@@ -342,6 +389,36 @@ def render_sidebar_telemetry_widget() -> None:
             st.session_state.telemetry = {"requests": 0, "est_tokens": 0, "last_latency": 0.0}
             st.toast("Telemetry metrics reset!", icon="🧹")
             st.rerun()
+
+import streamlit as st
+from openai import OpenAI
+
+def generate_and_render_image(prompt: str):
+    """Routes prompt to an image generation model and renders it directly in Streamlit."""
+    client = OpenAI(api_key=st.secrets.get("OPENAI_API_KEY", ""))
+    
+    with st.status("🎨 Generating image...", expanded=True) as status:
+        st.write(f"🖌️ Rendering canvas for: *'{prompt}'*...")
+        
+        try:
+            response = client.images.generate(
+                model="dall-e-3",
+                prompt=prompt,
+                n=1,
+                size="1024x1024"
+            )
+            image_url = response.data[0].url
+            
+            status.update(label="✨ Image rendered successfully!", state="complete", expanded=False)
+            
+            # Display image in Streamlit
+            st.image(image_url, caption=f"Generated: {prompt}", use_column_width=True)
+            return f"![Generated Image]({image_url})"
+
+        except Exception as e:
+            status.update(label="❌ Image generation failed", state="error", expanded=False)
+            st.error(f"Failed to generate image: {str(e)}")
+            return "Image generation failed."
             
 # ==============================================================================
 # UPGRADE #66: FRONTIER AGENTIC REASONING & COMPREHENSIVE ANALYSIS ENGINE
