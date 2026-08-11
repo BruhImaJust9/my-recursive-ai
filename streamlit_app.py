@@ -393,27 +393,23 @@ def render_sidebar_telemetry_widget() -> None:
 import streamlit as st
 from openai import OpenAI
 
-def generate_and_render_image(prompt: str):
-    """Routes prompt to an image generation model and renders it directly in Streamlit."""
-    client = OpenAI(api_key=st.secrets.get("OPENAI_API_KEY", ""))
-    
+import streamlit as st
+import urllib.parse
+
+def generate_and_render_image(prompt: str) -> str:
+    """Generates and displays an image using Pollinations.ai (Free, no API key needed)."""
     with st.status("🎨 Generating image...", expanded=True) as status:
         st.write(f"🖌️ Rendering canvas for: *'{prompt}'*...")
         
-        try:
-            response = client.images.generate(
-                model="dall-e-3",
-                prompt=prompt,
-                n=1,
-                size="1024x1024"
-            )
-            image_url = response.data[0].url
-            
-            status.update(label="✨ Image rendered successfully!", state="complete", expanded=False)
-            
-            # Display image in Streamlit
-            st.image(image_url, caption=f"Generated: {prompt}", use_column_width=True)
-            return f"![Generated Image]({image_url})"
+        # Clean and encode prompt for URL format
+        encoded_prompt = urllib.parse.quote(prompt)
+        image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
+        
+        status.update(label="✨ Image rendered successfully!", state="complete", expanded=False)
+        
+        # Display directly in Streamlit UI
+        st.image(image_url, caption=f"Generated: {prompt}", use_container_width=True)
+        return f"![Generated Image]({image_url})"
 
         except Exception as e:
             status.update(label="❌ Image generation failed", state="error", expanded=False)
@@ -1664,26 +1660,42 @@ if user_input and client:
         detected_style = "GENERAL"
         active_temperature = 0.7
 
-    # 7. ROUTE DISPATCHER & ASSISTANT EXECUTION
-    with st.chat_message("assistant"):
-        assistant_response = ""
-
-        # --- ROUTE A: LIVE WEB SEARCH ---
-        if detected_route == "ROUTE_SEARCH":
-            query = re.sub(r"^/search\s*", "", user_input, flags=re.IGNORECASE).strip()
+    # --- ROUTE A: LIVE WEB SEARCH ---
+elif detected_route == "ROUTE_SEARCH":
+    query = re.sub(r"^/search\s*", "", user_input, flags=re.IGNORECASE).strip()
+    
+    with st.status("🌐 Searching the web...", expanded=True) as status:
+        st.write(f"🔎 Fetching live data for: `{query}`...")
+        
+        # Fetch web search context
+        if "perform_live_search" in globals():
+            raw_search_data = perform_live_search(query)
+            status.update(label="✅ Data retrieved! Synthesizing answer...", state="complete", expanded=False)
             
-            if "perform_live_search" in globals():
-                search_results = perform_live_search(query)
-                augmented_prompt = f"Web Context:\n{search_results}\n\nUser Question: {query}"
-                
-                # Stream standard LLM completion using search context
-                if "stream_llm_response" in globals():
-                    assistant_response = stream_llm_response(augmented_prompt, active_temperature)
-                else:
-                    assistant_response = f"**Search Results for '{query}':**\n\n{search_results}"
-            else:
-                st.warning("⚠️ Live search tool function `perform_live_search` is not defined.")
-                assistant_response = "Search tool unavailable."
+            # Pass raw search context into the LLM for clean formatting
+            synthesis_prompt = f"""
+            You are a helpful AI. Answer the user's question using ONLY the provided search context.
+            Format the response cleanly with bullet points, bold headers, and key stats.
+            
+            SEARCH CONTEXT:
+            {raw_search_data}
+            
+            USER QUESTION:
+            {query}
+            """
+            
+            # Send context + prompt to your main LLM client
+            completion = client.chat.completions.create(
+                model=st.session_state.get("selected_model", "llama-3.3-70b-versatile"),
+                messages=[{"role": "user", "content": synthesis_prompt}],
+                temperature=0.2
+            )
+            assistant_response = completion.choices[0].message.content
+            st.markdown(assistant_response)
+        else:
+            status.update(label="❌ Search tool missing", state="error", expanded=False)
+            assistant_response = "Search tool function `perform_live_search` is not defined."
+            st.warning(assistant_response)
 
         # --- ROUTE B: IMAGE GENERATION ---
         elif detected_route == "ROUTE_IMAGE_GEN":
