@@ -396,20 +396,24 @@ from openai import OpenAI
 import streamlit as st
 import urllib.parse
 
+import streamlit as st
+import urllib.parse
+
 def generate_and_render_image(prompt: str) -> str:
     """Generates and displays an image using Pollinations.ai (Free, no API key needed)."""
     with st.status("🎨 Generating image...", expanded=True) as status:
         st.write(f"🖌️ Rendering canvas for: *'{prompt}'*...")
         
-        # Clean and encode prompt for URL format
-        encoded_prompt = urllib.parse.quote(prompt)
-        image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
-        
-        status.update(label="✨ Image rendered successfully!", state="complete", expanded=False)
-        
-        # Display directly in Streamlit UI
-        st.image(image_url, caption=f"Generated: {prompt}", use_container_width=True)
-        return f"![Generated Image]({image_url})"
+        try:
+            # Clean and encode prompt for URL format
+            encoded_prompt = urllib.parse.quote(prompt)
+            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
+            
+            # Display directly in Streamlit UI
+            st.image(image_url, caption=f"Generated: {prompt}", use_container_width=True)
+            
+            status.update(label="✨ Image rendered successfully!", state="complete", expanded=False)
+            return f"![Generated Image]({image_url})"
 
         except Exception as e:
             status.update(label="❌ Image generation failed", state="error", expanded=False)
