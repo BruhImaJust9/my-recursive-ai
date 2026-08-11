@@ -396,9 +396,6 @@ from openai import OpenAI
 import streamlit as st
 import urllib.parse
 
-import streamlit as st
-import urllib.parse
-
 def generate_and_render_image(prompt: str) -> str:
     """Generates and displays an image using Pollinations.ai (Free, no API key needed)."""
     with st.status("🎨 Generating image...", expanded=True) as status:
