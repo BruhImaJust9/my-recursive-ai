@@ -457,22 +457,28 @@ from openai import OpenAI
 import streamlit as st
 import urllib.parse
 
+import streamlit as st
+import openai
+
 def generate_and_render_image(prompt: str) -> str:
-    """Generates and displays an image using Pollinations.ai (Free, no API key needed)."""
-    with st.status("🎨 Generating image...", expanded=True) as status:
-        st.write(f"🖌️ Rendering canvas for: *'{prompt}'*...")
-        
+    """Generates and displays an image using DALL-E 3 via OpenAI."""
+    with st.status("🎨 Generating image with DALL-E 3...", expanded=True) as status:
         try:
-            # Clean and encode prompt for URL format
-            encoded_prompt = urllib.parse.quote(prompt)
-            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
+            # Call OpenAI DALL-E 3 for image generation
+            response = openai.images.generate(
+                model="dall-e-3",
+                prompt=prompt,
+                n=1,
+                size="1024x1024"
+            )
+            image_url = response.data[0].url
             
             # Display directly in Streamlit UI
             st.image(image_url, caption=f"Generated: {prompt}", use_container_width=True)
             
             status.update(label="✨ Image rendered successfully!", state="complete", expanded=False)
             return f"![Generated Image]({image_url})"
-
+        
         except Exception as e:
             status.update(label="❌ Image generation failed", state="error", expanded=False)
             st.error(f"Failed to generate image: {str(e)}")
