@@ -451,12 +451,8 @@ def render_sidebar_telemetry_widget() -> None:
             st.toast("Telemetry metrics reset!", icon="🧹")
             st.rerun()
 
-import streamlit as st
-from openai import OpenAI
-
-import streamlit as st
+import requests
 import urllib.parse
-
 import streamlit as st
 import openai
 
