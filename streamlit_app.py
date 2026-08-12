@@ -454,31 +454,39 @@ def render_sidebar_telemetry_widget() -> None:
 import requests
 import urllib.parse
 import streamlit as st
-import openai
 
 def generate_and_render_image(prompt: str) -> str:
-    """Generates and displays an image using DALL-E 3 via OpenAI."""
-    with st.status("🎨 Generating image with DALL-E 3...", expanded=True) as status:
+    """Generates and displays an image using Pollinations.ai with direct error printing."""
+    error_message = None
+    
+    with st.status("🎨 Generating image...", expanded=True) as status:
         try:
-            # Call OpenAI DALL-E 3 for image generation
-            response = openai.images.generate(
-                model="dall-e-3",
-                prompt=prompt,
-                n=1,
-                size="1024x1024"
-            )
-            image_url = response.data[0].url
+            # 1. Clean and encode prompt
+            clean_prompt = prompt.strip() if prompt else "abstract artwork"
+            encoded_prompt = urllib.parse.quote(clean_prompt)
+            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
             
-            # Display directly in Streamlit UI
-            st.image(image_url, caption=f"Generated: {prompt}", use_container_width=True)
+            # 2. Fetch with browser headers (prevents Cloud IP blocking)
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+            response = requests.get(image_url, headers=headers, timeout=12)
             
-            status.update(label="✨ Image rendered successfully!", state="complete", expanded=False)
-            return f"![Generated Image]({image_url})"
-        
+            if response.status_code == 200:
+                # Display image directly in status box
+                st.image(response.content, caption=f"Generated: {clean_prompt}", use_container_width=True)
+                status.update(label="✨ Image rendered successfully!", state="complete", expanded=False)
+                return f"![Generated Image]({image_url})"
+            else:
+                error_message = f"HTTP Error {response.status_code}: Pollinations server rejected request."
+                status.update(label="❌ Generation failed", state="error", expanded=True)
+
         except Exception as e:
-            status.update(label="❌ Image generation failed", state="error", expanded=False)
-            st.error(f"Failed to generate image: {str(e)}")
-            return "Image generation failed."
+            error_message = f"Exception caught: {type(e).__name__} - {str(e)}"
+            status.update(label="❌ Generation failed", state="error", expanded=True)
+
+    # Force error to display on the main Streamlit screen if it failed
+    if error_message:
+        st.error(f"🚨 **Image Error Details:** {error_message}")
+        return f"Image generation failed: {error_message}"
             
 # ==============================================================================
 # UPGRADE #66: FRONTIER AGENTIC REASONING & COMPREHENSIVE ANALYSIS ENGINE
