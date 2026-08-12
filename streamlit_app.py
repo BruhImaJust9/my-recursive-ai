@@ -468,7 +468,7 @@ def generate_and_render_image(prompt: str) -> str:
             
             # 2. Fetch with browser headers (prevents Cloud IP blocking)
             headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-            response = requests.get(image_url, headers=headers, timeout=12)
+            response = requests.get(image_url, headers=headers, timeout=60)
             
             if response.status_code == 200:
                 # Display image directly in status box
