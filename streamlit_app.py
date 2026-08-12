@@ -1728,7 +1728,7 @@ if user_input and client:
         detected_style = "GENERAL"
         active_temperature = 0.7
 
-    # 7. ROUTE DISPATCHER & ASSISTANT EXECUTION
+  # 7. ROUTE DISPATCHER & ASSISTANT EXECUTION
     # 🚨 DEFINE ASSISTANT_RESPONSE HERE TO PREVENT NAMEERROR
     assistant_response = "" 
 
@@ -1736,22 +1736,60 @@ if user_input and client:
         # --- ROUTE A: LIVE WEB SEARCH ---
         if detected_route == "ROUTE_SEARCH":
             query = re.sub(r"^/search\s*", "", user_input, flags=re.IGNORECASE).strip()
-            # ... your search logic ...
+            
+            with st.status("🌐 Searching the web...", expanded=True) as status:
+                st.write(f"🔎 Fetching live data for: `{query}`...")
+                
+                if "perform_live_search" in globals():
+                    raw_search_data = perform_live_search(query)
+                    status.update(label="✅ Data retrieved! Synthesizing answer...", state="complete", expanded=False)
+                    
+                    synthesis_prompt = f"""
+                    You are a helpful AI. Answer the user's question using ONLY the provided search context.
+                    Format the response cleanly with bullet points, bold headers, and key stats.
+                    
+                    SEARCH CONTEXT:
+                    {raw_search_data}
+                    
+                    USER QUESTION:
+                    {query}
+                    """
+                    
+                    completion = client.chat.completions.create(
+                        model=st.session_state.get("selected_model", "llama-3.3-70b-versatile"),
+                        messages=[{"role": "user", "content": synthesis_prompt}],
+                        temperature=0.2
+                    )
+                    assistant_response = completion.choices[0].message.content
+                    st.markdown(assistant_response)
+                else:
+                    status.update(label="❌ Search tool missing", state="error", expanded=False)
+                    assistant_response = "Search tool function `perform_live_search` is not defined."
+                    st.warning(assistant_response)
 
         # --- ROUTE B: IMAGE GENERATION ---
         elif detected_route == "ROUTE_IMAGE_GEN":
             image_prompt = re.sub(r"^/(image|imagine)\s*", "", user_input, flags=re.IGNORECASE).strip()
-            # ... your image logic ...
+            
+            if "generate_and_render_image" in globals():
+                assistant_response = generate_and_render_image(image_prompt)
+            else:
+                st.warning("⚠️ Image generation function `generate_and_render_image` is not defined.")
+                assistant_response = "Image generation tool unavailable."
 
         # --- ROUTE C: DEBUG TOOL ---
         elif detected_route == "ROUTE_DEBUG":
             st.toast("🛠️ Diagnostic trace initiated...", icon="🔍")
-            assistant_response = f"**System Debug Payload:**\n* Active Thread: `{current_thread}`"
+            assistant_response = f"**System Debug Payload:**\n* Active Thread: `{current_thread}`\n* Detected Style: `{detected_style}`\n* Active Temperature: `{active_temperature}`"
             st.markdown(assistant_response)
 
         # --- ROUTE D: STANDARD LLM COMPLETION ---
         else:
-            assistant_response = smart_model_router(processed_prompt, client, st.session_state.get("selected_model", "llama-3.3-70b-versatile"))
+            assistant_response = smart_model_router(
+                processed_prompt, 
+                client, 
+                st.session_state.get("selected_model", "llama-3.3-70b-versatile")
+            )
 
     # 8. Record Response to State, Update Telemetry & Rerun
     if assistant_response:
