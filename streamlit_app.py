@@ -1792,7 +1792,8 @@ if user_input and client:
             assistant_response = smart_model_router(
                 processed_prompt, 
                 client, 
-                st.session_state.get("selected_model", "llama-3.3-70b-versatile")
+                st.session_state.get("selected_model", "llama-3.3-70b-versatile"),
+                conversation_history=active_chat_list  # 👈 Passes past messages so the AI remembers context!
             )
 
     # 8. Record Response to State, Update Telemetry & Rerun
