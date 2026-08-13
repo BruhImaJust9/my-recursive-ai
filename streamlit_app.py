@@ -273,7 +273,8 @@ import time
 import streamlit as st
 import openai
 
-def smart_model_router(prompt: str, client, preferred_model: str = "llama-3.3-70b-versatile") -> str:
+def smart_model_router(prompt: str, client, preferred_model: str = "llama-3.3-70b-versatile", conversation_history: list = None):
+    
     """
     Production-Grade Smart Router:
     1. Analyzes prompt complexity to pick the cheapest/fastest optimal model.
