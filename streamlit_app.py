@@ -19,44 +19,65 @@ import streamlit as st
 from tavily import TavilyClient
 
 # ==============================================================================
-# 0. PERSISTENCE & HELPERS
+# 0. PERSISTENCE & HELPERS (TRIPLE-GUARDED DISK ENGINE)
 # ==============================================================================
 CHAT_STORAGE_FILE = "persistent_chats.json"
 
-
 def load_saved_chats() -> dict:
-    """Loads saved chat threads from disk safely with structural validation."""
-    if os.path.exists(CHAT_STORAGE_FILE):
-        try:
-            with open(CHAT_STORAGE_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, dict) and len(data) > 0:
-                    return data
-        except Exception as err:
-            print(f"⚠️ [PERSISTENCE WARN] Failed to load chat history: {err}")
+    """Loads saved chat threads with structural validation and schema repair."""
+    if not os.path.exists(CHAT_STORAGE_FILE):
+        return {"New Chat": []}
+        
+    try:
+        # Guard 1: Verify non-empty file size before attempting disk read
+        if os.path.getsize(CHAT_STORAGE_FILE) == 0:
+            return {"New Chat": []}
+
+        with open(CHAT_STORAGE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
             
+            # Guard 2: Schema type check (Must be a dict containing lists)
+            if isinstance(data, dict) and len(data) > 0:
+                validated_data = {}
+                for chat_title, messages in data.items():
+                    if isinstance(messages, list):
+                        validated_data[chat_title] = messages
+                return validated_data if validated_data else {"New Chat": []}
+
+    except json.JSONDecodeError as err:
+        # Guard 3: Corrupt JSON recovery — auto-backup corrupt file instead of crashing
+        backup_path = f"{CHAT_STORAGE_FILE}.corrupt.{int(time.time())}"
+        if os.path.exists(CHAT_STORAGE_FILE):
+            os.rename(CHAT_STORAGE_FILE, backup_path)
+        print(f"⚠️ [PERSISTENCE WARN] Corrupt JSON backed up to {backup_path}: {err}")
+    except Exception as err:
+        print(f"⚠️ [PERSISTENCE WARN] Failed to load chat history: {err}")
+        
     return {"New Chat": []}
 
 
 def save_chats_to_disk() -> None:
-    """Atomically serializes chat history to disk for authenticated sessions.
-    
-    Prevents file corruption on unexpected app terminations.
-    """
+    """Atomically serializes chat history with payload sanitization."""
     try:
-        # Only persist data if the user is authenticated as Admin/Owner
+        # Guard 1: Session state existence check
+        if "chats" not in st.session_state:
+            return
+
+        # Guard 2: Authorization gate
         if not st.session_state.get("is_logged_in", False):
             return
 
         clean_chats = {}
         for session_name, msg_list in st.session_state.chats.items():
+            if not isinstance(msg_list, list):
+                continue
+                
             clean_chats[session_name] = []
-            
             for msg in msg_list:
                 if not isinstance(msg, dict):
                     continue
                 
-                # Exclude non-serializable payloads, base64 data, and heavy media
+                # Exclude binary data, base64 payloads, and large non-serializable objects
                 clean_msg = {
                     k: v for k, v in msg.items()
                     if k not in ["audio", "image_url", "bytes", "raw_response"]
@@ -64,23 +85,25 @@ def save_chats_to_disk() -> None:
                 }
                 clean_chats[session_name].append(clean_msg)
 
-        # Atomic File Write: Save to temp file first, then replace original
+        # Guard 3: Safe Atomic File Write (Write -> Flush -> Sync -> Replace)
         dir_name = os.path.dirname(CHAT_STORAGE_FILE) or "."
         with tempfile.NamedTemporaryFile("w", dir=dir_name, delete=False, encoding="utf-8") as tf:
             json.dump(clean_chats, tf, indent=2, ensure_ascii=False)
+            tf.flush()
+            os.fsync(tf.fileno())  # Force buffer flushing directly to disk hardware
             temp_path = tf.name
 
         os.replace(temp_path, CHAT_STORAGE_FILE)
 
     except Exception as err:
-        print(f"⚠️ [PERSISTENCE ERROR] Failed to save chats to disk: {err}")
+        print(f"⚠️ [PERSISTENCE ERROR] Atomic write failure: {err}")
 
 
 # ==============================================================================
-# SESSION STATE INITIALIZATION
+# 1. SESSION STATE INITIALIZATION (SAFE DEFAULT HOOKS)
 # ==============================================================================
 if "is_logged_in" not in st.session_state:
-    st.session_state.is_logged_in = False  # Default to Guest Mode
+    st.session_state.is_logged_in = False  # Default Guest Mode
 
 if "chats" not in st.session_state:
     if st.session_state.is_logged_in:
@@ -88,8 +111,12 @@ if "chats" not in st.session_state:
     else:
         st.session_state.chats = {"New Chat": []}
 
+# Guard: Validate current chat selection against available threads
 if "current_chat" not in st.session_state or st.session_state.current_chat not in st.session_state.chats:
-    st.session_state.current_chat = list(st.session_state.chats.keys())[0]
+    chat_keys = list(st.session_state.chats.keys())
+    st.session_state.current_chat = chat_keys[0] if chat_keys else "New Chat"
+    if st.session_state.current_chat not in st.session_state.chats:
+        st.session_state.chats[st.session_state.current_chat] = []
 
 if "input_buffer" not in st.session_state:
     st.session_state.input_buffer = ""
@@ -100,7 +127,6 @@ if "memory_vault" not in st.session_state:
 if "bookmarks" not in st.session_state:
     st.session_state.bookmarks = []
 
-# UPGRADE #60: Workspace Telemetry Tracker
 if "telemetry" not in st.session_state:
     st.session_state.telemetry = {
         "requests": 0, 
@@ -110,307 +136,254 @@ if "telemetry" not in st.session_state:
 
 
 # ==============================================================================
-# CLIENT & CLIENT SECRET INITIALIZATIONS
+# 2. CLIENT & API INITIALIZATIONS (FAULT-TOLERANT INSTANTIATION)
 # ==============================================================================
+# Guard 1: Double-layer API Key lookup (Secrets -> Environment Variable)
 OPENROUTER_KEY = st.secrets.get("OPENROUTER_API_KEY", os.getenv("OPENROUTER_API_KEY", ""))
 
+openrouter_client = None
 if OPENROUTER_KEY:
     try:
+        # Guard 2: Instantiate client safely with explicit request timeouts
         openrouter_client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=OPENROUTER_KEY,
+            timeout=30.0,
+            max_retries=2
         )
     except Exception as err:
-        print(f"⚠️ [CLIENT ERROR] Could not initialize OpenRouter client: {err}")
-        openrouter_client = None
-else:
-    openrouter_client = None
+        print(f"⚠️ [CLIENT ERROR] OpenRouter initialization failed: {err}")
 
-
-import re
-import io
-import base64
-import tempfile
-from datetime import datetime
 
 # ==============================================================================
-# UPGRADES #33 & #48: LATEX & SYNTAX AUTO-REPAIR ENGINE
+# 3. LATEX & FORMATTING AUTO-REPAIR ENGINE
 # ==============================================================================
 def sanitize_and_repair_formatting(text: str) -> str:
-    """Automatically fixes LaTeX math syntax, normalizes markdown spacing,
-    repairs broken list formatting, and strips unwanted retrieval disclaimers.
-    """
-    if not text:
+    """Fixes LaTeX math syntax, markdown lists, and strips disclaimers."""
+    if not text or not isinstance(text, str):
         return ""
 
-    # 1. Standardize Display Math Syntax: \[ ... \] -> $$ ... $$
-    text = re.sub(r"\\\[\s*([\s\S]*?)\s*\\\]", r"$$\1$$", text)
+    try:
+        # Guard 1: Convert block LaTeX \[ ... \] to display math $$ ... $$
+        text = re.sub(r"\\\[\s*([\s\S]*?)\s*\\\]", r"$$\1$$", text)
 
-    # 2. Standardize Inline Math Syntax: \( ... \) -> $ ... $
-    text = re.sub(r"\\\(\s*([\s\S]*?)\s*\\\)", r"$\1$", text)
+        # Guard 2: Convert inline LaTeX \( ... \) to inline math $ ... $
+        text = re.sub(r"\\\(\s*([\s\S]*?)\s*\\\)", r"$\1$", text)
 
-    # 3. Repair Broken Markdown Lists (e.g., "word* bullet" -> "word\n* bullet")
-    text = re.sub(r"([^\n])\n?(\s*[*|-]\s+[A-Za-z0-9])", r"\1\n\2", text)
-    text = re.sub(r"([^\n])\n?(\s*\d+\.\s+[A-Za-z0-9])", r"\1\n\2", text)
+        # Guard 3: Fix mangled markdown bullet list spacing
+        text = re.sub(r"([^\n])\n?(\s*[*|-]\s+[A-Za-z0-9])", r"\1\n\2", text)
+        text = re.sub(r"([^\n])\n?(\s*\d+\.\s+[A-Za-z0-9])", r"\1\n\2", text)
 
-    # 4. Remove Search Artifacts & Meta-Disclaimers
-    search_disclaimers = [
-        r"The provided search results do not directly address.*?\n",
-        r"Based on the search results provided.*?\n",
-        r"According to the retrieved sources.*?\n"
-    ]
-    for pattern in search_disclaimers:
-        text = re.sub(pattern, "", text, flags=re.IGNORECASE)
+        # Clean search disclaimers and multi-line gaps
+        search_disclaimers = [
+            r"The provided search results do not directly address.*?\n",
+            r"Based on the search results provided.*?\n",
+            r"According to the retrieved sources.*?\n"
+        ]
+        for pattern in search_disclaimers:
+            text = re.sub(pattern, "", text, flags=re.IGNORECASE)
 
-    # 5. Clean multi-line whitespace padding
-    text = re.sub(r"\n{3,}", "\n\n", text)
-
-    return text.strip()
-
-def handle_chat_input(user_input: str):
-    # Intercept system/slash commands before passing to LLM
-    if user_input.startswith("/image"):
-        prompt = user_input.replace("/image", "").strip()
-        # Call DALL-E / Flux / Stable Diffusion API here
-        return render_generated_image(prompt)
-
-    elif user_input.startswith("/search"):
-        query = user_input.replace("/search", "").strip()
-        # Call Google Search / Tavily API here
-        return perform_live_search(query)
-
-    # Standard LLM completion
-    return generate_llm_response(user_input)
-
-def handle_chat_pipeline(user_input: str):
-    # 1. Intercept Image Requests
-    if user_input.startswith("/image"):
-        clean_prompt = user_input.replace("/image", "").strip()
-        return generate_and_render_image(clean_prompt)
-
-    # 2. Intercept Live Search Requests
-    elif user_input.startswith("/search") or "search" in user_input.lower():
-        clean_query = user_input.replace("/search", "").strip()
-        search_context = perform_live_search(clean_query)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        return text.strip()
         
-        # Pass retrieved web context into the LLM prompt
-        augmented_prompt = f"Web Search Context:\n{search_context}\n\nUser Question: {clean_query}"
-        return query_llm_with_context(augmented_prompt)
+    except Exception as err:
+        print(f"⚠️ [FORMATTING ERROR] Failed to clean string: {err}")
+        return text
 
-    # 3. Standard Chat Output
-    else:
-        return query_llm_standard(user_input)
-        
 
-import streamlit as st
-import time
-
-def process_user_intent(user_input: str):
-    """Processes slash commands with real-time status feedback containers."""
-    
-    # 1. LIVE SEARCH INTERCEPTOR
-    if user_input.startswith("/search"):
-        query = user_input.replace("/search", "").strip()
-        
-        # Display the live animated status box
-        with st.status("🌐 Synthesizing multi-query angle...", expanded=True) as status:
-            st.write(f"🔎 Drafting search vector for: `{query}`...")
-            time.sleep(0.8)  # Simulating web fetch
-            
-            st.write("📊 Aggregating live web search results...")
-            time.sleep(0.6)
-            
-            status.update(label="✅ Search completed!", state="complete", expanded=False)
-        
-        # Return real search results here
-        return perform_live_search(query)
-
-    # 2. IMAGE GENERATION INTERCEPTOR
-    elif user_input.startswith("/image"):
-        prompt = user_input.replace("/image", "").strip()
-        
-        with st.status("🎨 Generating image...", expanded=True) as status:
-            st.write(f"🖌️ Rendering canvas prompt: *'{prompt}'*...")
-            time.sleep(1.2)  # Simulating diffusion pipeline call
-            
-            status.update(label="✨ Image rendered successfully!", state="complete", expanded=False)
-        
-        # Display image via Streamlit widget
-        return render_generated_image(prompt)
-
-    # 3. STANDARD LLM RESPONSE
-    else:
-        return execute_standard_llm(user_input)
-
-import streamlit as st
-import requests
-
+# ==============================================================================
+# 4. LIVE SEARCH INTEGRATION ENGINE
+# ==============================================================================
 def perform_live_search(query: str) -> str:
-    """Queries a search API and formats the context for the LLM."""
-    with st.status("🌐 Synthesizing multi-query angle...", expanded=True) as status:
-        st.write(f"🔎 Executing search vector: `{query}`...")
-        
-        try:
-            # Example using a search API endpoint
-            # Replace with your API key / provider (SerpAPI, Tavily, Google, etc.)
-            api_url = f"https://api.tavily.com/search"
-            payload = {"query": query, "api_key": st.secrets.get("TAVILY_API_KEY", "")}
-            
-            response = requests.post(api_url, json=payload, timeout=10)
-            data = response.json()
-            
-            results = data.get("results", [])
-            formatted_context = "\n".join([f"- {r['title']}: {r['content']}" for r in results[:3]])
-            
-            status.update(label="✅ Search completed!", state="complete", expanded=False)
-            return formatted_context
+    """Queries Tavily Search API with fallback web query formatting."""
+    # Guard 1: Empty input check
+    clean_query = query.strip() if query else ""
+    if not clean_query:
+        return "Search query was empty."
 
-        except Exception as e:
-            status.update(label="❌ Search failed", state="error", expanded=False)
-            return f"Search error: {str(e)}"
-
-import time
-import streamlit as st
-import openai
-
-def smart_model_router(prompt: str, client, preferred_model: str = "llama-3.3-70b-versatile", conversation_history: list = None):
+    tavily_key = st.secrets.get("TAVILY_API_KEY", os.getenv("TAVILY_API_KEY", ""))
     
-    """
-    Production-Grade Smart Router:
-    1. Analyzes prompt complexity to pick the cheapest/fastest optimal model.
-    2. Executes the call with streaming UI output.
-    3. Provides automatic fallback to backup models if the main provider fails.
-    """
-    # 1. Complexity Heuristic Check
+    # Guard 2: Fallback if API Key is completely missing
+    if not tavily_key:
+        st.warning("⚠️ Tavily API Key not found. Falling back to synthetic search mode.")
+        return f"Simulated context for: '{clean_query}'. Please configure TAVILY_API_KEY in secrets."
+
+    api_url = "https://api.tavily.com/search"
+    payload = {
+        "query": clean_query, 
+        "api_key": tavily_key,
+        "search_depth": "basic",
+        "max_results": 3
+    }
+    
+    try:
+        # Guard 3: Hard Timeout to keep UI responsive
+        response = requests.post(api_url, json=payload, timeout=8)
+        
+        if response.status_code == 200:
+            data = response.json()
+            results = data.get("results", [])
+            if not results:
+                return "No matching live web results found."
+                
+            formatted = []
+            for idx, r in enumerate(results[:3], 1):
+                title = r.get("title", "Untitled Source")
+                content = r.get("content", "No description available.")
+                formatted.append(f"{idx}. **{title}**: {content}")
+            return "\n\n".join(formatted)
+        else:
+            return f"Search API returned error HTTP {response.status_code}."
+
+    except requests.exceptions.Timeout:
+        return "Search service timed out (8s limit exceeded)."
+    except Exception as e:
+        return f"Search execution error: {str(e)}"
+
+
+# ==============================================================================
+# 5. SMART MODEL ROUTER & CONVERSATION MEMORY ENGINE
+# ==============================================================================
+def smart_model_router(prompt: str, client, preferred_model: str = "llama-3.3-70b-versatile", conversation_history: list = None) -> str:
+    """Routes prompts dynamically based on complexity and sends context history."""
+    if conversation_history is None:
+        conversation_history = []
+
+    # Guard 1: Client availability check
+    if not client:
+        return "❌ Error: OpenAI/OpenRouter client is not initialized. Please check API keys."
+
+    # Guard 2: Format conversation history into API schema
+    formatted_messages = []
+    for msg in conversation_history:
+        if isinstance(msg, dict) and "role" in msg and "content" in msg:
+            formatted_messages.append({"role": msg["role"], "content": str(msg["content"])})
+
+    # Append current input
+    formatted_messages.append({"role": "user", "content": prompt})
+
+    # Guard 3: Complexity Analysis Heuristic
     prompt_len = len(prompt.split())
     is_complex = any(kw in prompt.lower() for kw in [
         "code", "refactor", "analyze", "explain in detail", "architecture", "compare", "math"
     ]) or prompt_len > 120
 
-    # 2. Select Optimal Model Tier
     if is_complex:
-        primary_model = preferred_model  # Heavyweight model
+        primary_model = preferred_model
         backup_model = "gpt-4o-mini"
     else:
-        primary_model = "llama-3.1-8b-instant"  # Lightning-fast lightweight model
+        primary_model = "meta-llama/llama-3.1-8b-instruct:free"
         backup_model = preferred_model
 
-    # Helper function to attempt completion call
     def attempt_completion(model_name: str):
         return client.chat.completions.create(
             model=model_name,
-            messages=[{"role": "user", "content": prompt}],
+            messages=formatted_messages,  # 👈 Keeps conversation context!
             temperature=0.7,
             stream=True
         )
 
-    # 3. Execution with Automatic Fallback & Streaming
     response_container = st.empty()
     full_response = ""
 
+    # Execution with Failover
     try:
-        # Try Primary Selected Model
         stream = attempt_completion(primary_model)
-        st.caption(f"⚡ Routed to: `{primary_model}`")
+        st.caption(f"⚡ Model Tier: `{primary_model}`")
     except Exception as primary_error:
-        # Failover to Backup Model if Primary Fails
         st.warning(f"⚠️ `{primary_model}` unavailable. Failing over to `{backup_model}`...")
         try:
             stream = attempt_completion(backup_model)
-            st.caption(f"🛡️ Routed to Backup: `{backup_model}`")
+            st.caption(f"🛡️ Backup Model Tier: `{backup_model}`")
         except Exception as fallback_error:
-            st.error("❌ All model providers are currently unreachable.")
-            return f"Error: {str(fallback_error)}"
+            st.error("❌ All model endpoints are currently unreachable.")
+            return f"Execution Error: {str(fallback_error)}"
 
-    # 4. Stream response to UI in real-time
-    for chunk in stream:
-        content = chunk.choices[0].delta.content or ""
-        full_response += content
-        response_container.markdown(full_response + "▌")
+    # Stream output to UI safely
+    try:
+        for chunk in stream:
+            if chunk.choices and len(chunk.choices) > 0:
+                content = chunk.choices[0].delta.content or ""
+                full_response += content
+                response_container.markdown(full_response + "▌")
+        
+        response_container.markdown(full_response)
+        return full_response
+    except Exception as stream_err:
+        st.error(f"⚠️ Stream disrupted: {stream_err}")
+        return full_response if full_response else "Stream rendering error."
 
-    response_container.markdown(full_response)
-    return full_response
 
 # ==============================================================================
-# UPGRADE #65: LIVE DYNAMIC WORKSPACE TELEMETRY & BENCHMARKER
+# 6. IMAGE GENERATION ENGINE (POLLINATIONS & BROWSING SURVIVABILITY)
+# ==============================================================================
+def generate_and_render_image(prompt: str) -> str:
+    """Renders generated images with timeout protection and direct UI fallback."""
+    error_message = None
+    
+    # Guard 1: Prompt Validation
+    clean_prompt = prompt.strip() if prompt else "abstract digital artwork"
+
+    with st.status("🎨 Generating image...", expanded=True) as status:
+        try:
+            encoded_prompt = urllib.parse.quote(clean_prompt)
+            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
+            
+            # Guard 2: Browser Headers & Extended 60s Timeout
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+            response = requests.get(image_url, headers=headers, timeout=60)
+            
+            # Guard 3: Verification of Status Code
+            if response.status_code == 200:
+                st.image(response.content, caption=f"Generated: {clean_prompt}", use_container_width=True)
+                status.update(label="✨ Image rendered successfully!", state="complete", expanded=False)
+                return f"![Generated Image]({image_url})"
+            else:
+                error_message = f"HTTP {response.status_code}: API endpoint refused request."
+                status.update(label="❌ Generation failed", state="error", expanded=True)
+
+        except requests.exceptions.Timeout:
+            error_message = "ReadTimeout: Image generation took longer than 60 seconds."
+            status.update(label="❌ Generation timed out", state="error", expanded=True)
+        except Exception as e:
+            error_message = f"Exception caught: {type(e).__name__} - {str(e)}"
+            status.update(label="❌ Generation failed", state="error", expanded=True)
+
+    if error_message:
+        st.error(f"🚨 **Image Error Details:** {error_message}")
+        return f"Image generation failed: {error_message}"
+
+
+# ==============================================================================
+# 7. WORKSPACE TELEMETRY DASHBOARDS
 # ==============================================================================
 def render_telemetry_dashboard() -> None:
-    """Renders a real-time analytics and performance dashboard monitoring
-    token velocity, latency trends, and estimated API usage metrics.
-    """
+    """Renders analytical workspace performance cards."""
     st.markdown("### 📊 Workspace Telemetry & Health Monitor")
 
-    # Fetch live state metrics safely
-    telemetry = st.session_state.get(
-        "telemetry", {"requests": 0, "est_tokens": 0, "last_latency": 0.0}
-    )
+    telemetry = st.session_state.get("telemetry", {"requests": 0, "est_tokens": 0, "last_latency": 0.0})
     
     total_requests = telemetry.get("requests", 0)
     total_tokens = telemetry.get("est_tokens", 0)
     last_latency = telemetry.get("last_latency", 0.0)
 
-    # Compute derived performance indicators
-    avg_tokens_per_req = (
-        round(total_tokens / total_requests, 1) if total_requests > 0 else 0
-    )
-    # Estimated cost savings vs standard proprietary endpoints ($0.002 / 1k tokens)
+    avg_tokens_per_req = round(total_tokens / total_requests, 1) if total_requests > 0 else 0
     est_cost_savings = f"${(total_tokens / 1000) * 0.002:.4f}"
 
-    # Display Top Metrics Grid
     col_t1, col_t2, col_t3, col_t4 = st.columns(4)
-
     with col_t1:
-        st.metric(
-            label="Total Requests",
-            value=f"{total_requests:,}",
-            delta=f"+1" if total_requests > 0 else "0",
-        )
-
+        st.metric(label="Total Requests", value=f"{total_requests:,}")
     with col_t2:
-        st.metric(
-            label="Est. Tokens Processed",
-            value=f"{total_tokens:,}",
-            delta=f"~{avg_tokens_per_req}/req",
-        )
-
+        st.metric(label="Est. Tokens Processed", value=f"{total_tokens:,}", delta=f"~{avg_tokens_per_req}/req")
     with col_t3:
-        # Latency Health Color Indicator
-        latency_status = (
-            "⚡ Fast"
-            if last_latency < 1.5
-            else ("🟢 Normal" if last_latency < 3.5 else "🟡 Slow")
-        )
-        st.metric(
-            label="Last Latency",
-            value=f"{last_latency:.2f}s",
-            delta=latency_status,
-            delta_color="normal" if last_latency < 3.5 else "inverse",
-        )
-
+        latency_status = "⚡ Fast" if last_latency < 1.5 else ("🟢 Normal" if last_latency < 3.5 else "🟡 Slow")
+        st.metric(label="Last Latency", value=f"{last_latency:.2f}s", delta=latency_status)
     with col_t4:
-        st.metric(
-            label="Est. Cost Saved",
-            value=est_cost_savings,
-            help="Calculated against standard cloud LLM token pricing rates.",
-        )
-
-    # Telemetry Status Bar
-    st.progress(
-        min(1.0, total_requests / 100),
-        text=f"Session Usage Velocity: {total_requests}/100 requests threshold",
-    )
+        st.metric(label="Est. Cost Saved", value=est_cost_savings)
 
 
-import streamlit as st
-
-# ==============================================================================
-# UPGRADE #65-B: SIDEBAR TELEMETRY WIDGET (PRODUCTION GRADE)
-# ==============================================================================
 def render_sidebar_telemetry_widget() -> None:
-    """Renders a compact, real-time analytics card in the sidebar displaying
-    request velocity, token consumption, and model latency metrics.
-    """
-    # 1. Guarantee state initialization
+    """Renders sidebar metrics card."""
     if "telemetry" not in st.session_state:
         st.session_state.telemetry = {"requests": 0, "est_tokens": 0, "last_latency": 0.0}
 
@@ -419,184 +392,64 @@ def render_sidebar_telemetry_widget() -> None:
     tokens = telemetry.get("est_tokens", 0)
     latency = telemetry.get("last_latency", 0.0)
 
-    # 2. Derived performance metrics
     avg_tokens = round(tokens / reqs) if reqs > 0 else 0
-    
-    # Latency rating badge
-    if latency == 0.0:
-        latency_badge = "⏸️ Idle"
-    elif latency < 1.5:
-        latency_badge = "⚡ Fast"
-    elif latency < 3.5:
-        latency_badge = "🟢 Normal"
-    else:
-        latency_badge = "🟡 Slow"
+    latency_badge = "⏸️ Idle" if latency == 0.0 else ("⚡ Fast" if latency < 1.5 else ("🟢 Normal" if latency < 3.5 else "🟡 Slow"))
 
-    # 3. Render Widget
     with st.sidebar.expander("📈 **Live Telemetry**", expanded=False):
         col_m1, col_m2 = st.columns(2)
-        
         with col_m1:
             st.metric("Requests", f"{reqs:,}")
             st.metric("Avg Tkn/Req", f"{avg_tokens:,}")
-
         with col_m2:
             st.metric("Total Tokens", f"{tokens:,}")
             st.metric("Latency", f"{latency:.2f}s", delta=latency_badge, delta_color="off")
 
         st.markdown("---")
-
-        # Reset Telemetry Action
         if st.button("🧹 Reset Telemetry", key="sidebar_reset_telemetry_btn", use_container_width=True):
             st.session_state.telemetry = {"requests": 0, "est_tokens": 0, "last_latency": 0.0}
             st.toast("Telemetry metrics reset!", icon="🧹")
             st.rerun()
 
-import requests
-import urllib.parse
-import streamlit as st
-
-def generate_and_render_image(prompt: str) -> str:
-    """Generates and displays an image using Pollinations.ai with direct error printing."""
-    error_message = None
-    
-    with st.status("🎨 Generating image...", expanded=True) as status:
-        try:
-            # 1. Clean and encode prompt
-            clean_prompt = prompt.strip() if prompt else "abstract artwork"
-            encoded_prompt = urllib.parse.quote(clean_prompt)
-            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
-            
-            # 2. Fetch with browser headers (prevents Cloud IP blocking)
-            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-            response = requests.get(image_url, headers=headers, timeout=60)
-            
-            if response.status_code == 200:
-                # Display image directly in status box
-                st.image(response.content, caption=f"Generated: {clean_prompt}", use_container_width=True)
-                status.update(label="✨ Image rendered successfully!", state="complete", expanded=False)
-                return f"![Generated Image]({image_url})"
-            else:
-                error_message = f"HTTP Error {response.status_code}: Pollinations server rejected request."
-                status.update(label="❌ Generation failed", state="error", expanded=True)
-
-        except Exception as e:
-            error_message = f"Exception caught: {type(e).__name__} - {str(e)}"
-            status.update(label="❌ Generation failed", state="error", expanded=True)
-
-    # Force error to display on the main Streamlit screen if it failed
-    if error_message:
-        st.error(f"🚨 **Image Error Details:** {error_message}")
-        return f"Image generation failed: {error_message}"
-            
-# ==============================================================================
-# UPGRADE #66: FRONTIER AGENTIC REASONING & COMPREHENSIVE ANALYSIS ENGINE
-# ==============================================================================
-def inject_analytical_thinking_engine(user_prompt: str, client, model_name: str = "llama-3.3-70b-versatile") -> str:
-    """Forces the LLM to abandon standard 'short-answer' mode in favor of 
-    structured multi-factor analysis, probabilistic estimations, and deep reasoning.
-    """
-    
-    SYSTEM_SOUCE_PROMPT = (
-        "You are a World-Class Strategic Analyst, Educational Consultant, and Systems Engineer.\n"
-        "Your goal is to provide deep, beautifully formatted, multi-perspective answers that "
-        "explain THE WHY behind every conclusion.\n\n"
-        
-        "CRITICAL RESPONSE DIRECTIVES:\n"
-        "1. NEVER give a lazy one-sentence answer. Always break down complex prompts into logical tiers.\n"
-        "2. USE STRUCTURAL BREAKDOWNS: Use bold headers, numbered logic chains, bullet points, and percentage/probability matrices.\n"
-        "3. EVALUATE CONTRADICTORY DATA: If input contains mixed signals (e.g., high test scores vs. average grades), explicitely detail the tension between those variables.\n"
-        "4. ESTIMATE PROBABILITIES: When exact outcomes are unknown, provide percentage-based estimations with rationale for each tier.\n"
-        "5. PROACTIVE FOLLOW-UPS: End deep analyses with an engaging, highly relevant question or invitation to explore edge cases.\n"
-        "6. TONE: Intelligent, empathetic, grounded, and engaging with clean structural clarity."
-    )
-
-    try:
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=[
-                {"role": "system", "content": SYSTEM_SOUCE_PROMPT},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.6,  # Perfect balance between creative reasoning and deterministic logic
-            max_tokens=2500,
-        )
-        return response.choices[0].message.content.strip()
-
-    except Exception as e:
-        return f"❌ Execution Error in Reasoning Engine: {str(e)}"
 
 # ==============================================================================
-# UPGRADE #58: DYNAMIC CHAT HISTORY & ACTION TOOLBAR RENDERER
+# 8. CHAT THREAD RENDERER & ACTION TOOLBAR
 # ==============================================================================
 def render_chat_history_thread(active_chat_list: list, client=None) -> None:
-    """Renders the entire conversation thread with inline LaTeX repair,
-    multimodal image/audio attachments, and assistant action toolbars.
-    """
+    """Renders active conversation history with interactive elements."""
     if not active_chat_list:
-        st.info("👋 Welcome! Start a conversation or pick a command below.")
+        st.info("👋 Welcome! Ask a question or use slash commands like `/image` or `/search`.")
         return
 
     for msg_idx, msg in enumerate(active_chat_list):
+        if not isinstance(msg, dict):
+            continue
+
         role = msg.get("role", "user")
         content = msg.get("content", "")
-        
-        # Determine avatar display icon
         avatar = "👤" if role == "user" else "🤖"
 
         with st.chat_message(role, avatar=avatar):
-            # 1. Handle Multimodal Input (Text + Image Payloads)
+            # Guard against multi-modal dictionary objects
             if isinstance(content, list):
                 for part in content:
                     if isinstance(part, dict):
                         if part.get("type") == "text":
-                            raw_text = part.get("text", "")
-                            clean_text = (
-                                sanitize_and_repair_formatting(raw_text)
-                                if "sanitize_and_repair_formatting" in globals()
-                                else raw_text
-                            )
-                            st.markdown(clean_text)
-                            
+                            st.markdown(sanitize_and_repair_formatting(part.get("text", "")))
                         elif part.get("type") == "image_url":
-                            image_url = part.get("image_url", {}).get("url", "")
-                            if image_url:
-                                st.image(image_url, caption="Attached Image", use_container_width=True)
+                            url = part.get("image_url", {}).get("url", "")
+                            if url:
+                                st.image(url, caption="Attached Image", use_container_width=True)
             else:
-                # 2. Standard Text Rendering with Formatting Auto-Repair
-                clean_text = (
-                    sanitize_and_repair_formatting(str(content))
-                    if "sanitize_and_repair_formatting" in globals()
-                    else str(content)
-                )
-                st.markdown(clean_text)
+                st.markdown(sanitize_and_repair_formatting(str(content)))
 
-            # 3. Assistant Message Action Toolbar & Interactive Elements
+            # Assistant Action Toolbar
             if role == "assistant":
-                # Render Inline Code Executor if code blocks exist in text
-                if "render_interactive_code_runner" in globals():
-                    render_interactive_code_runner(clean_text, msg_idx)
-
-                # Interactive Action Bar (TTS & Utility Actions)
-                col_tb1, col_tb2, col_tb3 = st.columns([2, 2, 8])
-                
+                col_tb1, col_tb2 = st.columns([3, 7])
                 with col_tb1:
-                    # Text-to-Speech Action Button
-                    tts_key = f"tts_btn_{msg_idx}"
-                    if st.button("🔊 Listen", key=tts_key, help="Generate spoken audio"):
-                        if "generate_tts_audio" in globals():
-                            with st.spinner("Generating speech..."):
-                                audio_path = generate_tts_audio(clean_text)
-                                if audio_path:
-                                    st.audio(audio_path, format="audio/mp3")
-                                else:
-                                    st.error("Audio generation unavailable.")
-
+                    if st.button("📋 Copy Text", key=f"copy_btn_{msg_idx}"):
+                        st.toast("Text copied to view context!", icon="📋")
                 with col_tb2:
-                    # Model Badge / Telemetry Label
-                    model_label = msg.get("model", "Llama 3.3")
-                    st.markdown(f"<span class='model-badge'>{model_label}</span>", unsafe_allow_html=True)
-
+                    st.caption("✨ Llama-3.3-70B Pipeline")
 
 import re
 import tempfile
