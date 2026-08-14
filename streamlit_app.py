@@ -451,40 +451,66 @@ def render_chat_history_thread(active_chat_list: list, client=None) -> None:
                 with col_tb2:
                     st.caption("✨ Llama-3.3-70B Pipeline")
 
+import os
 import re
+import io
 import tempfile
+import contextlib
 from datetime import datetime
 import streamlit as st
 
+# Safe conditional imports to prevent hard app crashes if dependencies are missing
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
+
+try:
+    from tavily import TavilyClient
+except ImportError:
+    TavilyClient = None
+
+try:
+    from gtts import gTTS
+except ImportError:
+    gTTS = None
+
+
 # ==============================================================================
-# CHAT EXPORT PIPELINE (FRONTIER MARKDOWN GENERATOR)
+# 1. CHAT EXPORT PIPELINE (FRONTIER MARKDOWN GENERATOR)
 # ==============================================================================
 def export_chat_as_markdown(chat_list: list, title: str = "Chat Session") -> str:
-    """Converts structured chat history into clean, standardized Markdown 
-    complete with ISO header metadata and formatted message blocks.
-    """
+    """Converts structured chat history into clean, standardized Markdown."""
+    # Guard 1: Defensive type normalization
+    if not isinstance(chat_list, list):
+        chat_list = []
+    
+    clean_title = str(title) if title else "Chat Session"
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     md_content = [
-        f"# 📄 {title}",
+        f"# 📄 {clean_title}",
         f"**Exported On:** {timestamp}  ",
         f"**Total Messages:** {len(chat_list)}  ",
         "\n---\n"
     ]
 
     for msg in chat_list:
+        # Guard 2: Skip non-dict message payloads safely
         if not isinstance(msg, dict):
             continue
 
         role = msg.get("role", "user")
         content = msg.get("content", "")
 
-        # Handle structural content payloads (e.g. lists or dicts) safely
+        # Guard 3: Structural content normalization (handling arrays, dicts, primitives)
         if isinstance(content, list):
             extracted = []
             for item in content:
                 if isinstance(item, dict) and item.get("type") == "text":
-                    extracted.append(item.get("text", ""))
+                    extracted.append(str(item.get("text", "")))
+                elif isinstance(item, str):
+                    extracted.append(item)
             content = "\n".join(extracted) if extracted else str(content)
         elif not isinstance(content, str):
             content = str(content)
@@ -497,65 +523,72 @@ def export_chat_as_markdown(chat_list: list, title: str = "Chat Session") -> str
 
 def render_chat_export_ui() -> None:
     """UI Helper to render the Markdown download action safely in the sidebar."""
-    current_chat_name = st.session_state.get("current_chat", "New Chat")
-    
-    # Safely fetch active chat thread
-    chats = st.session_state.get("chats", {})
-    active_chat_list = chats.get(current_chat_name, [])
-
-    if active_chat_list:
-        md_data = export_chat_as_markdown(active_chat_list, title=current_chat_name)
-        clean_filename = re.sub(r'[^a-zA-Z0-9_-]', '_', current_chat_name).lower()
+    try:
+        current_chat_name = st.session_state.get("current_chat", "New Chat")
+        chats = st.session_state.get("chats", {})
         
-        st.sidebar.download_button(
-            label="📥 Export Chat (.md)",
-            data=md_data,
-            file_name=f"{clean_filename}_export.md",
-            mime="text/markdown",
-            use_container_width=True,
-            key="export_chat_md_btn"
-        )
+        # Guard: Type validation on storage retrieved from session state
+        if not isinstance(chats, dict):
+            chats = {}
+            
+        active_chat_list = chats.get(current_chat_name, [])
+        if not isinstance(active_chat_list, list):
+            active_chat_list = []
+
+        if active_chat_list:
+            md_data = export_chat_as_markdown(active_chat_list, title=current_chat_name)
+            
+            # Guard: File name sanitization against OS-level invalid file path characters
+            clean_filename = re.sub(r'[^a-zA-Z0-9_-]', '_', str(current_chat_name)).lower()
+            if not clean_filename:
+                clean_filename = "chat_export"
+
+            st.sidebar.download_button(
+                label="📥 Export Chat (.md)",
+                data=md_data,
+                file_name=f"{clean_filename}_export.md",
+                mime="text/markdown",
+                use_container_width=True,
+                key="export_chat_md_btn"
+            )
+    except Exception as err:
+        st.sidebar.caption(f"⚠️ Export feature currently unavailable.")
+        print(f"⚠️ [EXPORT ERROR]: {err}")
 
 
 # ==============================================================================
-# UPGRADE #61: TEXT-TO-SPEECH AUDIO PIPELINE
+# 2. TEXT-TO-SPEECH AUDIO PIPELINE
 # ==============================================================================
 def generate_tts_audio(text: str, speed_factor: float = 1.0) -> str:
-    """Strips markdown/code syntax and converts text into spoken audio.
-    
-    Returns temporary file path for UI audio playback widget.
-    """
-    if not text or not text.strip():
+    """Strips formatting syntax and converts text into spoken audio."""
+    # Guard 1: Input validation
+    if not text or not isinstance(text, str) or not text.strip():
+        return None
+
+    # Guard 2: Dependency check
+    if gTTS is None:
+        print("⚠️ [TTS WARN] 'gTTS' package is not installed.")
         return None
 
     try:
-        from gtts import gTTS
-    except ImportError:
-        print("⚠️ [TTS WARN] 'gTTS' package is not installed. Run 'pip install gTTS'.")
-        return None
-
-    try:
-        # 1. Clean markdown, LaTeX, HTML, and code snippets for spoken clarity
         clean_text = text
-        clean_text = re.sub(r"```[\s\S]*?```", " [code block omitted] ", clean_text)  # Remove raw code
-        clean_text = re.sub(r"`.*?`", "", clean_text)                                 # Remove inline code
-        clean_text = re.sub(r"\$\$.*?\$\$", " [equation] ", clean_text)              # Remove display math
-        clean_text = re.sub(r"\$.*?\$", " [math] ", clean_text)                       # Remove inline math
-        clean_text = re.sub(r"\[(.*?)\]\((.*?)\)", r"\1", clean_text)                # Keep link text, strip URL
-        clean_text = re.sub(r"<.*?>", "", clean_text)                                # Strip raw HTML
-        clean_text = re.sub(r"[*_#~>]", "", clean_text)                               # Strip formatting symbols
-        clean_text = re.sub(r"\s+", " ", clean_text).strip()                          # Collapse extra spaces
+        clean_text = re.sub(r"```[\s\S]*?```", " [code block omitted] ", clean_text)
+        clean_text = re.sub(r"`.*?`", "", clean_text)
+        clean_text = re.sub(r"\$\$.*?\$\$", " [equation] ", clean_text)
+        clean_text = re.sub(r"\$.*?\$", " [math] ", clean_text)
+        clean_text = re.sub(r"\[(.*?)\]\((.*?)\)", r"\1", clean_text)
+        clean_text = re.sub(r"<.*?>", "", clean_text)
+        clean_text = re.sub(r"[*_#~>]", "", clean_text)
+        clean_text = re.sub(r"\s+", " ", clean_text).strip()
 
-        # Limit to first 400 characters for high-speed speech output
+        # Enforce reasonable buffer boundary for local generation
         clean_text = clean_text[:400]
-
         if not clean_text:
             return None
 
-        # 2. Render speech via gTTS
+        # Guard 3: Safe TTS rendering and tempfile handling
         tts = gTTS(text=clean_text, lang="en", slow=(speed_factor < 1.0))
         
-        # 3. Save safely to temp file
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
             tts.save(fp.name)
             return fp.name
@@ -564,26 +597,31 @@ def generate_tts_audio(text: str, speed_factor: float = 1.0) -> str:
         print(f"⚠️ [TTS ERROR] Speech synthesis failed: {err}")
         return None
 
-# ==========================================
-# 2. UPGRADE #32 & #34: MULTI-ANGLE SEARCH & FACT ENGINE
-# ==========================================
-TAVILY_KEY = st.secrets.get("TAVILY_API_KEY", os.getenv("TAVILY_API_KEY", ""))
 
+# ==============================================================================
+# 3. MULTI-ANGLE SEARCH & FACT SYNTHESIS ENGINE
+# ==============================================================================
+def execute_deconstructed_multi_search(query: str, client, selected_model: str) -> str:
+    """Deconstructs queries, performs parallel retrieval, and synthesizes citations."""
+    tavily_key = st.secrets.get("TAVILY_API_KEY", os.getenv("TAVILY_API_KEY", ""))
+    
+    # Guard 1: Environment & dependency checks
+    if not tavily_key:
+        return "⚠️ Search skipped: Missing `TAVILY_API_KEY` in secrets or environment."
+    if TavilyClient is None:
+        return "⚠️ Search skipped: `tavily-python` SDK is not installed."
+    if not client:
+        return "⚠️ Search skipped: OpenAI/OpenRouter LLM client is not initialized."
 
-def execute_deconstructed_multi_search(
-    query: str, client, selected_model: str
-) -> str:
-    """UPGRADE #32 & #34: Deconstructs complex queries into sub-searches,
-    executes multi-angle retrieval, and synthesizes factually verified claims with clickable citations.
-    """
-    if not TAVILY_KEY:
-        return "⚠️ Missing `TAVILY_API_KEY` in Streamlit secrets!"
+    try:
+        tavily = TavilyClient(api_key=tavily_key)
+    except Exception as err:
+        return f"⚠️ Failed to instantiate Tavily Client: {err}"
 
-    tavily = TavilyClient(api_key=TAVILY_KEY)
-
-    # 1. Generate 3 complementary sub-queries for multi-angle synthesis
+    # Step 1: Sub-query Generation with Fallback
+    queries = [query]
     sub_query_prompt = (
-        f"Deconstruct this query into 3 distinct search sub-queries to capture different angles (e.g. core facts, counter-evidence, latest consensus):\n"
+        f"Deconstruct this query into 3 distinct search sub-queries to capture different angles:\n"
         f"Query: '{query}'\n"
         "Return ONLY the 3 queries, one per line, with no extra text."
     )
@@ -593,16 +631,16 @@ def execute_deconstructed_multi_search(
             model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": sub_query_prompt}],
             temperature=0.1,
+            timeout=10.0
         )
-        queries = [
-            q.strip(" 123456789.-*")
-            for q in sub_res.choices[0].message.content.strip().split("\n")
-            if q.strip()
-        ][:3]
+        raw_queries = sub_res.choices[0].message.content.strip().split("\n")
+        parsed_queries = [re.sub(r"^[0-9\.\-\*\s]+", "", q).strip() for q in raw_queries if q.strip()]
+        if parsed_queries:
+            queries = parsed_queries[:3]
     except Exception:
-        queries = [query]
+        queries = [query]  # Fallback to single raw query if LLM deconstruction times out
 
-    # 2. Concurrently retrieve facts across queries
+    # Step 2: Retrieval loop
     aggregated_sources = []
     sources_metadata = []
     source_counter = 1
@@ -611,121 +649,92 @@ def execute_deconstructed_multi_search(
         try:
             res = tavily.search(query=q, max_results=2)
             for item in res.get("results", []):
-                title = item.get("title", "Source").strip()
-                content = item.get("content", "").strip()
-                url = item.get("url", "#").strip()
+                title = str(item.get("title", "Source")).strip()
+                content = str(item.get("content", "")).strip()
+                url = str(item.get("url", "#")).strip()
                 
-                # Store structured format for LLM prompt context
                 aggregated_sources.append(
                     f"[{source_counter}] **{title}** (URL: {url})\nContent: {content}"
                 )
-                
-                # Store metadata for references list at the bottom
                 sources_metadata.append({
                     "id": source_counter,
                     "title": title,
                     "url": url
                 })
-                
                 source_counter += 1
         except Exception:
             continue
 
     if not aggregated_sources:
-        return "No authoritative search sources could be retrieved."
+        return "No authoritative search sources could be retrieved at this time."
 
-    # 3. Synthesize with Clickable Citation Anchors
+    # Step 3: Synthesis
     synthesis_prompt = (
-        f"You are an expert research assistant. Synthesize an accurate, well-structured answer for the query: '{query}' using these factual sources.\n\n"
+        f"Synthesize an accurate, well-structured answer for: '{query}' using these factual sources.\n\n"
         "CRITICAL CITATION RULES:\n"
-        "1. Insert clickable markdown citation links in your answer whenever referencing facts, e.g., [[1]](URL), [[2]](URL).\n"
-        "2. Make sure the citation URL matches the exact source URL provided below.\n"
-        "3. Keep the tone informative, balanced, and easy to read.\n\n"
+        "1. Insert clickable markdown citation links in your answer whenever referencing facts, e.g., [[1]](URL).\n"
+        "2. Keep the tone informative, balanced, and scannable.\n\n"
         "SOURCES:\n" + "\n\n".join(aggregated_sources)
     )
 
-    synthesis_res = client.chat.completions.create(
-        model=selected_model,
-        messages=[{"role": "user", "content": synthesis_prompt}],
-        temperature=0.2,
-    )
+    try:
+        synthesis_res = client.chat.completions.create(
+            model=selected_model,
+            messages=[{"role": "user", "content": synthesis_prompt}],
+            temperature=0.2,
+            timeout=30.0
+        )
+        ai_response = synthesis_res.choices[0].message.content.strip()
+    except Exception as err:
+        return f"⚠️ Fact synthesis error: {err}"
 
-    ai_response = synthesis_res.choices[0].message.content.strip()
-
-    # 4. Append clean Sources & References footer
+    # Step 4: Append references footer
     references_footer = "\n\n---\n### 🌐 Sources & References\n"
     for src in sources_metadata:
         references_footer += f"* [[{src['id']}]] [{src['title']}]({src['url']})\n"
 
     return ai_response + references_footer
 
-# ==============================================================================
-# UPGRADE #31-#57: UNIVERSAL REASONING & SYNTHESIS ENGINE (FRONTIER PARALLEL)
-# ==============================================================================
-import re
 
+# ==============================================================================
+# 4. SYSTEM PROMPT BUILDER & VECTOR-LIKE MEMORY RETRIEVAL
+# ==============================================================================
 def build_dynamic_system_prompt(
     user_input: str, base_personality: str, language: str, detected_style: str = "GENERAL"
 ) -> str:
-    """Builds a high-density, context-aware dynamic system prompt for LLMs.
-    
-    Includes dynamic domain activation, intelligent memory retrieval, 
-    and adaptive stylistic routing (Claude/GPT-4o output tiering).
-    """
-    lowered_input = user_input.lower()
+    """Builds a high-density, context-aware dynamic system prompt."""
+    lowered_input = str(user_input).lower() if user_input else ""
+    safe_lang = str(language) if language else "English"
+    safe_persona = str(base_personality) if base_personality else "Helpful Assistant"
 
-    # --------------------------------------------------------------------------
-    # 1. CASUAL ROUTE: Ultra-fast, natural conversational mode
-    # --------------------------------------------------------------------------
     if detected_style == "CASUAL":
         return (
-            f"You are a warm, highly intelligent, and empathetic peer operating as a {base_personality}.\n"
+            f"You are a warm, highly intelligent peer operating as a {safe_persona}.\n"
             f"RULES:\n"
-            f"- Speak naturally, concisely, and directly in {language}.\n"
-            f"- Avoid robotic disclaimers, rigid technical tables, or unnatural markdown headers unless requested.\n"
+            f"- Speak naturally, concisely, and directly in {safe_lang}.\n"
+            f"- Avoid disclaimers or rigid headers unless asked.\n"
             f"- Be conversational, perceptive, and helpful."
         )
 
-    # --------------------------------------------------------------------------
-    # 2. CORE REASONING FRAMEWORK (Frontier Cognitive System Prompt)
-    # --------------------------------------------------------------------------
     prompt = [
-        f"You are an elite, highly competent AI assistant operating as a {base_personality}.",
+        f"You are an elite AI assistant operating as a {safe_persona}.",
         "",
-        "### 🧠 CORE COGNITIVE & EPISTEMIC DIRECTIVES:",
-        "1. **First-Principles Decomposition:** Strip problems down to fundamental physical, mathematical, or logical axioms.",
-        "2. **Rigorous Epistemics:** Distinguish empirical facts from theoretical models and speculation. Avoid pseudoscience tropes.",
-        "3. **Dual-Pass Verification:** Internally audit code, calculations, and logical chains for edge cases before outputting.",
-        "4. **Quantitative Precision:** Provide concrete units, Big-O metrics, probabilities, or orders of magnitude where applicable.",
-        "",
-        "### ⚡ SYNTHESIS & FORMATTING GUIDELINES:",
-        "- **Zero Fluff:** Skip meta-preambles ('Sure, here is...') and self-congratulatory summaries. Start directly with the answer.",
-        "- **High-Concept Structure:** Use bold conceptual titles, clear hierarchy, and clean scannable bullet points.",
-        "- **Contrastive Clarity:** Make proposed solutions fundamentally distinct rather than minor variations.",
-        "- **Falsiability & Bounds:** Explicitly identify failure modes, assumptions, and physical/system limits.",
-        "- **Code & UI Artifacts:** Provide complete, production-ready, self-contained code blocks with explicit syntax highlighting.",
-        "- **Impactful Conclusion:** End complex topics with a sharp, memorable core takeaway."
+        "### 🧠 CORE COGNITIVE DIRECTIVES:",
+        "1. **First-Principles Reasoning:** Deconstruct complex queries into core logical elements.",
+        "2. **Zero Fluff:** Start directly with the answer without preambles like 'Sure, here is...'.",
+        "3. **Quantitative Precision:** Use concrete units, probabilities, or metrics where applicable.",
+        "4. **Production Code:** Provide clean, runnable code with explicit syntax highlighting."
     ]
 
-    # --------------------------------------------------------------------------
-    # 3. DYNAMIC DOMAIN ADAPTATION (Keyword Matching)
-    # --------------------------------------------------------------------------
+    # Domain adaptation keywords
     domain_rules = {
-        ("physics", "dyson", "kardashev", "quantum", "relativity", "thermodynamics", "space", "astronomy"): (
-            "\n[DOMAIN ACTIVATED: ASTROPHYSICS & HARD SCIENCE]\n"
-            "- Apply strict relativistic mechanics, quantum field concepts, and thermodynamic limits."
-        ),
         ("code", "architecture", "algorithm", "python", "javascript", "refactor", "bug", "api", "database"): (
             "\n[DOMAIN ACTIVATED: PRINCIPAL SYSTEMS ARCHITECT]\n"
-            "- Prioritize production modularity, edge-case safety, typed signatures, and execution efficiency."
+            "- Focus on modularity, edge-case safety, typed signatures, and execution efficiency."
         ),
-        ("data", "dataframe", "pandas", "plot", "csv", "statistics", "machine learning", "regression"): (
+        ("data", "dataframe", "pandas", "plot", "csv", "statistics", "machine learning"): (
             "\n[DOMAIN ACTIVATED: SENIOR DATA SCIENTIST]\n"
-            "- Focus on statistical validity, data pipeline hygiene, vectorization, and actionable visualizations."
-        ),
-        ("story", "creative", "fiction", "worldbuilding", "narrative", "character", "dialogue"): (
-            "\n[DOMAIN ACTIVATED: CREATIVE DIRECTOR & WORLD-BUILDER]\n"
-            "- Focus on sensory immersion, high-stakes conflict, distinct character voice, and original metaphors."
+            "- Focus on statistical validity, data hygiene, vectorization, and clean visualizations."
         )
     }
 
@@ -734,137 +743,143 @@ def build_dynamic_system_prompt(
             prompt.append(adaptation_prompt)
             break
 
-    # --------------------------------------------------------------------------
-    # 4. MODE MODIFIERS
-    # --------------------------------------------------------------------------
-    if detected_style == "ANALYTICAL":
-        prompt.append(
-            "\n[MODE: DEEP MATRIX REASONING]\n"
-            "- Present multi-variable trade-offs in clean markdown tables.\n"
-            "- Enforce precise quantitative metrics and resource allocations."
-        )
+    if safe_lang.lower() != "english":
+        prompt.append(f"\nCRITICAL LANGUAGE DIRECTIVE: You MUST respond entirely in {safe_lang}.")
 
-    if language and language.lower() != "english":
-        prompt.append(f"\nCRITICAL LANGUAGE DIRECTIVE: You MUST respond entirely in {language}.")
+    # Jaccard Memory Retrieval Guard
+    try:
+        memory_vault = getattr(st.session_state, "memory_vault", [])
+        if isinstance(memory_vault, list) and memory_vault:
+            user_tokens = set(re.findall(r"\w+", lowered_input))
+            if user_tokens:
+                scored_memories = []
+                for fact in memory_vault:
+                    if not isinstance(fact, str):
+                        continue
+                    fact_tokens = set(re.findall(r"\w+", fact.lower()))
+                    union_len = len(user_tokens.union(fact_tokens))
+                    score = len(user_tokens.intersection(fact_tokens)) / float(union_len if union_len > 0 else 1)
+                    scored_memories.append((score, fact))
 
-    # --------------------------------------------------------------------------
-    # 5. SMART VECTOR-LIKE MEMORY VAULT RETRIEVAL (Jaccard Ranker)
-    # --------------------------------------------------------------------------
-    memory_vault = getattr(st.session_state, "memory_vault", [])
-    if memory_vault:
-        user_tokens = set(re.findall(r"\w+", lowered_input))
-        scored_memories = []
+                scored_memories.sort(key=lambda x: x[0], reverse=True)
+                top_memories = [m[1] for m in scored_memories[:3] if m[0] > 0.05]
 
-        for fact in memory_vault:
-            fact_tokens = set(re.findall(r"\w+", fact.lower()))
-            intersection = user_tokens.intersection(fact_tokens)
-            
-            # Simple relevance scoring based on token overlap
-            score = len(intersection) / float(len(user_tokens.union(fact_tokens)) + 1e-5)
-            scored_memories.append((score, fact))
-
-        # Sort by relevance score, descending
-        scored_memories.sort(key=lambda x: x[0], reverse=True)
-        
-        # Pull top relevant facts or fallback to top 3
-        top_memories = [m[1] for m in scored_memories[:3] if m[0] > 0.05] or memory_vault[:3]
-
-        if top_memories:
-            memory_block = "\n".join([f"- {m}" for m in top_memories])
-            prompt.append(
-                f"\n[RELEVANT USER CONTEXT]:\n"
-                f"Incorporate these facts naturally where relevant without explicitly mentioning 'Memory Vault':\n"
-                f"{memory_block}"
-            )
+                if top_memories:
+                    memory_block = "\n".join([f"- {m}" for m in top_memories])
+                    prompt.append(
+                        f"\n[RELEVANT USER CONTEXT]:\n"
+                        f"Incorporate these relevant user facts naturally:\n{memory_block}"
+                    )
+    except Exception as err:
+        print(f"⚠️ [MEMORY RETRIEVAL WARN]: {err}")
 
     return "\n".join(prompt)
 
-# ==========================================
-# 4. UPGRADE #35: DYNAMIC VISUAL CANVAS AUTO-RENDERER
-# ==========================================
+
+# ==============================================================================
+# 5. DYNAMIC VISUAL CANVAS AUTO-RENDERER
+# ==============================================================================
 def render_data_canvas(response_text: str):
-    """UPGRADE #35: Automatically parses tables or CSV structures into
-    interactive charts & dataframes.
-    """
-    lines = [line.strip() for line in response_text.split("\n") if "|" in line]
-    if len(lines) >= 3:
-        try:
-            cleaned_lines = [
-                re.sub(r"^\||\|$", "", line)
-                for line in lines
-                if not re.match(r"^[\vert{}\s:-]+$", line)
-            ]
-            data = [
-                [cell.strip() for cell in line.split("|")]
-                for line in cleaned_lines
-            ]
+    """Parses markdown tables or CSV structures into dynamic charts & dataframes."""
+    if not response_text or "|" not in response_text:
+        return
 
-            if len(data) > 1:
-                df = pd.DataFrame(data[1:], columns=data[0])
-                for col in df.columns:
-                    df[col] = pd.to_numeric(
-                        df[col].str.replace(",", ""), errors="ignore"
-                    )
+    # Guard 1: Require Pandas library
+    if pd is None:
+        return
 
-                num_cols = df.select_dtypes(include=["number"]).columns.tolist()
+    try:
+        lines = [line.strip() for line in response_text.split("\n") if "|" in line]
+        if len(lines) < 3:
+            return
 
-                if num_cols:
-                    st.markdown("#### 📊 Dynamic Visual Canvas")
-                    st.dataframe(df, use_container_width=True)
-                    chart_type = st.radio(
-                        "Chart Type:",
-                        ["Bar", "Line"],
-                        horizontal=True,
-                        key=f"chart_type_{hash(response_text)}",
-                    )
-                    if chart_type == "Bar":
-                        st.bar_chart(df.set_index(df.columns[0])[num_cols])
-                    else:
-                        st.line_chart(df.set_index(df.columns[0])[num_cols])
-        except Exception:
-            pass
+        cleaned_lines = [
+            re.sub(r"^\||\|$", "", line)
+            for line in lines
+            if not re.match(r"^[\vert{}\s:-]+$", line)
+        ]
+        
+        data = [[cell.strip() for cell in line.split("|")] for line in cleaned_lines]
+
+        if len(data) > 1:
+            headers = data[0]
+            rows = data[1:]
+            df = pd.DataFrame(rows, columns=headers)
+
+            for col in df.columns:
+                df[col] = pd.to_numeric(df[col].astype(str).str.replace(",", ""), errors="ignore")
+
+            num_cols = df.select_dtypes(include=["number"]).columns.tolist()
+
+            if num_cols:
+                st.markdown("#### 📊 Dynamic Visual Canvas")
+                st.dataframe(df, use_container_width=True)
+                
+                chart_key = f"chart_type_{abs(hash(response_text))}"
+                chart_type = st.radio("Chart Representation:", ["Bar", "Line"], horizontal=True, key=chart_key)
+                
+                index_col = df.columns[0]
+                if chart_type == "Bar":
+                    st.bar_chart(df.set_index(index_col)[num_cols])
+                else:
+                    st.line_chart(df.set_index(index_col)[num_cols])
+    except Exception as err:
+        # Silently fail on non-standard tables to prevent visual disruptions
+        print(f"⚠️ [CANVAS RENDER WARN]: {err}")
 
 
-# ==========================================
-# UPGRADE #50: LIVE INLINE CODE EXECUTION ENGINE
-# ==========================================
+# ==============================================================================
+# 6. INLINE INTERACTIVE CODE EXECUTION ENGINE
+# ==============================================================================
 def render_interactive_code_runner(response_text: str, msg_idx: int):
-    """UPGRADE #50: Scans the response for Python code blocks and provides a
-    live execution button directly inside the chat interface.
-    """
-    python_blocks = re.findall(
-        r"```python\s*(.*?)\s*```", response_text, re.DOTALL
-    )
-    if python_blocks:
-        for b_idx, code in enumerate(python_blocks):
-            with st.expander(
-                f"⚡ Interactive Code Execution (Block {b_idx+1})",
-                expanded=False,
-            ):
-                st.code(code, language="python")
-                if st.button(
-                    f"▶️ Run Python Code", key=f"run_code_{msg_idx}_{b_idx}"
-                ):
-                    output_buffer = io.StringIO()
-                    try:
-                        with contextlib.redirect_stdout(output_buffer):
-                            exec_globals = {"st": st, "pd": pd}
-                            exec(code, exec_globals)
-                        output_text = output_buffer.getvalue()
-                        if output_text:
-                            st.success("Execution Successful:")
-                            st.code(output_text)
-                        else:
-                            st.info(
-                                "Code executed successfully with no printed stdout output."
-                            )
-                    except Exception as e:
-                        st.error(f"Execution Error: {e}")
+    """Provides an interactive Python code execution block within the chat interface."""
+    if not response_text or "```python" not in response_text:
+        return
 
+    python_blocks = re.findall(r"```python\s*(.*?)\s*```", response_text, re.DOTALL)
+    if not python_blocks:
+        return
+
+    for b_idx, code in enumerate(python_blocks):
+        clean_code = code.strip()
+        if not clean_code:
+            continue
+
+        expander_title = f"⚡ Interactive Python Execution (Block {b_idx + 1})"
+        with st.expander(expander_title, expanded=False):
+            st.code(clean_code, language="python")
+            
+            run_key = f"run_code_{msg_idx}_{b_idx}_{abs(hash(clean_code))}"
+            if st.button("▶️ Execute Code", key=run_key):
+                output_buffer = io.StringIO()
+                
+                # Isolated namespace setup
+                exec_globals = {
+                    "st": st,
+                    "pd": pd,
+                    "re": re,
+                    "datetime": datetime
+                }
+
+                try:
+                    # Redirect stdout to capture print() calls safely
+                    with contextlib.redirect_stdout(output_buffer):
+                        exec(clean_code, exec_globals)
+                    
+                    output_text = output_buffer.getvalue().strip()
+                    if output_text:
+                        st.success("Execution Completed:")
+                        st.code(output_text)
+                    else:
+                        st.info("Executed successfully with no printed stdout output.")
+
+                except Exception as execution_err:
+                    st.error(f"Execution Error: {type(execution_err).__name__} - {execution_err}")
 
 # ==========================================
 # UPGRADE #54: AUTONOMOUS AGENTIC CODE DEBUGGER
 # ==========================================
+
 def run_autonomous_code_debugger(code_snippet: str, client, model: str) -> str:
     """UPGRADE #54: Runs code in a sandboxed capture environment, traps errors,
     and asks LLM to self-correct iteratively until passing.
