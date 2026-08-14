@@ -876,76 +876,135 @@ def render_interactive_code_runner(response_text: str, msg_idx: int):
                 except Exception as execution_err:
                     st.error(f"Execution Error: {type(execution_err).__name__} - {execution_err}")
 
-# ==========================================
-# UPGRADE #54: AUTONOMOUS AGENTIC CODE DEBUGGER
-# ==========================================
+import os
+import re
+import io
+import json
+import base64
+import contextlib
+import mimetypes
+from datetime import datetime
+import streamlit as st
 
+# Safe conditional imports for external third-party SDKs
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
+
+try:
+    from groq import Groq
+except ImportError:
+    Groq = None
+
+try:
+    from audio_recorder_streamlit import audio_recorder
+except ImportError:
+    audio_recorder = None
+
+
+# ==============================================================================
+# UPGRADE #54: AUTONOMOUS AGENTIC CODE DEBUGGER (HARDENED)
+# ==============================================================================
 def run_autonomous_code_debugger(code_snippet: str, client, model: str) -> str:
-    """UPGRADE #54: Runs code in a sandboxed capture environment, traps errors,
-    and asks LLM to self-correct iteratively until passing.
+    """Runs code in a sandboxed execution environment, traps errors, and asks
+    LLM to self-correct iteratively up to max bounds.
     """
-    st.info("🤖 Agentic Debugger active: Testing code execution...")
+    if not code_snippet or not isinstance(code_snippet, str):
+        st.error("❌ Invalid code snippet provided for debugging.")
+        return code_snippet or ""
+
+    st.info("🤖 Agentic Debugger Active: Safely testing code execution...")
     max_attempts = 3
-    current_code = code_snippet
+    current_code = code_snippet.strip()
 
     for attempt in range(1, max_attempts + 1):
         output_buffer = io.StringIO()
         try:
+            # Environment namespace setup
+            exec_globals = {
+                "st": st,
+                "pd": pd,
+                "re": re,
+                "datetime": datetime
+            }
+
             with contextlib.redirect_stdout(output_buffer):
-                exec_globals = {"st": st, "pd": pd}
                 exec(current_code, exec_globals)
+
             st.success(f"✅ Code executed cleanly on attempt {attempt}!")
             return current_code
+
         except Exception as err:
-            err_msg = str(err)
-            st.warning(f"⚠️ Attempt {attempt} failed with error: {err_msg}")
-            
+            err_msg = f"{type(err).__name__}: {err}"
+            st.warning(f"⚠️ Attempt {attempt} failed: {err_msg}")
+
+            if not client:
+                st.error("❌ Debugger halted: No active LLM client available for auto-correction.")
+                return current_code
+
             fix_prompt = (
                 f"The following Python code produced an execution error:\n\n"
                 f"```python\n{current_code}\n```\n\n"
                 f"ERROR:\n{err_msg}\n\n"
-                f"Fix the code. Return ONLY the valid Python code in standard triple-backtick markdown blocks."
+                f"Fix the code. Return ONLY valid Python code inside standard triple-backtick markdown blocks."
             )
-            res = client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": fix_prompt}],
-                temperature=0.1,
-            )
-            extracted = re.search(r"```python\s*(.*?)\s*```", res.choices[0].message.content, re.DOTALL)
-            if extracted:
-                current_code = extracted.group(1).strip()
-            else:
+
+            try:
+                res = client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": fix_prompt}],
+                    temperature=0.1,
+                    timeout=20.0
+                )
+                
+                raw_response = res.choices[0].message.content or ""
+                extracted = re.search(r"```python\s*(.*?)\s*```", raw_response, re.DOTALL)
+                
+                if extracted and extracted.group(1).strip():
+                    current_code = extracted.group(1).strip()
+                else:
+                    st.error("❌ Agentic debugger could not extract corrected Python block from response.")
+                    break
+            except Exception as api_err:
+                st.error(f"❌ LLM correction request failed: {api_err}")
                 break
 
-    st.error("❌ Agentic debugger reached maximum iterations.")
+    st.error("❌ Agentic debugger reached maximum iterations without clean resolution.")
     return current_code
 
 
 # ==============================================================================
-# UPGRADE #55: SMART CHAT AUTO-SUMMARIZER (FRONTIER PARALLEL)
+# UPGRADE #55: SMART CHAT AUTO-SUMMARIZER (HARDENED)
 # ==============================================================================
-import re
-
-def auto_summarize_chat_title(chat_history, client, current_name: str) -> None:
-    """Dynamically generates clean, human-like chat titles based on early message intent.
+def auto_summarize_chat_title(chat_history: list, client, current_name: str) -> None:
+    """Dynamically generates clean chat titles based on early user intent.
     
-    Robust against dictionary key collisions, markdown formatting leaks, and API failures.
+    Guards against state race conditions, dictionary key collisions, and API outages.
     """
-    # Find the first non-empty user text message in history
-    first_user_msg = None
-    for msg in chat_history:
-        if msg.get("role") == "user" and isinstance(msg.get("content"), str) and msg.get("content").strip():
-            first_user_msg = msg.get("content").strip()
-            break
-
-    # Only attempt renaming on default thread names when user text exists
-    if not first_user_msg or not (current_name.startswith("Chat ") or current_name == "New Chat"):
+    if not isinstance(chat_history, list) or not chat_history:
         return
 
-    # System instruction tailored for precise naming without chatter
+    # Find the first non-empty user text message
+    first_user_msg = None
+    for msg in chat_history:
+        if isinstance(msg, dict) and msg.get("role") == "user":
+            content = msg.get("content", "")
+            if isinstance(content, str) and content.strip():
+                first_user_msg = content.strip()
+                break
+
+    # Only rename default dynamic naming threads
+    safe_current_name = str(current_name) if current_name else ""
+    if not first_user_msg or not (safe_current_name.startswith("Chat ") or safe_current_name == "New Chat"):
+        return
+
+    if not client:
+        return
+
     system_instruction = (
         "You are an expert title generator for an AI platform. "
-        "Create a concise, highly relevant title (2 to 5 words maximum) summarizing the user's topic or intent.\n"
+        "Create a concise, highly relevant title (2 to 5 words maximum) summarizing the topic.\n"
         "STRICT CONSTRAINTS:\n"
         "- Return ONLY the plain text title.\n"
         "- Do NOT use quotes, punctuation, emojis, or markdown.\n"
@@ -962,69 +1021,69 @@ def auto_summarize_chat_title(chat_history, client, current_name: str) -> None:
             ],
             temperature=0.2,
             max_tokens=15,
+            timeout=8.0
         )
-        
-        raw_title = res.choices[0].message.content.strip()
-        
-        # 1. Clean sanitization pass (strip quotes, symbols, extra spaces)
+
+        raw_title = res.choices[0].message.content or ""
         cleaned_title = re.sub(r'[^a-zA-Z0-9\s-]', '', raw_title).strip()
         cleaned_title = " ".join(cleaned_title.split()).title()
 
-        # Fallback if AI returns blank or ultra-short junk
         if not cleaned_title or len(cleaned_title) < 2:
             cleaned_title = " ".join(first_user_msg.split()[:4]).title()
 
-        # Limit absolute length
         if len(cleaned_title) > 35:
             cleaned_title = cleaned_title[:32].rstrip() + "..."
 
-        # 2. Prevent Dictionary Collision (e.g., if "Python Basics" already exists)
+        # Safe Session State Dictionary Atomic Mutation
+        chats = st.session_state.get("chats", {})
+        if not isinstance(chats, dict):
+            return
+
         final_title = cleaned_title
         counter = 1
-        while final_title in st.session_state.get("chats", {}):
+        while final_title in chats:
             final_title = f"{cleaned_title} ({counter})"
             counter += 1
 
-        # 3. Safe State Mutation
-        if current_name in st.session_state.chats:
-            chat_data = st.session_state.chats.pop(current_name)
-            st.session_state.chats[final_title] = chat_data
+        if safe_current_name in chats:
+            chat_data = chats.pop(safe_current_name)
+            chats[final_title] = chat_data
+            st.session_state.chats = chats
             st.session_state.current_chat = final_title
-            
-            # Helper safely handles disk sync if function exists
-            if "save_chats_to_disk" in globals():
-                save_chats_to_disk()
-                
+
+            if "save_chats_to_disk" in globals() and callable(globals()["save_chats_to_disk"]):
+                try:
+                    globals()["save_chats_to_disk"]()
+                except Exception as save_err:
+                    print(f"⚠️ Disk save sync error: {save_err}")
+
             st.rerun()
 
-    except Exception:
-        # Fail silently without breaking the UI flow
-        pass
+    except Exception as err:
+        print(f"⚠️ [TITLE AUTO-SUMMARIZER WARN]: {err}")
 
 
 # ==============================================================================
-# UPGRADE #62: PROMPT ENHANCER & QUERY EXPANSION (GPT/CLAUDE STYLE)
+# UPGRADE #62: PROMPT ENHANCER & QUERY EXPANSION
 # ==============================================================================
 def enhance_user_prompt(prompt_text: str, client) -> str:
-    """Transforms raw user input into a rich, structured, frontier-grade AI instruction.
-    
-    Uses strict prompt engineering to force objective prompt refinement without answering.
-    """
+    """Transforms raw user input into a rich, structured instruction payload."""
+    if not prompt_text or not isinstance(prompt_text, str):
+        return ""
+
     cleaned_input = prompt_text.strip()
-    
-    # Don't waste API calls on ultra-short commands or already-detailed prompts
-    if not cleaned_input or len(cleaned_input) < 3:
+    if len(cleaned_input) < 3 or not client:
         return prompt_text
 
     system_instruction = (
-        "You are an expert Prompt Engineer for frontier AI models (Claude 3.5, GPT-4o).\n"
-        "Your task is to take a raw user input and transform it into a structured, highly effective system prompt.\n\n"
+        "You are an expert Prompt Engineer for frontier AI models.\n"
+        "Transform raw user input into a structured, highly effective instruction prompt.\n\n"
         "GUIDELINES:\n"
         "1. Clarify intent, context, objective, and output constraints.\n"
-        "2. Add structural formatting guidelines (e.g., step-by-step, bullet points, code-first) if beneficial.\n"
+        "2. Add structural formatting guidelines where beneficial.\n"
         "3. Preserve the core meaning, domain, and language of the original query.\n"
-        "4. DO NOT answer the user's query or fulfill the request. ONLY rewrite the prompt itself.\n"
-        "5. Output ONLY the improved prompt text. No preamble, no postscript, no commentary."
+        "4. DO NOT answer the query. ONLY rewrite the prompt itself.\n"
+        "5. Output ONLY the improved prompt text without commentary or preambles."
     )
 
     try:
@@ -1036,88 +1095,69 @@ def enhance_user_prompt(prompt_text: str, client) -> str:
             ],
             temperature=0.3,
             max_tokens=600,
+            timeout=10.0
         )
-        
-        enhanced = res.choices[0].message.content.strip()
-        
-        # Strip accidental conversational framing (e.g., "Here is the enhanced prompt:")
-        if enhanced.startswith("Here is") or enhanced.startswith("Enhanced Prompt:"):
-            enhanced = re.sub(r'^(Here is[^\n]*\n|Enhanced Prompt:\s*)', '', enhanced, flags=re.IGNORECASE).strip()
 
-        # Security check: If AI fails and returns empty, fall back safely
-        return enhanced if len(enhanced) > len(cleaned_input) else prompt_text
+        enhanced = res.choices[0].message.content or ""
+        enhanced = enhanced.strip()
 
-    except Exception:
+        # Clean conversational wrappers safely
+        enhanced = re.sub(r'^(Here is[^\n]*\n|Enhanced Prompt:\s*)', '', enhanced, flags=re.IGNORECASE).strip()
+
+        return enhanced if len(enhanced) >= len(cleaned_input) else prompt_text
+
+    except Exception as err:
+        print(f"⚠️ [PROMPT ENHANCER WARN]: {err}")
         return prompt_text
 
 
-import re
-
 # ==============================================================================
-# UPGRADE #53: AUTO-SEARCH INTENT ROUTER (FRONTIER PARALLEL)
+# UPGRADE #53: AUTO-SEARCH INTENT ROUTER
 # ==============================================================================
-
-# Search Trigger Keywords
 REALTIME_KEYWORDS = {
-    "news", "latest", "today", "yesterday", "current", "weather", 
-    "score", "results", "winner", "stock", "price", "who won", 
-    "schedule", "upcoming", "event", "standings", "release date", 
+    "news", "latest", "today", "yesterday", "current", "weather",
+    "score", "results", "winner", "stock", "price", "who won",
+    "schedule", "upcoming", "event", "standings", "release date",
     "trending", "update", "right now", "live"
 }
 
 MEDIA_LORE_KEYWORDS = {
-    "character", "characters", "cast", "show", "episode", "lore", 
+    "character", "characters", "cast", "show", "episode", "lore",
     "tadc", "fnaf", "anime", "manga", "season", "actor", "voice actor"
 }
 
 
 def needs_automatic_search(user_text: str) -> bool:
-    """Evaluates user input to determine if live web search context is required.
-    
-    Prevents hallucinations on niche pop-culture, media lore, and real-time news.
-    """
-    if not user_text or not user_text.strip():
+    """Evaluates user input to determine if live web search context is required."""
+    if not user_text or not isinstance(user_text, str) or not user_text.strip():
         return False
 
     lowered = user_text.lower().strip()
 
-    # 1. Explicit Slash Command Override
     if lowered.startswith("/search"):
         return True
 
-    # 2. Skip search for raw URL pastes or standard code/math snippets
+    # Skip search on URLs or explicit code blocks
     if re.search(r"https?://|www\.", lowered) or lowered.startswith("```"):
         return False
 
-    # 3. Dynamic Temporal Detection (Detects mentions of modern years like 2024-2026)
+    # Temporal detection for recent years
     if re.search(r"\b(202[4-6])\b", lowered):
         return True
 
-    # 4. Word-Boundary Phrase Matching for Realtime & Media Keywords
-    # Prevents false positives like 'broadcast' matching 'cast'
     tokens = set(re.findall(r"\b\w+\b", lowered))
-
     if tokens.intersection(REALTIME_KEYWORDS) or tokens.intersection(MEDIA_LORE_KEYWORDS):
         return True
 
-    # 5. Multi-Word Exact Phrase Detection
     phrases = ["who won", "release date", "right now", "voice actor", "who plays"]
     if any(phrase in lowered for phrase in phrases):
         return True
 
     return False
 
-import os
-import re
-import json
-import base64
-import mimetypes
-import pandas as pd
-import streamlit as st
-from groq import Groq
 
 # ==============================================================================
-# 5. UI CONFIG & SESSION STATE INITIALIZATION
+# UI CONFIG & WORKSPACE CONTROLS INITIALIZATION
 # ==============================================================================
 st.set_page_config(
     page_title="AI Workspace",
@@ -1126,7 +1166,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Modern Custom CSS Styling
+# Custom Workspace CSS
 st.markdown(
     """
     <style>
@@ -1164,30 +1204,44 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Ensure Session State Keys Exist
-if "chats" not in st.session_state:
+# Initialize Session State Keys Defensively
+if "chats" not in st.session_state or not isinstance(st.session_state.chats, dict):
     st.session_state.chats = {"Chat 1": []}
 
 if "current_chat" not in st.session_state or st.session_state.current_chat not in st.session_state.chats:
     st.session_state.current_chat = list(st.session_state.chats.keys())[0]
 
-if "memory_vault" not in st.session_state:
+if "memory_vault" not in st.session_state or not isinstance(st.session_state.memory_vault, list):
     st.session_state.memory_vault = []
+
+if "bookmarks" not in st.session_state or not isinstance(st.session_state.bookmarks, list):
+    st.session_state.bookmarks = []
+
+if "telemetry" not in st.session_state or not isinstance(st.session_state.telemetry, dict):
+    st.session_state.telemetry = {"requests": 0, "est_tokens": 0, "last_latency": 0.0}
 
 # Title & App Header
 st.title("🤖 Intelligent AI Workspace")
-st.caption(
-    "Enhanced with Epistemic Physics Guardrails, Live RAG Context & Dynamic Workspace Telemetry"
-)
+st.caption("Enhanced with Epistemic Guardrails, Live Search & Workspace Telemetry")
 
-# API Key Check & Client Setup
+# API Client Initialization
 GROQ_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
 
-if GROQ_KEY:
-    client = Groq(api_key=GROQ_KEY)
+if GROQ_KEY and Groq is not None:
+    try:
+        client = Groq(api_key=GROQ_KEY)
+    except Exception as err:
+        client = None
+        st.error(f"⚠️ Groq client initialization failed: {err}")
 else:
     client = None
-    st.warning("⚠️ Missing `GROQ_API_KEY` in Streamlit secrets!")
+    st.warning("⚠️ Missing `GROQ_API_KEY` or Groq SDK package!")
+
+# Helper formatting sanitizer placeholder guard
+def sanitize_and_repair_formatting(text: str) -> str:
+    if not isinstance(text, str):
+        return str(text or "")
+    return text
 
 # ==============================================================================
 # SIDEBAR CONTROLS & WORKSPACE MANAGER
@@ -1200,14 +1254,9 @@ with st.sidebar:
     st.header("💬 Chat Sessions")
     chat_names = list(st.session_state.chats.keys())
     
-    # Safe index lookup for the active thread
     current_index = chat_names.index(st.session_state.current_chat) if st.session_state.current_chat in chat_names else 0
 
-    selected_chat = st.selectbox(
-        "Select Thread:",
-        chat_names,
-        index=current_index,
-    )
+    selected_chat = st.selectbox("Select Thread:", chat_names, index=current_index)
 
     if selected_chat != st.session_state.current_chat:
         st.session_state.current_chat = selected_chat
@@ -1222,31 +1271,13 @@ with st.sidebar:
     st.markdown("---")
 
     # 2. Model Parameters
-    target_language = st.selectbox(
-        "Response Language:",
-        ["English", "Spanish", "French", "German", "Mandarin", "Japanese"],
-    )
-    personality = st.selectbox(
-        "AI Persona:",
-        [
-            "Helpful Assistant",
-            "Code Expert",
-            "Strict Tutor",
-            "Executive Analyst",
-        ],
-    )
-    selected_model = st.selectbox(
-        "Model Engine:",
-        [
-            "llama-3.3-70b-versatile",
-            "llama-3.1-8b-instant",
-            "mixtral-8x7b-32768",
-        ],
-    )
+    target_language = st.selectbox("Response Language:", ["English", "Spanish", "French", "German", "Mandarin", "Japanese"])
+    personality = st.selectbox("AI Persona:", ["Helpful Assistant", "Code Expert", "Strict Tutor", "Executive Analyst"])
+    selected_model = st.selectbox("Model Engine:", ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"])
 
     st.markdown("---")
 
-    # 3. File Context & Multimodal Ingestion Pipeline
+    # 3. Multimodal & File Ingestion
     st.header("📄 File Attachment Context")
     uploaded_file = st.file_uploader(
         "Upload TXT, CSV, Code, or Image:", 
@@ -1259,9 +1290,8 @@ with st.sidebar:
 
     if uploaded_file is not None:
         try:
-            filename = uploaded_file.name.lower()
+            filename = str(uploaded_file.name).lower()
             
-            # Robust Image Processing
             if filename.endswith((".jpg", ".png", ".jpeg", ".webp")):
                 mime_guess, _ = mimetypes.guess_type(uploaded_file.name)
                 image_mime_type = mime_guess if mime_guess else "image/jpeg"
@@ -1271,20 +1301,22 @@ with st.sidebar:
                 image_base64 = base64.b64encode(bytes_data).decode("utf-8")
                 st.image(uploaded_file, caption="📷 Loaded into Vision Context", use_container_width=True)
             
-            # CSV Analysis & Summarization
             elif filename.endswith(".csv"):
-                df_upload = pd.read_csv(uploaded_file)
-                st.markdown("#### 🔍 CSV File Summary")
-                st.write(f"**Rows:** {df_upload.shape[0]:,} | **Cols:** {df_upload.shape[1]}")
-                st.dataframe(df_upload.head(3), use_container_width=True)
-                
-                doc_context = (
-                    f"CSV File Summary ({uploaded_file.name}):\n"
-                    f"Columns: {list(df_upload.columns)}\n"
-                    f"Data Head:\n{df_upload.head(10).to_csv(index=False)}"
-                )
-            
-            # Plain Text / Code Processing
+                if pd is not None:
+                    df_upload = pd.read_csv(uploaded_file)
+                    st.markdown("#### 🔍 CSV File Summary")
+                    st.write(f"**Rows:** {df_upload.shape[0]:,} | **Cols:** {df_upload.shape[1]}")
+                    st.dataframe(df_upload.head(3), use_container_width=True)
+                    
+                    doc_context = (
+                        f"CSV File Summary ({uploaded_file.name}):\n"
+                        f"Columns: {list(df_upload.columns)}\n"
+                        f"Data Head:\n{df_upload.head(10).to_csv(index=False)}"
+                    )
+                else:
+                    uploaded_file.seek(0)
+                    doc_context = uploaded_file.read().decode("utf-8", errors="replace")
+                    st.info("📄 Standard pandas package missing; loaded CSV as raw string.")
             else:
                 uploaded_file.seek(0)
                 doc_context = uploaded_file.read().decode("utf-8", errors="replace")
@@ -1305,12 +1337,13 @@ with st.sidebar:
         st.rerun()
 
     if st.session_state.memory_vault:
-        for idx, fact in enumerate(st.session_state.memory_vault):
+        for idx, fact in enumerate(list(st.session_state.memory_vault)):
             col_m1, col_m2 = st.columns([8, 2])
             col_m1.caption(f"• {fact}")
             if col_m2.button("❌", key=f"del_mem_fact_{idx}"):
-                st.session_state.memory_vault.pop(idx)
-                st.rerun()
+                if idx < len(st.session_state.memory_vault):
+                    st.session_state.memory_vault.pop(idx)
+                    st.rerun()
                 
         if st.button("🧹 Clear All Memories", use_container_width=True):
             st.session_state.memory_vault = []
@@ -1318,52 +1351,43 @@ with st.sidebar:
     else:
         st.caption("No custom memory facts saved yet.")
 
-    # 5. Live Thread Export Engine
+    # 5. Thread Export Engine
     st.markdown("---")
     st.header("📥 Thread Export Options")
     export_chat = st.session_state.chats.get(st.session_state.current_chat, [])
     
-    # JSON Export
-    chat_export_json = json.dumps(export_chat, indent=2)
-    st.download_button(
-        label="Download Chat (.json)",
-        data=chat_export_json,
-        file_name=f"{re.sub(r'[^a-zA-Z0-9_-]', '_', st.session_state.current_chat).lower()}.json",
-        mime="application/json",
-        use_container_width=True,
-    )
-
-    # Markdown Export (if export function exists)
-    if "export_chat_as_markdown" in globals():
-        chat_export_md = export_chat_as_markdown(export_chat, title=st.session_state.current_chat)
+    try:
+        chat_export_json = json.dumps(export_chat, indent=2)
+        clean_chat_filename = re.sub(r'[^a-zA-Z0-9_-]', '_', str(st.session_state.current_chat)).lower()
+        
         st.download_button(
-            label="Download Chat (.md)",
-            data=chat_export_md,
-            file_name=f"{re.sub(r'[^a-zA-Z0-9_-]', '_', st.session_state.current_chat).lower()}.md",
-            mime="text/markdown",
+            label="Download Chat (.json)",
+            data=chat_export_json,
+            file_name=f"{clean_chat_filename}.json",
+            mime="application/json",
             use_container_width=True,
         )
+    except Exception as err:
+        st.caption("JSON Export unavailable.")
 
-    # UPGRADE #60: Session Telemetry
+    # Telemetry Dashboard
     st.markdown("---")
     st.header("📊 Telemetry Dashboard")
-    st.caption(f"⚡ **Requests Executed:** {st.session_state.telemetry['requests']}")
-    st.caption(f"🔤 **Est. Tokens Processed:** {st.session_state.telemetry['est_tokens']}")
-    st.caption(f"⏱️ **Last Latency:** {st.session_state.telemetry['last_latency']:.2f}s")
+    st.caption(f"⚡ **Requests Executed:** {st.session_state.telemetry.get('requests', 0)}")
+    st.caption(f"🔤 **Est. Tokens Processed:** {st.session_state.telemetry.get('est_tokens', 0)}")
+    st.caption(f"⏱️ **Last Latency:** {st.session_state.telemetry.get('last_latency', 0.0):.2f}s")
 
-    # UPGRADE #63: Global Workspace State Reset
+    # Global Reset
     st.markdown("---")
     if st.button("🧹 Reset Workspace Cache", use_container_width=True):
         st.session_state.chats = {"Chat 1": []}
         st.session_state.current_chat = "Chat 1"
         st.session_state.memory_vault = []
-        save_chats_to_disk()
         st.rerun()
 
-# Active Chat Buffer
-active_chat_list = st.session_state.chats[st.session_state.current_chat]
+# Active Chat Buffer Render
+active_chat_list = st.session_state.chats.get(st.session_state.current_chat, [])
 
-# Header Badge Display
 col_hdr1, col_hdr2 = st.columns([6, 4])
 with col_hdr1:
     st.markdown(f"### 💬 {st.session_state.current_chat}")
@@ -1375,50 +1399,51 @@ with col_hdr2:
 
 st.markdown("---")
 
-# Render Message History with Auto-Repair Formatting
+# Render Message History
 for idx, msg in enumerate(active_chat_list):
-    with st.chat_message(msg["role"]):
-        repaired_content = sanitize_and_repair_formatting(
-            msg.get("content", "")
-        )
+    if not isinstance(msg, dict):
+        continue
+    role = msg.get("role", "user")
+    
+    with st.chat_message(role):
+        repaired_content = sanitize_and_repair_formatting(msg.get("content", ""))
         st.markdown(repaired_content)
 
-        if msg["role"] == "assistant":
-            # Action Toolbar
+        if role == "assistant":
             col_a1, col_a2, col_a3, _ = st.columns([1, 1, 1, 7])
             if col_a1.button("📌", key=f"bm_{idx}", help="Bookmark Response"):
                 st.session_state.bookmarks.append(repaired_content)
                 st.toast("Bookmarked response!")
 
             if col_a2.button("🔊", key=f"tts_{idx}", help="Generate Speech"):
-                audio_file = generate_tts_audio(repaired_content)
-                if audio_file:
-                    st.audio(audio_file, format="audio/mp3")
+                if "generate_tts_audio" in globals():
+                    audio_file = generate_tts_audio(repaired_content)
+                    if audio_file:
+                        st.audio(audio_file, format="audio/mp3")
 
-            # Render Visual Canvas if data is present
-            if repaired_content:
+            if "render_data_canvas" in globals():
                 render_data_canvas(repaired_content)
 
-            # Render Interactive Code Execution Engine
-            if repaired_content:
+            if "render_interactive_code_runner" in globals():
                 render_interactive_code_runner(repaired_content, idx)
 
-# Voice Audio Recorder Control
+# Voice Audio Recorder
 col_v1, col_v2 = st.columns([1, 11])
 with col_v1:
-    audio_bytes = audio_recorder(
-        text="",
-        recording_color="#e8b62c",
-        neutral_color="#6aa84f",
-        icon_size="2x",
-    )
+    if audio_recorder is not None:
+        audio_bytes = audio_recorder(
+            text="",
+            recording_color="#e8b62c",
+            neutral_color="#6aa84f",
+            icon_size="2x",
+        )
+    else:
+        audio_bytes = None
 
 if audio_bytes and client:
     with st.spinner("🎙️ Transcribing audio input..."):
         try:
-            with tempfile.NamedTemporaryFile(
-                delete=False, suffix=".wav"
-            ) as fp:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as fp:
                 fp.write(audio_bytes)
                 tmp_path = fp.name
 
@@ -1428,26 +1453,33 @@ if audio_bytes and client:
                     file=audio_file,
                     response_format="text",
                 )
-            os.remove(tmp_path)
-            if transcription.strip():
-                st.session_state.input_buffer = transcription.strip()
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+                
+            if transcription and str(transcription).strip():
+                st.session_state.input_buffer = str(transcription).strip()
         except Exception as e:
             st.error(f"Voice transcription error: {e}")
 
-def classify_user_intent(prompt, client, model_name):
-    """
-    Analyzes user prompt and automatically decides which tool/route to run.
+
+def classify_user_intent(prompt: str, client, model_name: str) -> str:
+    """Analyzes user prompt and automatically decides routing.
     Returns: 'IMAGE', 'DEBUG', 'SEARCH', 'READ', or 'CHAT'
     """
-    lowered = prompt.lower().strip()
-    
-    # Fast-path for explicit slash commands
-    if lowered.startswith("/image") or lowered.startswith("/draw"): return "IMAGE"
-    if lowered.startswith("/debug"): return "DEBUG"
-    if lowered.startswith("/search"): return "SEARCH"
-    if lowered.startswith("/read"): return "READ"
+    if not prompt or not isinstance(prompt, str):
+        return "CHAT"
 
-    # Auto-detection rules
+    lowered = prompt.lower().strip()
+
+    if lowered.startswith("/image") or lowered.startswith("/draw"): 
+        return "IMAGE"
+    if lowered.startswith("/debug"): 
+        return "DEBUG"
+    if lowered.startswith("/search"): 
+        return "SEARCH"
+    if lowered.startswith("/read"): 
+        return "READ"
+
     image_triggers = ["draw", "generate an image", "picture of", "paint", "create an image"]
     if any(trigger in lowered for trigger in image_triggers):
         return "IMAGE"
@@ -1461,13 +1493,56 @@ def classify_user_intent(prompt, client, model_name):
 
     return "CHAT"
 
+import os
+import re
+import time
+import random
+import urllib.parse
+import streamlit as st
+
+# Safe conditional imports
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
+# Safe client references initialized from session state or environment
+client = globals().get("client", None)
+openrouter_client = globals().get("openrouter_client", None)
+selected_model = st.session_state.get("selected_model", "llama-3.3-70b-versatile")
+personality = st.session_state.get("personality", "Helpful Assistant")
+target_language = st.session_state.get("target_language", "English")
+
+# Retrieve uploaded context safely from state if initialized elsewhere
+doc_context = st.session_state.get("doc_context", globals().get("doc_context", ""))
+image_base64 = globals().get("image_base64", None)
+image_mime_type = globals().get("image_mime_type", "image/jpeg")
+uploaded_file = globals().get("uploaded_file", None)
+
+
+# Safe fallback helper definitions
+def sanitize_and_repair_formatting(text: str) -> str:
+    if not isinstance(text, str):
+        return str(text or "")
+    return text
+
+
+def build_dynamic_system_prompt(prompt: str, persona: str, lang: str, style: str) -> str:
+    return f"You are a {persona}. Reply in {lang}. Tone style: {style}."
+
+
 # ==============================================================================
 # FEATURE #3: DOCUMENT CANVAS & RAG INSPECTOR
 # ==============================================================================
-if doc_context and doc_context.strip():
+if doc_context and isinstance(doc_context, str) and doc_context.strip():
     with st.expander("📄 **Document Canvas & RAG Inspector**", expanded=True):
         col_canvas1, col_canvas2 = st.columns([3, 1])
-        
+
         # Calculate key Document Metrics
         word_count = len(doc_context.split())
         char_count = len(doc_context)
@@ -1475,69 +1550,67 @@ if doc_context and doc_context.strip():
 
         with col_canvas1:
             st.markdown("### 📝 Loaded Document Context")
-            
+
             # Interactive Toggle for Full View vs Truncated Preview
             full_view = st.checkbox("Show full document content", value=False, key="toggle_doc_full_view")
-            
-            display_text = doc_context if full_view or len(doc_context) <= 2000 else doc_context[:2000] + "\n\n... [Truncated for Preview]"
-            
+
+            display_text = (
+                doc_context
+                if full_view or len(doc_context) <= 2000
+                else doc_context[:2000] + "\n\n... [Truncated for Preview]"
+            )
+
             st.text_area(
                 label="Document Content Preview",
                 value=display_text,
                 height=200 if not full_view else 400,
                 disabled=True,
-                label_visibility="collapsed"
+                label_visibility="collapsed",
+                key="rag_doc_preview_area",
             )
-            
+
         with col_canvas2:
             st.markdown("### 📊 Document Metrics")
             st.metric("Total Words", f"{word_count:,}")
             st.metric("Total Characters", f"{char_count:,}")
             st.metric("Est. Read Time", f"~{est_read_time} min")
-            
+
             st.markdown("---")
-            
+
             # Safe Context Reset Action
             if st.button("🧹 Clear Canvas", use_container_width=True, key="clear_doc_canvas_btn"):
-                # Clear all persistent document states
                 st.session_state.doc_context = ""
                 doc_context = ""
-                
-                # Clear Streamlit file uploader widget key if present
+
                 if "uploader_key" in st.session_state:
                     del st.session_state["uploader_key"]
-                    
+
                 st.success("Document context cleared!")
                 st.rerun()
 
 
-import time
-import streamlit as st
-
-import time
-import re
-import streamlit as st
-
 # ==============================================================================
-# INPUT EXECUTION PIPELINE (FRONTIER DISPATCHER - PRODUCTION GRADE)
+# INPUT EXECUTION PIPELINE (FRONTIER DISPATCHER)
 # ==============================================================================
 user_input = st.chat_input("Ask anything, use /search, /image, /debug, or /enhance...")
 
-# Handle buffer redirects (e.g. prompt presets or quick actions)
+# Handle buffer redirects (e.g., prompt presets or voice input)
 if st.session_state.get("input_buffer") and not user_input:
     user_input = st.session_state.input_buffer
     st.session_state.input_buffer = ""
 
 if user_input and client:
     start_time = time.time()
+    final_reply = ""  # Scope accumulator for response and telemetry
 
     # 1. Thread Binding & Message Mutation
     current_thread = st.session_state.get("current_chat", "New Chat")
-    if "chats" not in st.session_state:
+    if "chats" not in st.session_state or not isinstance(st.session_state.chats, dict):
         st.session_state.chats = {}
+
     if current_thread not in st.session_state.chats:
         st.session_state.chats[current_thread] = []
-    
+
     active_chat_list = st.session_state.chats[current_thread]
 
     # 2. Command Override & Prompt Enhancement Pipeline
@@ -1549,48 +1622,49 @@ if user_input and client:
                     user_input = enhance_user_prompt(clean_prompt, client)
                     st.info(f"**Enhanced Prompt:** {user_input}")
 
-    # Log user activity
-    print(f"--- [USER ACTIVITY DETECTED] ---")
-    print(f"Thread: {current_thread} | Input: {user_input[:100]}...")
-
-    # 3. Dynamic Intent Classification & Slash Command Fast-Pass
+    # 3. Dynamic Intent Classification & Route Mapping
     lowered_input = user_input.lower().strip()
 
     if lowered_input.startswith("/search"):
         detected_route = "ROUTE_SEARCH"
-    elif lowered_input.startswith("/image") or lowered_input.startswith("/imagine"):
+    elif lowered_input.startswith(("/image", "/imagine", "/draw")):
         detected_route = "ROUTE_IMAGE_GEN"
     elif lowered_input.startswith("/debug"):
         detected_route = "ROUTE_DEBUG"
+    elif lowered_input.startswith("/read"):
+        detected_route = "ROUTE_READ"
     else:
-        # Fallback to auto-classifier if available
         if "classify_user_intent" in globals():
             try:
-                detected_route = classify_user_intent(user_input, client, selected_model)
+                classified = classify_user_intent(user_input, client, selected_model)
+                route_map = {
+                    "IMAGE": "ROUTE_IMAGE_GEN",
+                    "DEBUG": "ROUTE_DEBUG",
+                    "SEARCH": "ROUTE_SEARCH",
+                    "READ": "ROUTE_READ",
+                }
+                detected_route = route_map.get(classified, "ROUTE_STANDARD")
             except Exception:
                 detected_route = "ROUTE_STANDARD"
         else:
             detected_route = "ROUTE_STANDARD"
 
-    print(f"--- [AUTO-ROUTER] Active Route: {detected_route} ---")
-
-    # 4. Append User Message to Thread State & Render Immediately
+    # 4. Append User Message & Display
     active_chat_list.append({"role": "user", "content": user_input})
-    
     with st.chat_message("user"):
         st.markdown(user_input)
 
     # 5. Query Disambiguation & Heuristic Parsing
     processed_prompt = user_input
     if "tadc" in lowered_input and "character" in lowered_input:
-        processed_prompt += " (referring to the individuals/cast in the show 'The Amazing Digital Circus')"
+        processed_prompt += " (referring to the cast of 'The Amazing Digital Circus')"
 
     # 6. Adaptive Temperature & Style Tuning
-    casual_triggers = {"hi", "hello", "hey", "howdy", "sup", "how are you", "what's up", "thanks", "thank you", "cool", "nice"}
-    analytical_keywords = ["compare", "vs", "probability", "percent", "rate", "code", "architecture", "dyson", "kardashev", "refactor", "math"]
+    casual_triggers = {"hi", "hello", "hey", "howdy", "sup", "what's up", "thanks", "thank you", "cool", "nice"}
+    analytical_keywords = ["compare", "vs", "probability", "percent", "rate", "code", "architecture", "refactor", "math"]
 
     words = set(re.findall(r"\w+", lowered_input))
-    
+
     if len(lowered_input.split()) < 8 and words.intersection(casual_triggers):
         detected_style = "CASUAL"
         active_temperature = 0.85
@@ -1601,171 +1675,119 @@ if user_input and client:
         detected_style = "GENERAL"
         active_temperature = 0.7
 
-  # 7. ROUTE DISPATCHER & ASSISTANT EXECUTION
-    # 🚨 DEFINE ASSISTANT_RESPONSE HERE TO PREVENT NAMEERROR
-    assistant_response = "" 
-
+    # 7. ROUTE DISPATCHER EXECUTION
     with st.chat_message("assistant"):
+
         # --- ROUTE A: LIVE WEB SEARCH ---
         if detected_route == "ROUTE_SEARCH":
-            query = re.sub(r"^/search\s*", "", user_input, flags=re.IGNORECASE).strip()
-            
-            with st.status("🌐 Searching the web...", expanded=True) as status:
-                st.write(f"🔎 Fetching live data for: `{query}`...")
-                
-                if "perform_live_search" in globals():
-                    raw_search_data = perform_live_search(query)
-                    status.update(label="✅ Data retrieved! Synthesizing answer...", state="complete", expanded=False)
-                    
-                    synthesis_prompt = f"""
-                    You are a helpful AI. Answer the user's question using ONLY the provided search context.
-                    Format the response cleanly with bullet points, bold headers, and key stats.
-                    
-                    SEARCH CONTEXT:
-                    {raw_search_data}
-                    
-                    USER QUESTION:
-                    {query}
-                    """
-                    
-                    completion = client.chat.completions.create(
-                        model=st.session_state.get("selected_model", "llama-3.3-70b-versatile"),
-                        messages=[{"role": "user", "content": synthesis_prompt}],
-                        temperature=0.2
+            st.info("🔍 *Auto-Detected: Web Search Activated*")
+            clean_query = re.sub(r"^/search\s*", "", user_input, flags=re.IGNORECASE).strip()
+
+            if "execute_deconstructed_multi_search" in globals():
+                with st.spinner("🔍 Deconstructing query & synthesizing multi-angle search..."):
+                    raw_reply = execute_deconstructed_multi_search(clean_query, client, selected_model)
+                    final_reply = sanitize_and_repair_formatting(raw_reply)
+                    st.markdown(final_reply)
+            elif "perform_live_search" in globals():
+                with st.status("🌐 Searching the web...", expanded=True) as status:
+                    raw_search_data = perform_live_search(clean_query)
+                    status.update(label="✅ Search completed!", state="complete", expanded=False)
+
+                    synthesis_prompt = (
+                        f"Answer using ONLY the search context:\n\nCONTEXT:\n{raw_search_data}\n\nQUERY:\n{clean_query}"
                     )
-                    assistant_response = completion.choices[0].message.content
-                    st.markdown(assistant_response)
-                else:
-                    status.update(label="❌ Search tool missing", state="error", expanded=False)
-                    assistant_response = "Search tool function `perform_live_search` is not defined."
-                    st.warning(assistant_response)
-
-        # --- ROUTE B: IMAGE GENERATION ---
-        elif detected_route == "ROUTE_IMAGE_GEN":
-            image_prompt = re.sub(r"^/(image|imagine)\s*", "", user_input, flags=re.IGNORECASE).strip()
-            
-            if "generate_and_render_image" in globals():
-                assistant_response = generate_and_render_image(image_prompt)
+                    completion = client.chat.completions.create(
+                        model=selected_model,
+                        messages=[{"role": "user", "content": synthesis_prompt}],
+                        temperature=0.2,
+                    )
+                    final_reply = completion.choices[0].message.content or ""
+                    st.markdown(final_reply)
             else:
-                st.warning("⚠️ Image generation function `generate_and_render_image` is not defined.")
-                assistant_response = "Image generation tool unavailable."
+                final_reply = "⚠️ Search tool function `perform_live_search` is not defined."
+                st.warning(final_reply)
 
-        # --- ROUTE C: DEBUG TOOL ---
-        elif detected_route == "ROUTE_DEBUG":
-            st.toast("🛠️ Diagnostic trace initiated...", icon="🔍")
-            assistant_response = f"**System Debug Payload:**\n* Active Thread: `{current_thread}`\n* Detected Style: `{detected_style}`\n* Active Temperature: `{active_temperature}`"
-            st.markdown(assistant_response)
-
-        # --- ROUTE D: STANDARD LLM COMPLETION ---
-        else:
-            assistant_response = smart_model_router(
-                processed_prompt, 
-                client, 
-                st.session_state.get("selected_model", "llama-3.3-70b-versatile"),
-                conversation_history=active_chat_list  # 👈 Passes conversation memory!
-            )
-
-    # 8. Record Response to State, Update Telemetry & Rerun
-    if assistant_response:
-        active_chat_list.append({"role": "assistant", "content": assistant_response})
-        
-        # Log latency telemetry
-        elapsed_time = time.time() - start_time
-        if "telemetry" in st.session_state:
-            st.session_state.telemetry["requests"] += 1
-            st.session_state.telemetry["last_latency"] = elapsed_time
-            st.session_state.telemetry["est_tokens"] += len(user_input.split()) + len(assistant_response.split())
-
-        st.rerun()
-        
-        # ROUTE 0: Autonomous Code Debugger
-        if detected_route == "DEBUG":
-            st.info("🛠️ *Auto-Detected: Code Debugger Activated*")
-            clean_code = user_input.replace("/debug", "").strip()
-            fixed_code = run_autonomous_code_debugger(clean_code, client, selected_model)
-            reply = f"```python\n{fixed_code}\n```"
-            active_chat_list.append({"role": "assistant", "content": reply})
-
-        # ROUTE 1: High-Quality AI Image Generation
-        elif detected_route == "IMAGE":
-            clean_prompt = re.sub(r"^/(image|imagine|draw|generate)\s*", "", user_input, flags=re.IGNORECASE).strip()
+        # --- ROUTE B: AI IMAGE GENERATION ---
+        elif detected_route == "ROUTE_IMAGE_GEN":
+            clean_prompt = re.sub(
+                r"^/(image|imagine|draw|generate)\s*", "", user_input, flags=re.IGNORECASE
+            ).strip()
             if not clean_prompt:
                 clean_prompt = user_input
-                
+
             with st.spinner("🎨 Generating high-quality AI artwork..."):
                 enhanced_prompt = f"{clean_prompt}, high resolution, detailed, vivid colors"
                 encoded_prompt = urllib.parse.quote(enhanced_prompt)
-                
-                img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1, 99999)}&model=flux&enhance=true&nologo=true"
-                
-                full_response = f"🎨 **Generated Image for:** *'{clean_prompt}'*\n\n![AI Image]({img_url})"
-                
-                active_chat_list.append({
-                    "role": "assistant",
-                    "content": full_response
-                })
+                seed_val = random.randint(1, 99999)
 
-        # ROUTE 2: Deconstructed Multi-Angle Search Route
-        elif detected_route == "SEARCH":
-            st.info("🔍 *Auto-Detected: Web Search Activated*")
-            clean_query = user_input.replace("/search", "").strip()
-            with st.spinner("🔍 Deconstructing query & synthesizing multi-angle search..."):
-                reply = execute_deconstructed_multi_search(
-                    clean_query, client, selected_model
-                )
-                reply = sanitize_and_repair_formatting(reply)
-                active_chat_list.append({"role": "assistant", "content": reply})
+                img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={seed_val}&model=flux&enhance=true&nologo=true"
+                final_reply = f"🎨 **Generated Image for:** *'{clean_prompt}'*\n\n![AI Image]({img_url})"
+                st.markdown(final_reply)
 
-        # ROUTE 3: Web Scraper Route
-        elif detected_route == "READ":
-            target_url = user_input.replace("/read ", "").strip()
+        # --- ROUTE C: AUTONOMOUS AGENTIC CODE DEBUGGER ---
+        elif detected_route == "ROUTE_DEBUG":
+            st.info("🛠️ *Auto-Detected: Code Debugger Activated*")
+            clean_code = re.sub(r"^/debug\s*", "", user_input, flags=re.IGNORECASE).strip()
+
+            if "run_autonomous_code_debugger" in globals():
+                fixed_code = run_autonomous_code_debugger(clean_code, client, selected_model)
+                final_reply = f"```python\n{fixed_code}\n```"
+            else:
+                st.toast("🛠️ Diagnostic trace initiated...", icon="🔍")
+                final_reply = f"**System Debug Payload:**\n* Active Thread: `{current_thread}`\n* Style: `{detected_style}`\n* Temp: `{active_temperature}`"
+
+            st.markdown(final_reply)
+
+        # --- ROUTE D: WEB SCRAPER / PAGE READER ---
+        elif detected_route == "ROUTE_READ":
+            target_url = re.sub(r"^/read\s*", "", user_input, flags=re.IGNORECASE).strip()
+
             with st.spinner(f"🌐 Fetching content from {target_url}..."):
-                try:
-                    import requests
-                    from bs4 import BeautifulSoup
-                    
-                    res = requests.get(target_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=8)
-                    soup = BeautifulSoup(res.text, "html.parser")
-                    paragraphs = [p.get_text() for p in soup.find_all("p")]
-                    page_text = " ".join(paragraphs)[:4000]
-                    
-                    prompt_with_url = f"Analyze and summarize the following content from {target_url}:\n\n{page_text}"
-                    
-                    response = client.chat.completions.create(
-                        model=selected_model,
-                        messages=[{"role": "user", "content": prompt_with_url}],
-                        temperature=active_temperature,
-                    )
-                    reply = response.choices[0].message.content
-                    active_chat_list.append({"role": "assistant", "content": reply})
-                except Exception as e:
-                    active_chat_list.append({"role": "assistant", "content": f"Failed to fetch web page: {e}"})
+                if requests and BeautifulSoup:
+                    try:
+                        res = requests.get(target_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=8)
+                        soup = BeautifulSoup(res.text, "html.parser")
+                        paragraphs = [p.get_text() for p in soup.find_all("p")]
+                        page_text = " ".join(paragraphs)[:4000]
 
-       # ROUTE 4: Standard Chat Generation
+                        prompt_with_url = (
+                            f"Analyze and summarize the content from {target_url}:\n\n{page_text}"
+                        )
+                        response = client.chat.completions.create(
+                            model=selected_model,
+                            messages=[{"role": "user", "content": prompt_with_url}],
+                            temperature=active_temperature,
+                        )
+                        final_reply = response.choices[0].message.content or ""
+                        st.markdown(final_reply)
+                    except Exception as e:
+                        final_reply = f"Failed to fetch web page: {e}"
+                        st.error(final_reply)
+                else:
+                    final_reply = "⚠️ `requests` or `beautifulsoup4` module is missing."
+                    st.warning(final_reply)
+
+        # --- ROUTE E: STANDARD CHAT COMPLETION & VISION ---
         else:
             system_prompt = build_dynamic_system_prompt(
                 processed_prompt, personality, target_language, detected_style
             )
-
-            system_prompt += (
-                "\n\n[STRICT CONTEXT RULE]: Always maintain awareness of prior topics in the chat."
-            )
+            system_prompt += "\n\n[STRICT CONTEXT RULE]: Always maintain awareness of prior chat history."
 
             if doc_context:
                 system_prompt += f"\n\n[USER ATTACHED FILE CONTEXT]:\n{doc_context[:4000]}"
 
-            # Construct system payload
             messages_payload = [{"role": "system", "content": system_prompt}]
 
-            # Append chat history
             for m in active_chat_list[:-1]:
                 if isinstance(m.get("content"), str):
                     messages_payload.append({"role": m["role"], "content": m["content"]})
 
-            # --- BRANCH 1: IMAGE HANDLING ---
-            if image_base64:
-                prompt_text = user_input.strip() if user_input.strip() else "Describe and analyze this image in detail."
-
+            # Branch 1: Vision Ingestion
+            if image_base64 and openrouter_client:
+                prompt_text = (
+                    user_input.strip() if user_input.strip() else "Describe and analyze this image in detail."
+                )
                 vision_messages = [
                     {
                         "role": "user",
@@ -1773,42 +1795,38 @@ if user_input and client:
                             {"type": "text", "text": prompt_text},
                             {
                                 "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:{image_mime_type};base64,{image_base64}"
-                                }
-                            }
-                        ]
+                                "image_url": {"url": f"data:{image_mime_type};base64,{image_base64}"},
+                            },
+                        ],
                     }
                 ]
 
                 vision_models = [
                     "openrouter/auto",
                     "google/gemma-3-12b-it:free",
-                    "qwen/qwen-2.5-vl-72b-instruct:free"
+                    "qwen/qwen-2.5-vl-72b-instruct:free",
                 ]
 
                 success = False
-
-                if openrouter_client:
-                    with st.spinner("👁️ Analyzing image with Vision..."):
-                        for model_slug in vision_models:
-                            try:
-                                response = openrouter_client.chat.completions.create(
-                                    model=model_slug,
-                                    messages=vision_messages,
-                                    temperature=active_temperature,
-                                )
-                                final_reply = response.choices[0].message.content
-                                st.markdown(final_reply)
-                                active_chat_list.append({"role": "assistant", "content": final_reply})
-                                success = True
-                                break
-                            except Exception:
-                                continue
+                with st.spinner("👁️ Analyzing image with Vision..."):
+                    for model_slug in vision_models:
+                        try:
+                            response = openrouter_client.chat.completions.create(
+                                model=model_slug,
+                                messages=vision_messages,
+                                temperature=active_temperature,
+                            )
+                            final_reply = response.choices[0].message.content or ""
+                            st.markdown(final_reply)
+                            success = True
+                            break
+                        except Exception:
+                            continue
 
                 if not success:
-                    st.info("📷 Image attached (Vision endpoints busy). Processing query with text engine...")
-                    fallback_msg = f"[Attached Image: {uploaded_file.name}]\nUser Prompt: {prompt_text}"
+                    st.info("📷 Image attached (Vision endpoints busy). Fallback to standard text model...")
+                    file_name_str = uploaded_file.name if uploaded_file else "Attachment"
+                    fallback_msg = f"[Attached Image: {file_name_str}]\nUser Prompt: {prompt_text}"
                     messages_payload.append({"role": "user", "content": fallback_msg})
 
                     response = client.chat.completions.create(
@@ -1816,11 +1834,10 @@ if user_input and client:
                         messages=messages_payload,
                         temperature=active_temperature,
                     )
-                    final_reply = response.choices[0].message.content
+                    final_reply = response.choices[0].message.content or ""
                     st.markdown(final_reply)
-                    active_chat_list.append({"role": "assistant", "content": final_reply})
 
-            # --- BRANCH 2: STANDARD TEXT STREAMING ---
+            # Branch 2: Streaming Standard Text
             else:
                 messages_payload.append({"role": "user", "content": user_input})
 
@@ -1833,46 +1850,46 @@ if user_input and client:
 
                 def stream_generator():
                     for chunk in stream:
-                        if chunk.choices[0].delta.content:
+                        if chunk.choices and chunk.choices[0].delta.content:
                             yield chunk.choices[0].delta.content
 
                 raw_reply = st.write_stream(stream_generator)
                 final_reply = sanitize_and_repair_formatting(raw_reply)
-                active_chat_list.append({"role": "assistant", "content": final_reply})
+
+    # 8. Record Response to State Thread Buffer
+    if final_reply:
+        active_chat_list.append({"role": "assistant", "content": final_reply})
 
     # ==============================================================================
-    # TELEMETRY, SUMMARIZATION & STATE WRAP-UP (UPGRADES #55 & #60)
+    # TELEMETRY, SUMMARIZATION & STATE WRAP-UP
     # ==============================================================================
-    
-    # 1. Calculate Request Execution Time
     latency_seconds = round(time.time() - start_time, 2)
-    
-    # 2. Estimate Token Usage (Input Words + Assistant Words * 1.33)
+
     input_word_count = len(user_input.split())
-    output_word_count = len(final_reply.split()) if "final_reply" in locals() else 100
+    output_word_count = len(final_reply.split()) if final_reply else 100
     estimated_request_tokens = int((input_word_count + output_word_count) * 1.33)
 
-    # 3. Update Session Telemetry
-    if "telemetry" not in st.session_state:
+    if "telemetry" not in st.session_state or not isinstance(st.session_state.telemetry, dict):
         st.session_state.telemetry = {"requests": 0, "est_tokens": 0, "last_latency": 0.0}
 
     st.session_state.telemetry["requests"] += 1
     st.session_state.telemetry["est_tokens"] += estimated_request_tokens
     st.session_state.telemetry["last_latency"] = latency_seconds
 
-    # 4. Trigger Smart Thread Summarization (Auto-rename thread if brand new)
-    if "auto_summarize_chat_title" in globals() and client:
+    # Auto-rename dynamic thread title on initial conversation
+    if "auto_summarize_chat_title" in globals() and callable(globals()["auto_summarize_chat_title"]):
         try:
             auto_summarize_chat_title(
-                chat_history=active_chat_list, 
-                client=client, 
-                current_name=st.session_state.current_chat
+                chat_history=active_chat_list, client=client, current_name=st.session_state.current_chat
             )
         except Exception as err:
             print(f"⚠️ [SUMMARIZER WARN] Thread renaming skipped: {err}")
 
-    # 5. Persist State & Sync UI View
-    if "save_chats_to_disk" in globals():
-        save_chats_to_disk()
+    # Synchronize Disk Persistence if function exists
+    if "save_chats_to_disk" in globals() and callable(globals()["save_chats_to_disk"]):
+        try:
+            globals()["save_chats_to_disk"]()
+        except Exception as err:
+            print(f"⚠️ [DISK SYNC WARN]: {err}")
 
     st.rerun()
