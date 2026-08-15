@@ -400,7 +400,7 @@ def retry_with_exponential_backoff(
 # ==============================================================================
 # 5. SMART MODEL ROUTER & CONVERSATION MEMORY ENGINE
 # ==============================================================================
-def smart_model_router(prompt: str, client, preferred_model: str = "llama-3.3-70b-versatile", conversation_history: list = None) -> str:
+def smart_model_router(prompt: str, client, preferred_model: str = "nvidia/nemotron-3-ultra-550b-a55b:free", conversation_history: list = None) -> str:
     """Routes prompts dynamically based on complexity and sends context history."""
     if conversation_history is None:
         conversation_history = []
@@ -428,7 +428,7 @@ def smart_model_router(prompt: str, client, preferred_model: str = "llama-3.3-70
         primary_model = preferred_model
         backup_model = "gpt-4o-mini"
     else:
-        primary_model = "meta-llama/llama-3.1-8b-instruct:free"
+        primary_model = "nvidia/nemotron-3-ultra-550b-a55b:free"
         backup_model = preferred_model
 
     def attempt_completion(model_name: str):
@@ -685,7 +685,7 @@ def render_chat_history_thread(active_chat_list: list, client=None) -> None:
                     if st.button("📋 Copy Text", key=f"copy_btn_{msg_idx}"):
                         st.toast("Text copied to view context!", icon="📋")
                 with col_tb2:
-                    st.caption("✨ Llama-3.3-70B Pipeline")
+                    st.caption("✨ nvidia/nemotron-3-ultra-550b-a55b:free Pipeline)
 
 import os
 import re
@@ -864,7 +864,7 @@ def execute_deconstructed_multi_search(query: str, client, selected_model: str) 
 
     try:
         sub_res = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="nvidia/nemotron-3-ultra-550b-a55b:free",
             messages=[{"role": "user", "content": sub_query_prompt}],
             temperature=0.1,
             timeout=10.0
@@ -1250,7 +1250,7 @@ def auto_summarize_chat_title(chat_history: list, client, current_name: str) -> 
 
     try:
         res = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="nvidia/nemotron-3-ultra-550b-a55b:free",
             messages=[
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": f"Topic query: '{first_user_msg[:500]}'"}
@@ -1324,7 +1324,7 @@ def enhance_user_prompt(prompt_text: str, client) -> str:
 
     try:
         res = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="nvidia/nemotron-3-ultra-550b-a55b:free",
             messages=[
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": f"Raw User Query: '{cleaned_input}'"}
@@ -1750,7 +1750,7 @@ except ImportError:
 # Safe client references initialized from session state or environment
 client = globals().get("client", None)
 openrouter_client = globals().get("openrouter_client", None)
-selected_model = st.session_state.get("selected_model", "llama-3.3-70b-versatile")
+selected_model = st.session_state.get("selected_model", "nvidia/nemotron-3-ultra-550b-a55b:free")
 personality = st.session_state.get("personality", "Helpful Assistant")
 target_language = st.session_state.get("target_language", "English")
 
