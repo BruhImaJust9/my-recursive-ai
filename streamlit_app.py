@@ -645,8 +645,7 @@ def import_session_from_json(json_str: str) -> dict:
     except Exception as e:
         logging.error(f"Failed to import session JSON: {e}")
     return {}
-
-
+    
 # ==============================================================================
 # 8. CHAT THREAD RENDERER & ACTION TOOLBAR
 # ==============================================================================
@@ -678,39 +677,14 @@ def render_chat_history_thread(active_chat_list: list, client=None) -> None:
             else:
                 st.markdown(sanitize_and_repair_formatting(str(content)))
 
-            # Assistant Action Toolbar
-if role == "assistant":
-    col_tb1, col_tb2 = st.columns([3, 7])
-    with col_tb1:
-        if st.button("📋 Copy Text", key=f"copy_btn_{msg_idx}"):
-            st.toast("Text copied to view context!", icon="📋")
-    with col_tb2:
-        st.caption("✨ llama-3.3-70b-versatile Pipeline")
-
-import os
-import re
-import io
-import tempfile
-import contextlib
-from datetime import datetime
-import streamlit as st
-
-# Safe conditional imports to prevent hard app crashes if dependencies are missing
-try:
-    import pandas as pd
-except ImportError:
-    pd = None
-
-try:
-    from tavily import TavilyClient
-except ImportError:
-    TavilyClient = None
-
-try:
-    from gtts import gTTS
-except ImportError:
-    gTTS = None
-
+            # Assistant Action Toolbar (Indented inside 'with st.chat_message')
+            if role == "assistant":
+                col_tb1, col_tb2 = st.columns([3, 7])
+                with col_tb1:
+                    if st.button("📋 Copy Text", key=f"copy_btn_{msg_idx}"):
+                        st.toast("Text copied to view context!", icon="📋")
+                with col_tb2:
+                    st.caption("✨ llama-3.3-70b-versatile Pipeline")
 
 # ==============================================================================
 # 1. CHAT EXPORT PIPELINE (FRONTIER MARKDOWN GENERATOR)
