@@ -679,13 +679,13 @@ def render_chat_history_thread(active_chat_list: list, client=None) -> None:
                 st.markdown(sanitize_and_repair_formatting(str(content)))
 
             # Assistant Action Toolbar
-            if role == "assistant":
-                col_tb1, col_tb2 = st.columns([3, 7])
-                with col_tb1:
-                    if st.button("📋 Copy Text", key=f"copy_btn_{msg_idx}"):
-                        st.toast("Text copied to view context!", icon="📋")
-                with col_tb2:
-                    st.caption("✨ llama-3.3-70b-versatile" Pipeline),
+if role == "assistant":
+    col_tb1, col_tb2 = st.columns([3, 7])
+    with col_tb1:
+        if st.button("📋 Copy Text", key=f"copy_btn_{msg_idx}"):
+            st.toast("Text copied to view context!", icon="📋")
+    with col_tb2:
+        st.caption("✨ llama-3.3-70b-versatile Pipeline")
 
 import os
 import re
