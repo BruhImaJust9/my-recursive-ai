@@ -237,6 +237,79 @@ def extract_text_from_upload(uploaded_file, max_char_limit: int = 50000) -> str:
     except Exception as e:
         return f"⚠️ Error parsing file '{file_name}': {str(e)}"
 
+def build_reasoning_prompt(user_query: str, system_context: str = "") -> str:
+    """
+    Forces the model to execute explicit step-by-step reasoning 
+    and self-verification before producing the final response.
+    """
+    reasoning_instructions = """
+You are an expert analytical assistant. Before providing your final response, follow these strict internal reasoning steps:
+
+1. **Deconstruct**: Identify the core components, constraints, and implicit goals of the user's request.
+2. **Draft Logic**: Outline the logical steps or architectural design needed to answer thoroughly.
+3. **Self-Correction & Edge Cases**: Review your draft logic. Identify potential flaws, edge cases, missing context, or logic traps. Refine your plan.
+4. **Final Synthesis**: Provide the clear, accurate, and structured final answer.
+
+Structure your response clearly, showing your reasoning process where helpful.
+"""
+    return f"{reasoning_instructions}\n\nContext:\n{system_context}\n\nUser Query: {user_query}"
+
+def re_rank_context(query: str, retrieved_docs: list[str], top_k: int = 3) -> list[str]:
+    """
+    Ranks retrieved context chunks by exact relevance to the query.
+    (Requires `sentence_transformers` or a re-ranking API like Cohere).
+    """
+    try:
+        from sentence_transformers import CrossEncoder
+        # Load a lightweight, high-accuracy cross-encoder model
+        model = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
+        
+        # Pair query with each document snippet
+        pairs = [[query, doc] for doc in retrieved_docs]
+        scores = model.predict(pairs)
+        
+        # Sort documents by score descending
+        doc_score_pairs = sorted(zip(retrieved_docs, scores), key=lambda x: x[1], reverse=True)
+        return [doc for doc, score in doc_score_pairs[:top_k]]
+    except Exception:
+        # Fallback to returning original top_k if cross-encoder is unavailable
+        return retrieved_docs[:top_k]
+
+def solve_with_self_consistency(client, model: str, query: str, num_samples: int = 3) -> str:
+    """
+    Generates multiple reasoning paths and asks the model to evaluate 
+    and synthesize the most robust solution.
+    """
+    samples = []
+    
+    # Step 1: Generate multiple reasoning trajectories
+    for i in range(num_samples):
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "Solve this problem step-by-step. Show all work."},
+                {"role": "user", "content": query}
+            ],
+            temperature=0.6,  # Allow slight variance in solution paths
+        )
+        samples.append(response.choices[0].message.content)
+    
+    # Step 2: Synthesize the solutions into one authoritative answer
+    synthesis_prompt = f"""
+Below are {num_samples} different solutions to the same problem:
+
+{chr(10).join([f"--- Solution {idx+1} ---\n{s}" for idx, s in enumerate(samples)])}
+
+Review all solutions above. Identify any logical errors or discrepancies, extract the correct elements, and produce the single best, fully verified final solution.
+"""
+    
+    final_completion = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": synthesis_prompt}],
+        temperature=0.1,  # Low temperature for precise synthesis
+    )
+    
+    return final_completion.choices[0].message.content
 
 # ==============================================================================
 # 4. LIVE SEARCH INTEGRATION ENGINE
