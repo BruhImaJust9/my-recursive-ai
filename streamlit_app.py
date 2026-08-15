@@ -685,7 +685,7 @@ def render_chat_history_thread(active_chat_list: list, client=None) -> None:
                     if st.button("📋 Copy Text", key=f"copy_btn_{msg_idx}"):
                         st.toast("Text copied to view context!", icon="📋")
                 with col_tb2:
-                    st.caption("✨ nvidia/nemotron-3-ultra-550b-a55b:free Pipeline)
+                    st.caption("✨ nvidia/nemotron-3-ultra-550b-a55b:free Pipeline")
 
 import os
 import re
