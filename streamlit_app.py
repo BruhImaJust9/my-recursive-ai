@@ -190,6 +190,53 @@ def sanitize_and_repair_formatting(text: str) -> str:
         print(f"⚠️ [FORMATTING ERROR] Failed to clean string: {err}")
         return text
 
+import io
+import json
+import pandas as pd
+
+def extract_text_from_upload(uploaded_file, max_char_limit: int = 50000) -> str:
+    """
+    Parses uploaded files across multiple MIME types safely, returning clean plain text.
+    """
+    if uploaded_file is None:
+        return ""
+    
+    file_type = uploaded_file.type
+    file_name = uploaded_file.name.lower()
+    
+    try:
+        if file_name.endswith(".csv") or "csv" in file_type:
+            df = pd.read_csv(uploaded_file)
+            return f"--- CSV Content ({file_name}) ---\n" + df.to_markdown(index=False)
+            
+        elif file_name.endswith(".json") or "json" in file_type:
+            content = json.load(uploaded_file)
+            return f"--- JSON Content ({file_name}) ---\n" + json.dumps(content, indent=2)
+            
+        elif file_name.endswith(".txt") or file_name.endswith(".md"):
+            raw_bytes = uploaded_file.read()
+            text = raw_bytes.decode("utf-8", errors="replace")
+            return text[:max_char_limit]
+            
+        elif file_name.endswith(".pdf"):
+            # Requires pypdf
+            try:
+                from pypdf import PdfReader
+                reader = PdfReader(uploaded_file)
+                extracted_pages = [page.extract_text() for page in reader.pages if page.extract_text()]
+                full_text = "\n\n".join(extracted_pages)
+                return full_text[:max_char_limit]
+            except ImportError:
+                return "⚠️ PDF parsing requires `pypdf` package installed."
+                
+        else:
+            # General fallback decode
+            raw_bytes = uploaded_file.read()
+            return raw_bytes.decode("utf-8", errors="replace")[:max_char_limit]
+
+    except Exception as e:
+        return f"⚠️ Error parsing file '{file_name}': {str(e)}"
+
 
 # ==============================================================================
 # 4. LIVE SEARCH INTEGRATION ENGINE
@@ -239,6 +286,42 @@ def perform_live_search(query: str) -> str:
         return "Search service timed out (8s limit exceeded)."
     except Exception as e:
         return f"Search execution error: {str(e)}"
+
+import time
+import functools
+import logging
+
+def retry_with_exponential_backoff(
+    max_retries: int = 3,
+    initial_delay: float = 1.0,
+    backoff_factor: float = 2.0,
+    allowed_exceptions: tuple = (Exception,)
+):
+    """
+    Decorator for retrying unstable network calls using exponential backoff with jitter.
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            delay = initial_delay
+            for attempt in range(1, max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except allowed_exceptions as err:
+                    if attempt == max_retries:
+                        logging.error(f"Function {func.__name__} failed after {max_retries} attempts. Error: {err}")
+                        raise err
+                    
+                    sleep_time = delay + (random.uniform(0, 0.5) * delay)  # Add jitter
+                    logging.warning(f"Attempt {attempt} failed for {func.__name__}. Retrying in {sleep_time:.2f}s... Error: {err}")
+                    time.sleep(sleep_time)
+                    delay *= backoff_factor
+        return wrapper
+    return decorator
+
+# Usage Example:
+# @retry_with_exponential_backoff(max_retries=3, initial_delay=1.5)
+# def call_llm_api(messages): ...
 
 
 # ==============================================================================
@@ -312,6 +395,57 @@ def smart_model_router(prompt: str, client, preferred_model: str = "llama-3.3-70
     except Exception as stream_err:
         st.error(f"⚠️ Stream disrupted: {stream_err}")
         return full_response if full_response else "Stream rendering error."
+
+import re
+
+def sanitize_sensitive_data(text: str) -> str:
+    """
+    Scubs potential PII and secret patterns from text before sending to LLM endpoints.
+    """
+    if not isinstance(text, str) or not text.strip():
+        return text
+
+    # Redact Emails
+    text = re.sub(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', '[REDACTED_EMAIL]', text)
+    
+    # Redact IPv4 Addresses
+    text = re.sub(r'\b(?:\d{1,3}\.){3}\d{1,3}\b', '[REDACTED_IP]', text)
+    
+    # Redact API Key Patterns (e.g. sk-..., gsk_..., or standard hex/base64 patterns)
+    text = re.sub(r'\b(sk-[a-zA-Z0-9]{20,}|gsk_[a-zA-Z0-9]{20,})\b', '[REDACTED_API_KEY]', text)
+    
+    # Redact US Phone Numbers
+    text = re.sub(r'\b(?:\+?1[-. ]?)?\(?\d{3}\)?[-. ]?\d{3}[-. ]?\d{4}\b', '[REDACTED_PHONE]', text)
+
+    return text
+
+def enforce_context_window(
+    messages: list[dict], 
+    max_token_budget: int = 4090, 
+    char_per_token_ratio: float = 4.0
+) -> list[dict]:
+    """
+    Prunes older chat messages (preserving system prompt and latest prompt) 
+    to fit within defined token budgets.
+    """
+    if not messages:
+        return []
+
+    # Preserve System Message if present
+    system_msg = [m for m in messages if m.get("role") == "system"]
+    conversation_msgs = [m for m in messages if m.get("role") != "system"]
+
+    def estimate_tokens(msg_list):
+        total_chars = sum(len(str(m.get("content", ""))) for m in msg_list)
+        return int(total_chars / char_per_token_ratio)
+
+    # Prune from oldest conversation messages until within budget
+    while conversation_msgs and (estimate_tokens(system_msg + conversation_msgs) > max_token_budget):
+        if len(conversation_msgs) <= 1:
+            break  # Always keep the latest user input
+        conversation_msgs.pop(0)
+
+    return system_msg + conversation_msgs
 
 
 # ==============================================================================
@@ -409,6 +543,35 @@ def render_sidebar_telemetry_widget() -> None:
             st.session_state.telemetry = {"requests": 0, "est_tokens": 0, "last_latency": 0.0}
             st.toast("Telemetry metrics reset!", icon="🧹")
             st.rerun()
+
+import json
+from datetime import datetime
+
+def export_session_to_json(chats_dict: dict) -> str:
+    """
+    Serializes active session threads into a structured JSON string for export.
+    """
+    export_payload = {
+        "version": "1.0",
+        "exported_at": datetime.utcnow().isoformat() + "Z",
+        "threads": chats_dict
+    }
+    return json.dumps(export_payload, indent=2)
+
+
+def import_session_from_json(json_str: str) -> dict:
+    """
+    Validates and restores chat history from an imported JSON payload.
+    """
+    try:
+        data = json.loads(json_str)
+        if isinstance(data, dict) and "threads" in data and isinstance(data["threads"], dict):
+            return data["threads"]
+        elif isinstance(data, dict):
+            return data
+    except Exception as e:
+        logging.error(f"Failed to import session JSON: {e}")
+    return {}
 
 
 # ==============================================================================
