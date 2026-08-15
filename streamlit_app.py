@@ -685,7 +685,7 @@ def render_chat_history_thread(active_chat_list: list, client=None) -> None:
                     if st.button("📋 Copy Text", key=f"copy_btn_{msg_idx}"):
                         st.toast("Text copied to view context!", icon="📋")
                 with col_tb2:
-                    st.caption("✨ llama-3.3-70b-versatile" Pipeline)
+                    st.caption("✨ llama-3.3-70b-versatile" Pipeline),
 
 import os
 import re
