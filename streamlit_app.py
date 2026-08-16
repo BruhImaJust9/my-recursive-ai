@@ -1387,6 +1387,11 @@ def needs_automatic_search(user_text: str) -> bool:
 # SECTION 8: MAIN CHAT THREAD & INTERACTIVE WORKSPACE
 # ==============================================================================
 
+# Safe Fallback Variable Assignments (Prevents NameErrors if defined later in sidebar)
+selected_model_display = globals().get("selected_model", "llama-3.3-70b-versatile")
+target_language_display = globals().get("target_language", "English")
+personality_display = globals().get("personality", "Helpful Assistant")
+
 # 1. Fetch Active Chat Thread
 active_chat_list = st.session_state.chats.get(st.session_state.current_chat, [])
 
@@ -1395,7 +1400,7 @@ with col_hdr1:
     st.markdown(f"### 💬 {st.session_state.current_chat}")
 with col_hdr2:
     st.markdown(
-        f"<div style='text-align: right;'><span class='model-badge'>🤖 {selected_model}</span> <span class='model-badge'>🌐 {target_language}</span></div>",
+        f"<div style='text-align: right;'><span class='model-badge'>🤖 {selected_model_display}</span> <span class='model-badge'>🌐 {target_language_display}</span></div>",
         unsafe_allow_html=True,
     )
 
@@ -1463,8 +1468,8 @@ if prompt_input:
 
     # B. Construct Dynamic System Prompt
     system_prompt_with_rag = f"""You are a helpful assistant.
-Language: {target_language}
-Persona: {personality}
+Language: {target_language_display}
+Persona: {personality_display}
 
 Recalled Memory Context:
 {retrieved_memory if retrieved_memory else "No relevant past context found."}
@@ -1476,11 +1481,12 @@ Recalled Memory Context:
     # D. Display & Generate Assistant Response
     with st.chat_message("assistant"):
         if client:
+            model_to_use = globals().get("selected_model", "llama-3.3-70b-versatile")
             if "generate_with_reflection" in globals():
                 with st.status("Thinking and reflecting...", expanded=True) as status:
                     final_response = generate_with_reflection(
                         client=client,
-                        model=selected_model,
+                        model=model_to_use,
                         user_prompt=prompt_input,
                         system_prompt=system_prompt_with_rag
                     )
@@ -1488,7 +1494,7 @@ Recalled Memory Context:
             else:
                 # Standard Direct Completion Fallback
                 response = client.chat.completions.create(
-                    model=selected_model,
+                    model=model_to_use,
                     messages=[
                         {"role": "system", "content": system_prompt_with_rag},
                         *active_chat_list
