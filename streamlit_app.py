@@ -645,6 +645,23 @@ def import_session_from_json(json_str: str) -> dict:
     except Exception as e:
         logging.error(f"Failed to import session JSON: {e}")
     return {}
+
+def search_past_memory(user_query: str, chat_history: list, top_k: int = 2) -> str:
+    """Searches past chat messages for overlapping keywords to pull relevant context."""
+    relevant_contexts = []
+    keywords = set(user_query.lower().split())
+    
+    for msg in chat_history[:-2]:  # Exclude current turn
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            matches = sum(1 for word in keywords if word in content.lower())
+            if matches > 1:  # Threshold for relevance
+                relevant_contexts.append(content)
+                
+    if not relevant_contexts:
+        return ""
+        
+    return "\n---\n".join(relevant_contexts[-top_k:])
     
 # ==============================================================================
 # 8. CHAT THREAD RENDERER & ACTION TOOLBAR
@@ -1609,6 +1626,16 @@ with col_hdr2:
 
 st.markdown("---")
 
+# Section 7 - Injecting RAG Context
+retrieved_memory = search_past_memory(prompt, st.session_state.messages)
+
+system_prompt_with_rag = f"""You are a helpful assistant.
+Use this recalled memory from earlier in the chat if relevant:
+{retrieved_memory}
+"""
+
+# Pass 'system_prompt_with_rag' into your model completion call!
+
 # Render Message History
 for idx, msg in enumerate(active_chat_list):
     if not isinstance(msg, dict):
@@ -1885,6 +1912,23 @@ if user_input and client:
         detected_style = "GENERAL"
         active_temperature = 0.7
 
+    # Section 7 - Main Response Generation
+if prompt := st.chat_input("Ask a question..."):
+    # ... append user message to state ...
+    
+    with st.chat_message("assistant"):
+        with st.status("Thinking and reflecting...", expanded=True) as status:
+            final_response = generate_with_reflection(
+                client=client,
+                model=selected_model,
+                user_prompt=prompt,
+                system_prompt="You are a helpful assistant."
+            )
+            status.update(label="Response refined!", state="complete", expanded=False)
+            
+        st.markdown(final_response)
+
+    
     # 7. ROUTE DISPATCHER EXECUTION
     with st.chat_message("assistant"):
 
