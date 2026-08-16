@@ -1589,7 +1589,7 @@ if doc_context and isinstance(doc_context, str) and doc_context.strip():
 # ==============================================================================
 # INPUT EXECUTION PIPELINE (FRONTIER DISPATCHER)
 # ==============================================================================
-user_input = st.chat_input("Ask anything, use /search, /image, /debug, or /enhance...")
+user_input = st.chat_input("Ask anything, use /search, /image, /debug, or /enhance...", key="primary_chat_input")
 
 # Handle buffer redirects (e.g., prompt presets or voice input)
 if st.session_state.get("input_buffer") and not user_input:
@@ -1672,23 +1672,6 @@ if user_input and client:
         detected_style = "GENERAL"
         active_temperature = 0.7
 
-    # Section 7 - Main Response Generation
-if prompt := st.chat_input("Ask a question..."):
-    # ... append user message to state ...
-    
-    with st.chat_message("assistant"):
-        with st.status("Thinking and reflecting...", expanded=True) as status:
-            final_response = generate_with_reflection(
-                client=client,
-                model=selected_model,
-                user_prompt=prompt,
-                system_prompt="You are a helpful assistant."
-            )
-            status.update(label="Response refined!", state="complete", expanded=False)
-            
-        st.markdown(final_response)
-
-    
     # 7. ROUTE DISPATCHER EXECUTION
     with st.chat_message("assistant"):
 
