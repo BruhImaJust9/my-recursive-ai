@@ -1384,235 +1384,10 @@ def needs_automatic_search(user_text: str) -> bool:
 
 
 # ==============================================================================
-# UI CONFIG & WORKSPACE CONTROLS INITIALIZATION
+# SECTION 8: MAIN CHAT THREAD & INTERACTIVE WORKSPACE
 # ==============================================================================
-st.set_page_config(
-    page_title="AI Workspace",
-    page_icon="🤖",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
-# Custom Workspace CSS
-st.markdown(
-    """
-    <style>
-    iframe[title*='audio_recorder'], iframe[src*='audio_recorder'] {
-        background-color: transparent !important; 
-        border: none !important;
-    }
-    div[data-testid='stCustomComponentV1'] {
-        background-color: transparent !important; 
-        border: none !important; 
-        padding: 0 !important;
-    }
-    div[data-testid='column'] button {
-        border: none !important; 
-        background: transparent !important; 
-        color: #888888 !important;
-        font-size: 0.8rem !important; 
-        padding: 2px 8px !important; 
-        border-radius: 6px !important;
-    }
-    div[data-testid='column'] button:hover {
-        background-color: rgba(255, 255, 255, 0.08) !important; 
-        color: #ffffff !important;
-    }
-    .model-badge {
-        background: rgba(255, 255, 255, 0.08); 
-        padding: 4px 10px; 
-        border-radius: 12px;
-        font-size: 0.75rem; 
-        color: #aaa; 
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-# Initialize Session State Keys Defensively
-if "chats" not in st.session_state or not isinstance(st.session_state.chats, dict):
-    st.session_state.chats = {"Chat 1": []}
-
-if "current_chat" not in st.session_state or st.session_state.current_chat not in st.session_state.chats:
-    st.session_state.current_chat = list(st.session_state.chats.keys())[0]
-
-if "memory_vault" not in st.session_state or not isinstance(st.session_state.memory_vault, list):
-    st.session_state.memory_vault = []
-
-if "bookmarks" not in st.session_state or not isinstance(st.session_state.bookmarks, list):
-    st.session_state.bookmarks = []
-
-if "telemetry" not in st.session_state or not isinstance(st.session_state.telemetry, dict):
-    st.session_state.telemetry = {"requests": 0, "est_tokens": 0, "last_latency": 0.0}
-
-# Title & App Header
-st.title("🤖 Intelligent AI Workspace")
-st.caption("Enhanced with Epistemic Guardrails, Live Search & Workspace Telemetry")
-
-# API Client Initialization
-GROQ_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
-
-if GROQ_KEY and Groq is not None:
-    try:
-        client = Groq(api_key=GROQ_KEY)
-    except Exception as err:
-        client = None
-        st.error(f"⚠️ Groq client initialization failed: {err}")
-else:
-    client = None
-    st.warning("⚠️ Missing `GROQ_API_KEY` or Groq SDK package!")
-
-# Helper formatting sanitizer placeholder guard
-def sanitize_and_repair_formatting(text: str) -> str:
-    if not isinstance(text, str):
-        return str(text or "")
-    return text
-
-# ==============================================================================
-# SIDEBAR CONTROLS & WORKSPACE MANAGER
-# ==============================================================================
-with st.sidebar:
-    st.header("⚙️ Workspace Controls")
-    st.markdown("---")
-
-    # 1. Thread Management
-    st.header("💬 Chat Sessions")
-    chat_names = list(st.session_state.chats.keys())
-    
-    current_index = chat_names.index(st.session_state.current_chat) if st.session_state.current_chat in chat_names else 0
-
-    selected_chat = st.selectbox("Select Thread:", chat_names, index=current_index)
-
-    if selected_chat != st.session_state.current_chat:
-        st.session_state.current_chat = selected_chat
-        st.rerun()
-
-    if st.button("➕ New Chat Session", use_container_width=True):
-        new_chat_name = f"Chat {len(st.session_state.chats) + 1}"
-        st.session_state.chats[new_chat_name] = []
-        st.session_state.current_chat = new_chat_name
-        st.rerun()
-
-    st.markdown("---")
-
-    # 2. Model Parameters
-    target_language = st.selectbox("Response Language:", ["English", "Spanish", "French", "German", "Mandarin", "Japanese"])
-    personality = st.selectbox("AI Persona:", ["Helpful Assistant", "Code Expert", "Strict Tutor", "Executive Analyst"])
-    selected_model = st.selectbox("Model Engine:", ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"])
-
-    st.markdown("---")
-
-    # 3. Multimodal & File Ingestion
-    st.header("📄 File Attachment Context")
-    uploaded_file = st.file_uploader(
-        "Upload TXT, CSV, Code, or Image:", 
-        type=["txt", "py", "js", "md", "csv", "jpg", "png", "jpeg", "webp"]
-    )
-    
-    doc_context = ""
-    image_base64 = None 
-    image_mime_type = "image/jpeg"
-
-    if uploaded_file is not None:
-        try:
-            filename = str(uploaded_file.name).lower()
-            
-            if filename.endswith((".jpg", ".png", ".jpeg", ".webp")):
-                mime_guess, _ = mimetypes.guess_type(uploaded_file.name)
-                image_mime_type = mime_guess if mime_guess else "image/jpeg"
-
-                uploaded_file.seek(0)
-                bytes_data = uploaded_file.read()
-                image_base64 = base64.b64encode(bytes_data).decode("utf-8")
-                st.image(uploaded_file, caption="📷 Loaded into Vision Context", use_container_width=True)
-            
-            elif filename.endswith(".csv"):
-                if pd is not None:
-                    df_upload = pd.read_csv(uploaded_file)
-                    st.markdown("#### 🔍 CSV File Summary")
-                    st.write(f"**Rows:** {df_upload.shape[0]:,} | **Cols:** {df_upload.shape[1]}")
-                    st.dataframe(df_upload.head(3), use_container_width=True)
-                    
-                    doc_context = (
-                        f"CSV File Summary ({uploaded_file.name}):\n"
-                        f"Columns: {list(df_upload.columns)}\n"
-                        f"Data Head:\n{df_upload.head(10).to_csv(index=False)}"
-                    )
-                else:
-                    uploaded_file.seek(0)
-                    doc_context = uploaded_file.read().decode("utf-8", errors="replace")
-                    st.info("📄 Standard pandas package missing; loaded CSV as raw string.")
-            else:
-                uploaded_file.seek(0)
-                doc_context = uploaded_file.read().decode("utf-8", errors="replace")
-                st.success(f"📄 Loaded text context ({len(doc_context.split()):,} words)")
-
-        except Exception as e:
-            st.error(f"Error reading file: {e}")
-
-    st.markdown("---")
-
-    # 4. Memory Vault Management
-    st.header("🧠 Memory Vault Facts")
-    new_memory_fact = st.text_input("Add Persistent Fact:", key="memory_input_field")
-    
-    if st.button("Save Memory Fact", use_container_width=True) and new_memory_fact.strip():
-        st.session_state.memory_vault.append(new_memory_fact.strip())
-        st.success(f"Remembered: '{new_memory_fact.strip()}'")
-        st.rerun()
-
-    if st.session_state.memory_vault:
-        for idx, fact in enumerate(list(st.session_state.memory_vault)):
-            col_m1, col_m2 = st.columns([8, 2])
-            col_m1.caption(f"• {fact}")
-            if col_m2.button("❌", key=f"del_mem_fact_{idx}"):
-                if idx < len(st.session_state.memory_vault):
-                    st.session_state.memory_vault.pop(idx)
-                    st.rerun()
-                
-        if st.button("🧹 Clear All Memories", use_container_width=True):
-            st.session_state.memory_vault = []
-            st.rerun()
-    else:
-        st.caption("No custom memory facts saved yet.")
-
-    # 5. Thread Export Engine
-    st.markdown("---")
-    st.header("📥 Thread Export Options")
-    export_chat = st.session_state.chats.get(st.session_state.current_chat, [])
-    
-    try:
-        chat_export_json = json.dumps(export_chat, indent=2)
-        clean_chat_filename = re.sub(r'[^a-zA-Z0-9_-]', '_', str(st.session_state.current_chat)).lower()
-        
-        st.download_button(
-            label="Download Chat (.json)",
-            data=chat_export_json,
-            file_name=f"{clean_chat_filename}.json",
-            mime="application/json",
-            use_container_width=True,
-        )
-    except Exception as err:
-        st.caption("JSON Export unavailable.")
-
-    # Telemetry Dashboard
-    st.markdown("---")
-    st.header("📊 Telemetry Dashboard")
-    st.caption(f"⚡ **Requests Executed:** {st.session_state.telemetry.get('requests', 0)}")
-    st.caption(f"🔤 **Est. Tokens Processed:** {st.session_state.telemetry.get('est_tokens', 0)}")
-    st.caption(f"⏱️ **Last Latency:** {st.session_state.telemetry.get('last_latency', 0.0):.2f}s")
-
-    # Global Reset
-    st.markdown("---")
-    if st.button("🧹 Reset Workspace Cache", use_container_width=True):
-        st.session_state.chats = {"Chat 1": []}
-        st.session_state.current_chat = "Chat 1"
-        st.session_state.memory_vault = []
-        st.rerun()
-
-# Active Chat Buffer Render
+# 1. Fetch Active Chat Thread
 active_chat_list = st.session_state.chats.get(st.session_state.current_chat, [])
 
 col_hdr1, col_hdr2 = st.columns([6, 4])
@@ -1626,17 +1401,7 @@ with col_hdr2:
 
 st.markdown("---")
 
-# Section 7 - Injecting RAG Context
-retrieved_memory = search_past_memory(prompt, st.session_state.messages)
-
-system_prompt_with_rag = f"""You are a helpful assistant.
-Use this recalled memory from earlier in the chat if relevant:
-{retrieved_memory}
-"""
-
-# Pass 'system_prompt_with_rag' into your model completion call!
-
-# Render Message History
+# 2. Render Past Chat Message History
 for idx, msg in enumerate(active_chat_list):
     if not isinstance(msg, dict):
         continue
@@ -1647,7 +1412,7 @@ for idx, msg in enumerate(active_chat_list):
         st.markdown(repaired_content)
 
         if role == "assistant":
-            col_a1, col_a2, col_a3, _ = st.columns([1, 1, 1, 7])
+            col_a1, col_a2, _ = st.columns([1, 1, 8])
             if col_a1.button("📌", key=f"bm_{idx}", help="Bookmark Response"):
                 st.session_state.bookmarks.append(repaired_content)
                 st.toast("Bookmarked response!")
@@ -1658,95 +1423,84 @@ for idx, msg in enumerate(active_chat_list):
                     if audio_file:
                         st.audio(audio_file, format="audio/mp3")
 
-            if "render_data_canvas" in globals():
-                render_data_canvas(repaired_content)
+# 3. Voice Input Processing (Optional)
+if "audio_recorder" in globals() and audio_recorder is not None:
+    audio_bytes = audio_recorder(
+        text="",
+        recording_color="#e8b62c",
+        neutral_color="#6aa84f",
+        icon_size="2x",
+    )
+    if audio_bytes and client:
+        with st.spinner("🎙️ Transcribing audio input..."):
+            try:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as fp:
+                    fp.write(audio_bytes)
+                    tmp_path = fp.name
 
-            if "render_interactive_code_runner" in globals():
-                render_interactive_code_runner(repaired_content, idx)
+                with open(tmp_path, "rb") as audio_file:
+                    transcription = client.audio.transcriptions.create(
+                        model="whisper-large-v3",
+                        file=audio_file,
+                        response_format="text",
+                    )
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+                    
+                if transcription and str(transcription).strip():
+                    st.session_state.input_buffer = str(transcription).strip()
+            except Exception as e:
+                st.error(f"Voice transcription error: {e}")
 
-# Voice Audio Recorder
-col_v1, col_v2 = st.columns([1, 11])
-with col_v1:
-    if audio_recorder is not None:
-        audio_bytes = audio_recorder(
-            text="",
-            recording_color="#e8b62c",
-            neutral_color="#6aa84f",
-            icon_size="2x",
-        )
-    else:
-        audio_bytes = None
+# 4. Main Chat Input Loop (RAG + Reflection Execution)
+prompt_input = st.chat_input("Ask a question...")
 
-if audio_bytes and client:
-    with st.spinner("🎙️ Transcribing audio input..."):
-        try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as fp:
-                fp.write(audio_bytes)
-                tmp_path = fp.name
+if prompt_input:
+    # A. Search RAG memory safely using active_chat_list
+    retrieved_memory = ""
+    if "search_past_memory" in globals():
+        retrieved_memory = search_past_memory(prompt_input, active_chat_list)
 
-            with open(tmp_path, "rb") as audio_file:
-                transcription = client.audio.transcriptions.create(
-                    model="whisper-large-v3",
-                    file=audio_file,
-                    response_format="text",
+    # B. Construct Dynamic System Prompt
+    system_prompt_with_rag = f"""You are a helpful assistant.
+Language: {target_language}
+Persona: {personality}
+
+Recalled Memory Context:
+{retrieved_memory if retrieved_memory else "No relevant past context found."}
+"""
+
+    # C. Append User Message
+    active_chat_list.append({"role": "user", "content": prompt_input})
+    
+    # D. Display & Generate Assistant Response
+    with st.chat_message("assistant"):
+        if client:
+            if "generate_with_reflection" in globals():
+                with st.status("Thinking and reflecting...", expanded=True) as status:
+                    final_response = generate_with_reflection(
+                        client=client,
+                        model=selected_model,
+                        user_prompt=prompt_input,
+                        system_prompt=system_prompt_with_rag
+                    )
+                    status.update(label="Complete!", state="complete", expanded=False)
+            else:
+                # Standard Direct Completion Fallback
+                response = client.chat.completions.create(
+                    model=selected_model,
+                    messages=[
+                        {"role": "system", "content": system_prompt_with_rag},
+                        *active_chat_list
+                    ]
                 )
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-                
-            if transcription and str(transcription).strip():
-                st.session_state.input_buffer = str(transcription).strip()
-        except Exception as e:
-            st.error(f"Voice transcription error: {e}")
+                final_response = response.choices[0].message.content
 
-
-def classify_user_intent(prompt: str, client, model_name: str) -> str:
-    """Analyzes user prompt and automatically decides routing.
-    Returns: 'IMAGE', 'DEBUG', 'SEARCH', 'READ', or 'CHAT'
-    """
-    if not prompt or not isinstance(prompt, str):
-        return "CHAT"
-
-    lowered = prompt.lower().strip()
-
-    if lowered.startswith("/image") or lowered.startswith("/draw"): 
-        return "IMAGE"
-    if lowered.startswith("/debug"): 
-        return "DEBUG"
-    if lowered.startswith("/search"): 
-        return "SEARCH"
-    if lowered.startswith("/read"): 
-        return "READ"
-
-    image_triggers = ["draw", "generate an image", "picture of", "paint", "create an image"]
-    if any(trigger in lowered for trigger in image_triggers):
-        return "IMAGE"
-
-    debug_triggers = ["traceback", "syntaxerror", "fix this code", "def ", "import "]
-    if "error" in lowered and any(trig in lowered for trig in debug_triggers):
-        return "DEBUG"
-
-    if needs_automatic_search(prompt) or any(kw in lowered for kw in REALTIME_KEYWORDS):
-        return "SEARCH"
-
-    return "CHAT"
-
-import os
-import re
-import time
-import random
-import urllib.parse
-import streamlit as st
-
-# Safe conditional imports
-try:
-    import requests
-except ImportError:
-    requests = None
-
-try:
-    from bs4 import BeautifulSoup
-except ImportError:
-    BeautifulSoup = None
+            st.markdown(final_response)
+            active_chat_list.append({"role": "assistant", "content": final_response})
+            st.rerun()
+        else:
+            st.error("API client not initialized. Check your GROQ_API_KEY secret.")
 
 # Safe client references initialized from session state or environment
 client = globals().get("client", None)
