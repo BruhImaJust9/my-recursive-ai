@@ -287,6 +287,9 @@ def save_settings(settings_dict: dict) -> None:
     _atomic_json_write(SETTINGS_FILE, settings_dict)
 
 
+import streamlit as st
+
+
 # ==============================================================================
 # 3. SESSION STATE INITIALIZATION (SAFE DEFAULT HOOKS)
 # ==============================================================================
@@ -318,7 +321,7 @@ def initialize_session_state() -> None:
         "auto_search": True,
         "prompt_enhance": False,
         "system_prompt_override": "",
- }
+    }
 
     # Seed defaults only when missing
     for key, val in defaults.items():
@@ -333,19 +336,18 @@ def initialize_session_state() -> None:
         st.session_state.chats_loaded_from_disk = True
 
     # Validate current_chat pointer
-if (
-    "current_chat" not in st.session_state
-    or st.session_state.current_chat not in st.session_state.get("chats", {})
-):
-    keys = list(st.session_state.chats.keys())
-    st.session_state.current_chat = keys[0] if keys else "New Chat"
-    if st.session_state.current_chat not in st.session_state.chats:
-        st.session_state.chats[st.session_state.current_chat] = []
+    if (
+        "current_chat" not in st.session_state
+        or st.session_state.current_chat not in st.session_state.get("chats", {})
+    ):
+        keys = list(st.session_state.chats.keys())
+        st.session_state.current_chat = keys[0] if keys else "New Chat"
+        if st.session_state.current_chat not in st.session_state.chats:
+            st.session_state.chats[st.session_state.current_chat] = []
 
-# Ensure bookmarks/memory are lists
-if not isinstance(st.session_state.get("bookmarks"), list):
-    st.session_state.bookmarks = []
-
+    # Ensure bookmarks/memory are lists
+    if not isinstance(st.session_state.get("bookmarks"), list):
+        st.session_state.bookmarks = []
 
 # ==============================================================================
 # 4. CLIENT INITIALIZATION (CACHED RESOURCE LAYER)
