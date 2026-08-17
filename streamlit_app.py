@@ -1984,7 +1984,7 @@ if lowered.startswith("/memory"):
                 logging.warning("[ROUTE] Intent classification failed: %s", exc)
 
     # -------------------------------------------------------------------------
- # PROMPT ENHANCEMENT (if toggled and applicable)
+    # PROMPT ENHANCEMENT (if toggled and applicable)
     # -------------------------------------------------------------------------
     processed_prompt = user_input
     if detected_route == "ROUTE_STANDARD" and st.session_state.get("prompt_enhance", False):
@@ -1996,7 +1996,7 @@ if lowered.startswith("/memory"):
                         processed_prompt = enhanced
                         st.info(f"**Enhanced Prompt:** {processed_prompt}")
             except Exception as exc:
- logging.warning("[ENHANCE] %s", exc)
+                logging.warning("[ENHANCE] %s", exc)
 
     # -------------------------------------------------------------------------
     # STYLE & TEMPERATURE HEURISTICS
