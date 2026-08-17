@@ -1273,7 +1273,7 @@ def run_autonomous_code_debugger(code_snippet: str, client, model: str) -> str:
 
 
 def safe_exec_python(code: str):
- """
+    """
     Safer interactive Python runner for the inline code execution widget.
     Returns (success: bool, output: str, error: str).
     """
