@@ -1123,7 +1123,6 @@ def auto_summarize_chat_title(chat_history: list, client, current_name: str) -> 
             f"- Avoid disclaimers or rigid headers unless asked.\n"
             f"- Be conversational, perceptive, and helpful."
         )
-
     lines = [
         f"You are an elite AI assistant operating as a {safe_persona}.",
         "",
