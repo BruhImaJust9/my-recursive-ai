@@ -1891,8 +1891,11 @@ def handle_chat_turn(user_input: str, client, openrouter_client):
 
     active_chat_list = st.session_state.chats[current_thread]
 
+    def process_command_overrides(lowered, user_input, active_chat_list, current_thread, client):
+    """Handles slash command overrides like /clear, /export, /summarize, and /memory."""
+    
     # -------------------------------------------------------------------------
- # COMMAND OVERRIDES (stateful actions that do not generate a chat response)
+    # COMMAND OVERRIDES (stateful actions that do not generate a chat response)
     # -------------------------------------------------------------------------
     if lowered.startswith("/clear"):
         st.session_state.chats[current_thread] = []
@@ -1911,36 +1914,36 @@ def handle_chat_turn(user_input: str, client, openrouter_client):
         )
         return
 
-if lowered.startswith("/summarize"):
-    with st.chat_message("assistant"):
-        with st.spinner("Summarizing conversation..."):
-            payload = "Summarize this conversation concisely:\n\n" + str(active_chat_list)
-            try:
-                summary = client.chat.completions.create(
-                    model=st.session_state.selected_model,
-                    messages=[{"role": "user", "content": payload}],
-                    temperature=0.3,
-                    max_tokens=1024,
-                ).choices[0].message.content
-            except Exception as exc:
-                summary = f"Summarization failed: {exc}"
-        st.markdown(summary)
-    active_chat_list.append({"role": "assistant", "content": summary})
-    save_chats_to_disk()
-    st.rerun()
-    return
+    if lowered.startswith("/summarize"):
+        with st.chat_message("assistant"):
+            with st.spinner("Summarizing conversation..."):
+                payload = "Summarize this conversation concisely:\n\n" + str(active_chat_list)
+                try:
+                    summary = client.chat.completions.create(
+                        model=st.session_state.selected_model,
+                        messages=[{"role": "user", "content": payload}],
+                        temperature=0.3,
+                        max_tokens=1024,
+                    ).choices[0].message.content
+                except Exception as exc:
+                    summary = f"Summarization failed: {exc}"
+            st.markdown(summary)
+        active_chat_list.append({"role": "assistant", "content": summary})
+        save_chats_to_disk()
+        st.rerun()
+        return
 
-if lowered.startswith("/memory"):
-    recalled = search_past_memory(user_input, active_chat_list)
-    with st.chat_message("assistant"):
-        if recalled:
-            st.markdown(f"**Recalled Context:**\n\n{recalled}")
-        else:
-            st.info("No strong memory matches found in this thread.")
-    active_chat_list.append({"role": "assistant", "content": recalled or "No memory matches."})
-    save_chats_to_disk()
-    st.rerun()
-    return
+    if lowered.startswith("/memory"):
+        recalled = search_past_memory(user_input, active_chat_list)
+        with st.chat_message("assistant"):
+            if recalled:
+                st.markdown(f"**Recalled Context:**\n\n{recalled}")
+            else:
+                st.info("No strong memory matches found in this thread.")
+        active_chat_list.append({"role": "assistant", "content": recalled or "No memory matches."})
+        save_chats_to_disk()
+        st.rerun()
+        return
 
     # -------------------------------------------------------------------------
     # APPEND USER MESSAGE & DISPLAY IMMEDIATELY
