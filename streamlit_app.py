@@ -2085,35 +2085,34 @@ if lowered.startswith("/memory"):
         # ROUTE A: LIVE WEB SEARCH
         # ---------------------------------------------------------------------
         if detected_route == "ROUTE_SEARCH":
-            st.info("🔍 Auto-Detected: Web Search Activated")
-            clean_query = re.sub(r"^/search\s*", "", user_input, flags=re.IGNORECASE).strip()
+    st.info("🔍 Auto-Detected: Web Search Activated")
+    clean_query = re.sub(r"^/search\s*", "", user_input, flags=re.IGNORECASE).strip()
 
-            if "execute_deconstructed_multi_search" in globals() and client:
-                with st.spinner("Deconstructing & synthesizing multi-angle search..."):
-                    final_reply = execute_deconstructed_multi_search(
-                        clean_query, client, st.session_state.selected_model
-                    )
-                st.markdown(final_reply)
-            elif "perform_live_search" in globals():
-                with st.status("🌐 Searching the web...", expanded=True) as status:
-                    raw_search_data = perform_live_search(clean_query)
-                    status.update(label="✅ Search completed!", state="complete", expanded=False)
+    if "execute_deconstructed_multi_search" in globals() and client:
+        with st.spinner("Deconstructing & synthesizing multi-angle search..."):
+            final_reply = execute_deconstructed_multi_search(
+                clean_query, client, st.session_state.selected_model
+            )
+        st.markdown(final_reply)
+    elif "perform_live_search" in globals():
+        with st.status("🌐 Searching the web...", expanded=True) as status:
+            raw_search_data = perform_live_search(clean_query)
+            status.update(label="✅ Search completed!", state="complete", expanded=False)
 
-                synthesis_prompt = (
-                    f"Answer using ONLY the search context provided.\n\n"
-                    f"CONTEXT:\n{raw_search_data}\n\nQUERY:\n{clean_query}"
-                )
-                completion = client.chat.completions.create(
-                    model=st.session_state.selected_model,
-                    messages=[{"role": "user", "content": synthesis_prompt}],
-                    temperature=0.2,
-                )
- final_reply = completion.choices[0].message.content or ""
-                st.markdown(final_reply)
-            else:
-                final_reply = "⚠️ Search tool functions are not available."
-                st.warning(final_reply)
-
+        synthesis_prompt = (
+            f"Answer using ONLY the search context provided.\n\n"
+            f"CONTEXT:\n{raw_search_data}\n\nQUERY:\n{clean_query}"
+        )
+        completion = client.chat.completions.create(
+            model=st.session_state.selected_model,
+            messages=[{"role": "user", "content": synthesis_prompt}],
+            temperature=0.2,
+        )
+        final_reply = completion.choices[0].message.content or ""
+        st.markdown(final_reply)
+    else:
+        final_reply = "⚠️ Search tool functions are not available."
+        st.warning(final_reply)
         # ---------------------------------------------------------------------
         # ROUTE B: AI IMAGE GENERATION
         # ---------------------------------------------------------------------
