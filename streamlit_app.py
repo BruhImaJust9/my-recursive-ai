@@ -238,7 +238,9 @@ def save_chats_to_disk() -> None:
     Only persists if user is logged in.
     """
     if not st.session_state.get("is_logged_in", False):
-        return    if "chats" not in st.session_state:
+        return
+
+    if "chats" not in st.session_state:
         return
 
     clean_chats: dict = {}
