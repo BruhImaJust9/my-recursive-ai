@@ -2266,20 +2266,20 @@ if lowered.startswith("/memory"):
                         stream=True,
                     )
 
- def _stream_generator():
+                    def _stream_generator():
                         for chunk in stream:
                             if (
- chunk.choices
- and len(chunk.choices) > 0
+                                chunk.choices
+                                and len(chunk.choices) > 0
                                 and chunk.choices[0].delta
                             ):
                                 delta = chunk.choices[0].delta.content or ""
- yield delta
+                                yield delta
 
                     raw_reply = st.write_stream(_stream_generator)
                     final_reply = sanitize_and_repair_formatting(raw_reply)
 
- except Exception as exc:
+                except Exception as exc:
                     final_reply = f"⚠️ Streaming error: {exc}"
                     st.error(final_reply)
 
@@ -2344,7 +2344,7 @@ def main():
         .stChatMessage { border-radius: 12px; }
         .stChatMessage div { line-height: 1.6; }
         div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column;"] > div[data-testid="stVerticalBlock"] {
- gap: 0.5rem;
+            gap: 0.5rem;
         }
         </style>
         """,
@@ -2395,7 +2395,7 @@ def main():
     user_input = st.chat_input(
         "Ask anything, or use /search, /image, /debug, /enhance, /read, /memory, /summarize, /clear ...",
         key="primary_chat_input",
- )
+    )
 
     if user_input:
         handle_chat_turn(user_input, client, openrouter_client)
