@@ -1911,7 +1911,7 @@ def handle_chat_turn(user_input: str, client, openrouter_client):
         )
         return
 
-    if lowered.startswith("/summarize"):
+if lowered.startswith("/summarize"):
     with st.chat_message("assistant"):
         with st.spinner("Summarizing conversation..."):
             payload = "Summarize this conversation concisely:\n\n" + str(active_chat_list)
