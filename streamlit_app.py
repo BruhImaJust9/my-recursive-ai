@@ -1892,27 +1892,27 @@ def handle_chat_turn(user_input: str, client, openrouter_client):
     active_chat_list = st.session_state.chats[current_thread]
 
     def process_command_overrides(lowered, user_input, active_chat_list, current_thread, client):
-    """Handles slash command overrides like /clear, /export, /summarize, and /memory."""
-    
-    # -------------------------------------------------------------------------
-    # COMMAND OVERRIDES (stateful actions that do not generate a chat response)
-    # -------------------------------------------------------------------------
-    if lowered.startswith("/clear"):
-        st.session_state.chats[current_thread] = []
-        save_chats_to_disk()
-        st.toast("Chat thread cleared!", icon="🧹")
-        st.rerun()
-        return
+        """Handles slash command overrides like /clear, /export, /summarize, and /memory."""
+        
+        # -------------------------------------------------------------------------
+        # COMMAND OVERRIDES (stateful actions that do not generate a chat response)
+        # -------------------------------------------------------------------------
+        if lowered.startswith("/clear"):
+            st.session_state.chats[current_thread] = []
+            save_chats_to_disk()
+            st.toast("Chat thread cleared!", icon="🧹")
+            st.rerun()
+            return
 
-    if lowered.startswith("/export"):
-        md_data = export_chat_as_markdown(active_chat_list, current_thread)
-        st.download_button(
-            "📥 Download Markdown",
-            md_data,
-            file_name=f"{re.sub(r'[^a-zA-Z0-9_-]', '_', current_thread).lower()}_export.md",
-            mime="text/markdown",
-        )
-        return
+        if lowered.startswith("/export"):
+            md_data = export_chat_as_markdown(active_chat_list, current_thread)
+            st.download_button(
+                "📥 Download Markdown",
+                md_data,
+                file_name=f"{re.sub(r'[^a-zA-Z0-9_-]', '_', current_thread).lower()}_export.md",
+                mime="text/markdown",
+            )
+            return
 
     if lowered.startswith("/summarize"):
         with st.chat_message("assistant"):
