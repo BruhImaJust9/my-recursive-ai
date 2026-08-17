@@ -1466,7 +1466,7 @@ def render_file_uploader():
                 "type": doc_file.type,
                 "size": getattr(doc_file, "size", 0),
             }
- st.success(f"Loaded {doc_file.name}")
+            st.success(f"Loaded {doc_file.name}")
 
     img_file = st.file_uploader(
         "Upload Image (Vision)",
