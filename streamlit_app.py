@@ -1944,8 +1944,16 @@ def handle_chat_turn(user_input: str, client, openrouter_client):
         detected_route = "ROUTE_ENHANCE"
     else:
         if st.session_state.get("auto_search", False):
-            if needs_automatic_search(user_input):
-                detected_route = "ROUTE_SEARCH"
+            # Safely check if function exists, or implement simple keyword trigger
+            if "needs_automatic_search" in globals():
+                if needs_automatic_search(user_input):
+                    detected_route = "ROUTE_SEARCH"
+            else:
+                # Basic fallback check if helper function is missing
+                search_triggers = ["who is", "what is", "latest", "news", "weather", "today", "price"]
+                if any(trigger in lowered for trigger in search_triggers):
+                    detected_route = "ROUTE_SEARCH"
+
         if detected_route == "ROUTE_STANDARD" and client:
             try:
                 intent = classify_user_intent(user_input, client, st.session_state.selected_model)
