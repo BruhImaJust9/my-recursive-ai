@@ -330,19 +330,19 @@ def initialize_session_state() -> None:
             st.session_state.chats = disk_chats
         st.session_state.chats_loaded_from_disk = True
 
-    # Validate current_chat pointer    if (
-        "current_chat" not in st.session_state
-        or st.session_state.current_chat not in st.session_state.get("chats", {})
-    ):
-        keys = list(st.session_state.chats.keys())
-        st.session_state.current_chat = keys[0] if keys else "New Chat"
-        if st.session_state.current_chat not in st.session_state.chats:
-            st.session_state.chats[st.session_state.current_chat] = []
+    # Validate current_chat pointer
+if (
+    "current_chat" not in st.session_state
+    or st.session_state.current_chat not in st.session_state.get("chats", {})
+):
+    keys = list(st.session_state.chats.keys())
+    st.session_state.current_chat = keys[0] if keys else "New Chat"
+    if st.session_state.current_chat not in st.session_state.chats:
+        st.session_state.chats[st.session_state.current_chat] = []
 
-    # Ensure bookmarks/memory are lists    if not isinstance(st.session_state.get("bookmarks"), list):
-        st.session_state.bookmarks = []
-    if not isinstance(st.session_state.get("memory_vault"), list):
-        st.session_state.memory_vault = []
+# Ensure bookmarks/memory are lists
+if not isinstance(st.session_state.get("bookmarks"), list):
+    st.session_state.bookmarks = []
 
 
 # ==============================================================================
