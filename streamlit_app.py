@@ -678,10 +678,10 @@ def retry_with_exponential_backoff(
                     sleep_time = delay + (random.uniform(0, 0.5) * delay)
                     logging.warning(
                         "[RETRY] %s attempt %d/%d failed: %s | sleeping %.2fs",
-                        func.__name__, attempt, max_retries, err, sleep_time                    )
+                        func.__name__, attempt, max_retries, err, sleep_time
+                    )
                     time.sleep(sleep_time)
                     delay *= backoff_factor
- return None # Unreachable
         return wrapper
     return decorator
 
