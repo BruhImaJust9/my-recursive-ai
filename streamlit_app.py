@@ -1232,7 +1232,7 @@ def run_autonomous_code_debugger(code_snippet: str, client, model: str) -> str:
             with contextlib.redirect_stdout(output_buffer):
                 exec(current_code, exec_globals)
 
- st.success(f"✅ Code executed cleanly on attempt {attempt}!")
+            st.success(f"✅ Code executed cleanly on attempt {attempt}!")
             return current_code
 
         except Exception as err:
@@ -1248,7 +1248,7 @@ def run_autonomous_code_debugger(code_snippet: str, client, model: str) -> str:
                 f"```python\n{current_code}\n```\n\n"
                 f"ERROR:\n{err_msg}\n\n"
                 f"Fix the code. Return ONLY valid Python code inside standard triple-backtick markdown blocks."
- )
+            )
 
             try:
                 res = client.chat.completions.create(
