@@ -2131,7 +2131,7 @@ if lowered.startswith("/memory"):
                 encoded = urllib.parse.quote(enhanced)
                 seed_val = random.randint(1, 99999)
 
- img_url = (
+                img_url = (
                     f"https://image.pollinations.ai/prompt/{encoded}"
                     f"?width=1024&height=1024&seed={seed_val}"
                     f"&model=flux&enhance=true&nologo=true"
