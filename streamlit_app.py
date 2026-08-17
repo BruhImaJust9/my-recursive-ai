@@ -637,23 +637,23 @@ def scrape_web_page(target_url: str, max_chars: int = 6000) -> str:
         clean_url = "https://" + clean_url
 
     try:
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-    resp = requests.get(clean_url, headers=headers, timeout=12)
-    resp.raise_for_status()
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        resp = requests.get(clean_url, headers=headers, timeout=12)
+        resp.raise_for_status()
 
-    soup = BeautifulSoup(resp.text, "html.parser")
-    # Remove script/style
-    for tag in soup(["script", "style", "nav", "footer", "header"]):
-        tag.decompose()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        # Remove script/style
+        for tag in soup(["script", "style", "nav", "footer", "header"]):
+            tag.decompose()
 
-    title = soup.title.string.strip() if soup.title else "No Title"
-    paragraphs = [p.get_text(strip=True) for p in soup.find_all("p") if len(p.get_text(strip=True)) > 20]
-    body_text = " ".join(paragraphs)[:max_chars]
+        title = soup.title.string.strip() if soup.title else "No Title"
+        paragraphs = [p.get_text(strip=True) for p in soup.find_all("p") if len(p.get_text(strip=True)) > 20]
+        body_text = " ".join(paragraphs)[:max_chars]
 
-    return f"Title: {title}\nURL: {clean_url}\n\n{body_text}"
+        return f"Title: {title}\nURL: {clean_url}\n\n{body_text}"
 
-except Exception as exc:
-    return f"⚠️ Failed to scrape {clean_url}: {exc}"
+    except Exception as exc:
+        return f"⚠️ Failed to scrape {clean_url}: {exc}"
 
 # ==============================================================================
 # 7. SEARCH, IMAGE, TTS, & TOOL ENGINES
