@@ -1101,7 +1101,7 @@ def auto_summarize_chat_title(chat_history: list, client, current_name: str) -> 
         logging.warning("[SUMMARIZER] %s", exc)
 
 
-        def build_dynamic_system_prompt(
+def build_dynamic_system_prompt(
     user_input: str,
     base_personality: str,
     language: str,
