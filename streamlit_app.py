@@ -1565,14 +1565,15 @@ def render_settings_panel():
             height=80,
             key="set_sys_override",
         )
-        st.session_state.system_prompt_override = override if st.button("Reset to Defaults", use_container_width=True, key="btn_reset_settings"):
+        st.session_state.system_prompt_override = override
+
+        if st.button("Reset to Defaults", use_container_width=True, key="btn_reset_settings"):
             st.session_state.temperature = 0.7
             st.session_state.max_tokens = 4096
             st.session_state.auto_search = True
             st.session_state.prompt_enhance = False
             st.session_state.system_prompt_override = ""
- st.rerun()
-
+            st.rerun()
 
 def render_sidebar_telemetry_widget():
     """Compact telemetry card inside the sidebar."""
