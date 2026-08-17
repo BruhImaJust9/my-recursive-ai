@@ -2164,9 +2164,10 @@ if lowered.startswith("/memory"):
             target_url = re.sub(r"^/read\s*", "", user_input, flags=re.IGNORECASE).strip()
             st.info(f"🌐 Fetching content from `{target_url}`...")
 
- page_text = scrape_web_page(target_url)
+            page_text = scrape_web_page(target_url)
             if page_text.startswith("⚠️"):
-                final_reply = page_text st.error(final_reply)
+                final_reply = page_text
+                st.error(final_reply)
             else:
                 prompt_with_url = (
                     f"Analyze and summarize the content from {target_url}:\n\n{page_text}"
@@ -2177,12 +2178,11 @@ if lowered.startswith("/memory"):
                         messages=[{"role": "user", "content": prompt_with_url}],
                         temperature=active_temperature,
                     )
- final_reply = response.choices[0].message.content or ""
+                    final_reply = response.choices[0].message.content or ""
                     st.markdown(final_reply)
                 except Exception as exc:
                     final_reply = f"LLM synthesis failed after scrape: {exc}"
- st.error(final_reply)
-
+                    st.error(final_reply)
         # ---------------------------------------------------------------------
         # ROUTE E: STANDARD CHAT COMPLETION (with Vision Branch)
         # ---------------------------------------------------------------------
