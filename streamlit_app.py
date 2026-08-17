@@ -1312,28 +1312,6 @@ def safe_exec_python(code: str):
 # ==============================================================================
 # 10. SIDEBAR UI MANAGERS
 # ==============================================================================
-def render_login_gate():
-    """Renders an authentication form inside the sidebar."""
-    st.header("🔐 Authentication")
-    demo_user = st.secrets.get("DEMO_USER", "user")
-    demo_pass = st.secrets.get("DEMO_PASS", "password")
-
-    username = st.text_input("Username", key="login_user")
-    password = st.text_input("Password", type="password", key="login_pass")
-
-    col_btn, _ = st.columns([1, 2])
-    with col_btn:
-        if st.button("Login", use_container_width=True, key="login_btn"):
-            if username == demo_user and password == demo_pass:
-                st.session_state.is_logged_in = True
-                st.session_state.chats = load_saved_chats()
-                st.success("Logged in successfully!")
-                time.sleep(0.5)
-                st.rerun()
-            else:
-                st.error("Invalid credentials.")
-
-
 def render_thread_manager():
     """
     Full chat thread lifecycle manager: switch, create, rename, delete.
