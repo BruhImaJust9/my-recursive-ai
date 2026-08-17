@@ -525,7 +525,7 @@ def _estimate_message_tokens(msg: dict, char_per_token: float = 4.0) -> int:
                 total += int(len(part.get("text", "")) / char_per_token)
             elif part.get("type") == "image_url":
                 total += 1024
- return total
+        return total
     return 0
 
 
