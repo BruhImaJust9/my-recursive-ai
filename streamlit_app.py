@@ -2085,14 +2085,14 @@ if lowered.startswith("/memory"):
         # ROUTE A: LIVE WEB SEARCH
         # ---------------------------------------------------------------------
         if detected_route == "ROUTE_SEARCH":
-    st.info("🔍 Auto-Detected: Web Search Activated")
-    clean_query = re.sub(r"^/search\s*", "", user_input, flags=re.IGNORECASE).strip()
+            st.info("🔍 Auto-Detected: Web Search Activated")
+            clean_query = re.sub(r"^/search\s*", "", user_input, flags=re.IGNORECASE).strip()
 
-    if "execute_deconstructed_multi_search" in globals() and client:
-        with st.spinner("Deconstructing & synthesizing multi-angle search..."):
-            final_reply = execute_deconstructed_multi_search(
-                clean_query, client, st.session_state.selected_model
-            )
+            if "execute_deconstructed_multi_search" in globals() and client:
+                with st.spinner("Deconstructing & synthesizing multi-angle search..."):
+                    final_reply = execute_deconstructed_multi_search(
+                        clean_query, client, st.session_state.selected_model
+                    )
         st.markdown(final_reply)
     elif "perform_live_search" in globals():
         with st.status("🌐 Searching the web...", expanded=True) as status:
