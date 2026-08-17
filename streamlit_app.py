@@ -1615,14 +1615,16 @@ def render_chat_export_ui():
         current_chat_name = st.session_state.get("current_chat", "New Chat")
         chats = st.session_state.get("chats", {})
         if not isinstance(chats, dict):
-            return        active_list = chats.get(current_chat_name, [])
+            return
+
+        active_list = chats.get(current_chat_name, [])
         if not isinstance(active_list, list):
             return
 
         if active_list:
             md_data = export_chat_as_markdown(active_list, title=current_chat_name)
             clean_filename = re.sub(r"[^a-zA-Z0-9_-]", "_", str(current_chat_name)).lower()
- if not clean_filename:
+            if not clean_filename:
                 clean_filename = "chat_export"
 
             st.sidebar.download_button(
@@ -1636,7 +1638,6 @@ def render_chat_export_ui():
     except Exception as exc:
         st.sidebar.caption("⚠️ Export feature currently unavailable.")
         logging.warning("[EXPORT UI] %s", exc)
-
 
 def initialize_sidebar_ui():
     """
