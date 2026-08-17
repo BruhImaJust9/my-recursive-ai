@@ -1622,15 +1622,10 @@ def render_chat_export_ui():
 def initialize_sidebar_ui():
     """
     Aggregates all sidebar panels in the correct order.
-    Separates authenticated content from the login gate.
     """
     with st.sidebar:
         st.title("🧠 Frontier AI Workspace")
         st.markdown("---")
-
-        if not st.session_state.get("is_logged_in", False):
-            render_login_gate()
-            st.stop()
 
         render_thread_manager()
         st.markdown("---")
