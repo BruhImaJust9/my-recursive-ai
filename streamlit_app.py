@@ -1524,12 +1524,11 @@ def render_bookmarks_panel():
             for i, bm in enumerate(bms[:20]):
                 c1, c2 = st.columns([6, 1])
                 c1.markdown(f"{i+1}. {str(bm)[:100]}...")
-                    if c2.button("🗑️", key=f"del_bm_{i}"):
+                if c2.button("🗑️", key=f"del_bm_{i}"):
                     bms.pop(i)
                     st.session_state.bookmarks = bms
                     save_bookmarks()
                     st.rerun()
-
 
 def render_settings_panel():
     """Advanced generation settings and behavior toggles."""
