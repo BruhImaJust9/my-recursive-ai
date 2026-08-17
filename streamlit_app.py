@@ -923,11 +923,11 @@ def classify_user_intent(user_text: str, client, model: str) -> str:
 
 
 def generate_with_reflection(client, model: str, user_prompt: str, system_prompt: str, temperature: float = 0.7):
- """
+    """
     Three-step reflective reasoning pipeline:
-      1) Draft reasoning
-      2) Critique / error check
-      3) Final polished synthesis
+       1) Draft reasoning
+       2) Critique / error check
+       3) Final polished synthesis
     """
     if not client:
         return "❌ LLM client unavailable for reflection."
@@ -938,8 +938,7 @@ def generate_with_reflection(client, model: str, user_prompt: str, system_prompt
         messages=[
             {
                 "role": "system",
-                "content": system_prompt
- + "\nThink step-by-step and draft your reasoning internally.",
+                "content": system_prompt + "\nThink step-by-step and draft your reasoning internally.",
             },
             {"role": "user", "content": user_prompt},
         ],
@@ -964,7 +963,8 @@ def generate_with_reflection(client, model: str, user_prompt: str, system_prompt
         max_tokens=1024,
     ).choices[0].message.content
 
-    # Step 3: Final    final = client.chat.completions.create(
+    # Step 3: Final
+    final = client.chat.completions.create(
         model=model,
         messages=[
             {"role": "system", "content": system_prompt},
@@ -973,7 +973,7 @@ def generate_with_reflection(client, model: str, user_prompt: str, system_prompt
             {
                 "role": "user",
                 "content": (
- f"Critique feedback: {critique}\n\n"
+                    f"Critique feedback: {critique}\n\n"
                     "Now produce the final, polished answer incorporating improvements."
                 ),
             },
