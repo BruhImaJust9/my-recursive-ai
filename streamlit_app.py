@@ -2155,9 +2155,8 @@ if lowered.startswith("/memory"):
                 )
                 final_reply = f"```python\n{fixed_code}\n```"
             else:
- final_reply = "**System Debug Payload:**\n* Debugger module not available."
+                final_reply = "**System Debug Payload:**\n* Debugger module not available."
             st.markdown(final_reply)
-
         # ---------------------------------------------------------------------
         # ROUTE D: WEB PAGE READER / SCRAPER
         # ---------------------------------------------------------------------
