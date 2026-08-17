@@ -2024,8 +2024,7 @@ if lowered.startswith("/memory"):
 
     # Override temperature from settings regardless if not extreme style
     if detected_style not in ("CASUAL", "ANALYTICAL"):
- active_temperature = float(st.session_state.get("temperature", 0.7))
-
+        active_temperature = float(st.session_state.get("temperature", 0.7))
     # -------------------------------------------------------------------------
     # SYSTEM PROMPT CONSTRUCTION
     # -------------------------------------------------------------------------
