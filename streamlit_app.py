@@ -1101,7 +1101,7 @@ def auto_summarize_chat_title(chat_history: list, client, current_name: str) -> 
         logging.warning("[SUMMARIZER] %s", exc)
 
 
-def build_dynamic_system_prompt(
+        def build_dynamic_system_prompt(
     user_input: str,
     base_personality: str,
     language: str,
@@ -1155,7 +1155,8 @@ def build_dynamic_system_prompt(
             f"\nCRITICAL LANGUAGE DIRECTIVE: You MUST respond entirely in {safe_lang}."
         )
 
-    # Memory Retrieval    try:
+    # Memory Retrieval
+    try:
         vault = st.session_state.get("memory_vault", [])
         if isinstance(vault, list) and vault:
             user_tokens = set(re.findall(r"\w+", lowered))
