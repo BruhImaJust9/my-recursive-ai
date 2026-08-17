@@ -1774,7 +1774,8 @@ def render_chat_history_thread(active_chat_list: list):
 
     for msg_idx, msg in enumerate(active_chat_list):
         if not isinstance(msg, dict):
-            continue role = msg.get("role", "user")
+            continue
+        role = msg.get("role", "user")
         content = msg.get("content", "")
         avatar = "👤" if role == "user" else "🤖"
 
@@ -1792,7 +1793,6 @@ def render_chat_history_thread(active_chat_list: list):
 
             if role == "assistant":
                 render_message_actions(msg_idx, str(content), role)
-
 
 def render_voice_input(client):
     """
