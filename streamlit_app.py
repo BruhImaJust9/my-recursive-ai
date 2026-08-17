@@ -2209,7 +2209,7 @@ if lowered.startswith("/memory"):
                     }
                 ]
 
- # Prepend system + text history
+                # Prepend system + text history
                 history_text = [
                     {"role": m["role"], "content": str(m["content"])}
                     for m in active_chat_list[:-1]
@@ -2231,11 +2231,13 @@ if lowered.startswith("/memory"):
                             )
                             final_reply = response.choices[0].message.content or ""
                             st.markdown(final_reply)
- success = True
+                            success = True
                             break
                         except Exception:
-                            continue if not success:
- st.info("Vision endpoints busy. Falling back to text model...")
+                            continue
+
+                if not success:
+                    st.info("Vision endpoints busy. Falling back to text model...")
                     fallback_msg = (
                         f"[Attached Image]\nUser Prompt: {prompt_text}"
                     )
@@ -2245,10 +2247,10 @@ if lowered.startswith("/memory"):
                             model=st.session_state.selected_model,
                             messages=api_messages,
                             temperature=active_temperature,
- )
+                        )
                         final_reply = response.choices[0].message.content or ""
                         st.markdown(final_reply)
- except Exception as exc:
+                    except Exception as exc:
                         final_reply = f"Vision fallback failed: {exc}"
                         st.error(final_reply)
 
