@@ -1718,14 +1718,14 @@ def render_document_canvas():
             )
 
         with c2:
- st.markdown("### 📊 Document Metrics")
+            st.markdown("### 📊 Document Metrics")
             st.metric("Total Words", f"{words:,}")
             st.metric("Total Characters", f"{chars:,}")
             st.metric("Est. Read Time", f"~{est_read} min")
             if meta.get("name"):
                 st.caption(f"File: `{meta['name']}`")
 
- st.markdown("---")
+            st.markdown("---")
             if st.button("🧹 Clear Canvas", use_container_width=True, key="btn_clear_canvas"):
                 st.session_state.doc_context = ""
                 st.session_state.doc_context_meta = {}
