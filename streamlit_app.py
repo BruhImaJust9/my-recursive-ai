@@ -147,6 +147,12 @@ MEDIA_LORE_KEYWORDS = {
     "tadc", "fnaf", "anime", "manga", "season", "actor", "voice actor",
 }
 
+STABILITY_PROMPT = (
+    "Maintain consistent tone and persona across turns. "
+    "Do not contradict earlier statements unless corrected."
+)
+system_prompt += "\n" + STABILITY_PROMPT
+
 PERSONALITY_PRESETS = [
     "Helpful Assistant",
     "Principal Systems Architect",
@@ -845,6 +851,24 @@ def generate_and_render_image(prompt: str) -> str:
             status.update(label="❌ Generation failed", state="error", expanded=True)
             return f"Image generation failed: {exc}"
 
+def search_past_memory(user_query, chat_history, top_k=2):
+    query_tokens = set(re.findall(r"\w+", user_query.lower()))
+    scored = []
+
+    for msg in chat_history:
+        content = msg.get("content", "")
+        if not isinstance(content, str):
+            continue
+
+        tokens = set(re.findall(r"\w+", content.lower()))
+        score = len(query_tokens & tokens)
+
+        if score > 1:
+            scored.append((score, content))
+
+    scored.sort(reverse=True)
+    return "\n---\n".join([c for _, c in scored[:top_k]])
+
 
 def generate_tts_audio(text: str, speed_factor: float = 1.0) -> str:
     """Strips formatting syntax and converts text into spoken audio via gTTS."""
@@ -1103,105 +1127,20 @@ def auto_summarize_chat_title(chat_history: list, client, current_name: str) -> 
         logging.warning("[SUMMARIZER] %s", exc)
 
 
-def build_dynamic_system_prompt(
-    user_input: str,
-    base_personality: str,
-    language: str,
-    detected_style: str = "GENERAL",
-) -> str:
-    """
-    Constructs a high-density system prompt with domain adaptation,
-    language enforcement, and Jaccard memory retrieval.
-    """
-    lowered = str(user_input).lower() if user_input else ""
-    safe_lang = str(language) if language else "English"
-    safe_persona = str(base_personality) if base_personality else "Helpful Assistant"
+def build_dynamic_system_prompt(user_input, persona, language, style):
+    base = (
+        f"You are a highly capable AI assistant operating as a {persona}. "
+        f"Respond in {language}. "
+        "Be clear, structured, and helpful. Avoid filler."
+    )
 
-    if detected_style == "CASUAL":
-        return (
-            f"You are a warm, highly intelligent peer operating as a {safe_persona}.\n"
-            f"RULES:\n"
-            f"- Speak naturally, concisely, and directly in {safe_lang}.\n"
-            f"- Avoid disclaimers or rigid headers unless asked.\n"
-            f"- Be conversational, perceptive, and helpful."
-        )
-    lines = [
-        f"You are an elite AI assistant operating as a {safe_persona}.",
-        "",
-        "### 🧠 CORE COGNITIVE DIRECTIVES:",
-        "1. **First-Principles Reasoning:** Deconstruct complex queries into core logical elements.",
-        "2. **Zero Fluff:** Start directly with the answer without preambles like 'Sure, here is...'.",
-        "3. **Quantitative Precision:** Use concrete units, probabilities, or metrics where applicable.",
-        "4. **Production Code:** Provide clean, runnable code with explicit syntax highlighting.",
-    ]
+    if style == "CASUAL":
+        return base + "\nSpeak naturally and conversationally."
 
-    domains = {
-        ("code", "architecture", "algorithm", "python", "javascript", "refactor", "bug", "api", "database"): (
-            "\n[DOMAIN ACTIVATED: PRINCIPAL SYSTEMS ARCHITECT]\n"
-            "- Focus on modularity, edge-case safety, typed signatures, and execution efficiency."
-        ),
-        ("data", "dataframe", "pandas", "plot", "csv", "statistics", "machine learning"): (
-            "\n[DOMAIN ACTIVATED: SENIOR DATA SCIENTIST]\n"
-            "- Focus on statistical validity, data hygiene, vectorization, and clean visualizations."
-        ),
-    }
+    if style == "ANALYTICAL":
+        return base + "\nFocus on logic, precision, and step-by-step reasoning."
 
-    for keywords, adaptation in domains.items():
-        if any(kw in lowered for kw in keywords):
-            lines.append(adaptation)
-            break
-
-    if safe_lang.lower() != "english":
-        lines.append(
-            f"\nCRITICAL LANGUAGE DIRECTIVE: You MUST respond entirely in {safe_lang}."
-        )
-
-    # Memory Retrieval
-    try:
-        vault = st.session_state.get("memory_vault", [])
-        if isinstance(vault, list) and vault:
-            user_tokens = set(re.findall(r"\w+", lowered))
-            if user_tokens:
-                scored = []
-                for fact in vault:
-                    if not isinstance(fact, str):
-                        continue
-                    fact_tokens = set(re.findall(r"\w+", fact.lower()))
-                    union_len = len(user_tokens.union(fact_tokens))
-                    score = len(user_tokens.intersection(fact_tokens)) / float(
-                        union_len if union_len else 1
-                    )
-                    scored.append((score, fact))
-                scored.sort(key=lambda x: x[0], reverse=True)
-                top_memories = [m[1] for m in scored[:3] if m[0] > 0.05]
-                if top_memories:
-                    mem_block = "\n".join([f"- {m}" for m in top_memories])
-                    lines.append(
-                        f"\n[RELEVANT USER CONTEXT]:\n"
-                        f"Incorporate these relevant user facts naturally:\n{mem_block}"
-                    )
-    except Exception as exc:
-        logging.warning("[MEMORY RETRIEVAL] %s", exc)
-
-    return "\n".join(lines)
-
-
-def search_past_memory(user_query: str, chat_history: list, top_k: int = 2) -> str:
-    """Searches past chat messages for overlapping keywords to pull relevant context."""
-    relevant = []
-    keywords = set(user_query.lower().split())
-
-    for msg in chat_history[:-2]:  # Exclude current turn
-        content = msg.get("content", "")
-        if isinstance(content, str):
-            matches = sum(1 for word in keywords if word in content.lower())
-            if matches > 1:
-                relevant.append(content)
-
-    if not relevant:
-        return ""
-
-    return "\n---\n".join(relevant[-top_k:])
+    return base
 
 
 # ==============================================================================
@@ -1415,6 +1354,16 @@ def render_model_config():
         key="cfg_persona",
     )
     st.session_state.personality = persona
+
+    PERSONALITY_MODES = {
+    "Helpful Assistant": "Friendly, clear, supportive.",
+    "Principal Systems Architect": "Technical, structured, precise.",
+    "Creative Writing Coach": "Imaginative, expressive, narrative-driven.",
+    "Socratic Tutor": "Guiding questions, step-by-step discovery.",
+}
+
+    persona_desc = PERSONALITY_MODES.get(persona, "")
+system_prompt += f"\nPersona Style: {persona_desc}"
 
     lang = st.selectbox(
         "Language",
@@ -1860,6 +1809,9 @@ def handle_chat_turn(user_input: str, client, openrouter_client):
     user_input = user_input.strip()
     lowered = user_input.lower()
 
+    if st.session_state.get("doc_context"):
+    detected_route = "ROUTE_READ"
+
     current_thread = st.session_state.get("current_chat", "New Chat")
     if current_thread not in st.session_state.chats:
         st.session_state.chats[current_thread] = []
@@ -1964,6 +1916,23 @@ def handle_chat_turn(user_input: str, client, openrouter_client):
                     "READ": "ROUTE_READ",
                     "MEMORY": "ROUTE_MEMORY",
                     "SUMMARIZE": "ROUTE_SUMMARIZE",
+
+SMART_SWITCH = {
+    "image": "ROUTE_IMAGE_GEN",
+    "draw": "ROUTE_IMAGE_GEN",
+    "fix": "ROUTE_DEBUG",
+    "bug": "ROUTE_DEBUG",
+    "explain": "ROUTE_STANDARD",
+    "summarize": "ROUTE_SUMMARIZE",
+    "read": "ROUTE_READ",
+    "search": "ROUTE_SEARCH",
+}
+
+                
+for key, route in SMART_SWITCH.items():
+    if key in lowered:
+        return route
+        
                 }
                 detected_route = route_map.get(intent, "ROUTE_STANDARD")
             except Exception as exc:
