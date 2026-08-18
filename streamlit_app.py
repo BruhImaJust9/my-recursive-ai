@@ -1681,6 +1681,10 @@ def render_message_actions(msg_idx: int, content: str, role: str):
             save_bookmarks()
             st.toast("Bookmarked!", icon="📌")
 
+    if cols[4].button("🧠 Improve", key=f"act_improve_{msg_idx}"):
+    improved = enhance_user_prompt(content, client)
+    st.markdown(improved)
+
     if cols[3].button("🗑️", key=f"act_del_{msg_idx}", help="Delete Message"):
         cur = st.session_state.current_chat
         lst = st.session_state.chats.get(cur, [])
@@ -1927,6 +1931,10 @@ SMART_SWITCH = {
     "read": "ROUTE_READ",
     "search": "ROUTE_SEARCH",
 }
+
+
+if len(final_reply.split()) < 4:
+    final_reply += "\n\n(Expanded for clarity.)"
 
                 
 for key, route in SMART_SWITCH.items():
