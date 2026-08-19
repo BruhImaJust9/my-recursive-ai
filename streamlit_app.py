@@ -557,22 +557,22 @@ def chat_ui(client):
     render_chat_thread()
 
     # Input area
-    st.text_area(
-        "Your message",
-        key="input_buffer",
-        height=120,
-        placeholder="Type your message here…",
-    )
+st.text_area(
+    "Your message",
+    key="chat_input",
+    height=120,
+    placeholder="Type your message here…",
+)
 
-    cols = st.columns([2, 1])
-    with cols[0]:
-        if st.button("Send"):
-            handle_chat_turn(client)
-    with cols[1]:
-        if st.button("New Chat"):
-            new_name = f"Chat {len(st.session_state.chats) + 1}"
-            st.session_state.chats[new_name] = []
-            st.session_state.current_chat = new_name
+cols = st.columns([2, 1])
+with cols[0]:
+    if st.button("Send"):
+        handle_chat_turn(client)
+with cols[1]:
+    if st.button("New Chat"):
+        new_name = f"Chat {len(st.session_state.chats) + 1}"
+        st.session_state.chats[new_name] = []
+        st.session_state.current_chat = new_name
 
 # ==============================================================================
 # 13. TELEMETRY & SIMPLE METRICS (FOUNDATION)
