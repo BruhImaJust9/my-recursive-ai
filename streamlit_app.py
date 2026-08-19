@@ -421,7 +421,7 @@ def sidebar_controls():
         index=[PROVIDER_GROQ, PROVIDER_OPENROUTER].index(
             st.session_state.selected_provider
         ),
-        key="provider_select"
+        key="sidebar_provider_select"
     )
 
     # Model selection
@@ -432,7 +432,7 @@ def sidebar_controls():
             index=GROQ_MODELS.index(st.session_state.selected_model)
             if st.session_state.selected_model in GROQ_MODELS
             else 0,
-            key="model_select_groq"
+            key="sidebar_model_select_groq"
         )
     else:
         st.session_state.selected_model = st.sidebar.selectbox(
@@ -441,7 +441,7 @@ def sidebar_controls():
             index=OPENROUTER_MODELS.index(st.session_state.selected_model)
             if st.session_state.selected_model in OPENROUTER_MODELS
             else 0,
-            key="model_select_openrouter"
+            key="sidebar_model_select_openrouter"
         )
 
     # Personality
@@ -451,7 +451,7 @@ def sidebar_controls():
         index=PERSONALITY_PRESETS.index(st.session_state.personality)
         if st.session_state.personality in PERSONALITY_PRESETS
         else 0,
-        key="personality_select"
+        key="sidebar_personality_select"
     )
 
     # Language
@@ -463,7 +463,7 @@ def sidebar_controls():
         )
         if st.session_state.target_language in ["English", "Spanish", "French"]
         else 0,
-        key="language_select"
+        key="sidebar_language_select"
     )
 
     # Temperature
@@ -473,7 +473,7 @@ def sidebar_controls():
         1.0,
         st.session_state.temperature,
         0.05,
-        key="temperature_slider"
+        key="sidebar_temperature_slider"
     )
 
     # Max tokens
@@ -483,20 +483,20 @@ def sidebar_controls():
         4096,
         st.session_state.max_tokens,
         256,
-        key="max_tokens_slider"
+        key="sidebar_max_tokens_slider"
     )
 
     # Document upload (for simple RAG)
     uploaded = st.sidebar.file_uploader(
         "Upload a text/CSV file for context",
         type=["txt", "csv"],
-        key="doc_upload"
+        key="sidebar_doc_upload"
     )
     if uploaded is not None:
         st.session_state.doc_context = extract_text_from_upload(uploaded)
 
     # Memory vault viewer
-    with st.sidebar.expander("Memory Vault", expanded=False):
+    with st.sidebar.expander("Memory Vault", expanded=False, key="sidebar_memory_vault_expander"):
         if not st.session_state.memory_vault:
             st.write("No stored memories yet.")
         else:
@@ -504,6 +504,7 @@ def sidebar_controls():
                 ts = mem.get("timestamp", "unknown")
                 user = mem.get("user", "")
                 st.markdown(f"- **{ts}** — {user[:80]}...")
+
 
 # ==============================================================================
 # 12. CHAT UI RENDERING
